@@ -5,7 +5,7 @@
 At its core, it provides a standardized interface for heterogeneous graph representations of traffic scenes using the [PyTorch-Geometric](https://pytorch-geometric.readthedocs.io/en/latest/) framework.
 
 The package aims to serve as a flexible framework that, without putting restrictions on potential research directions, minimizes the time spent on implementing boilerplate code. Through its object-oriented design with highly flexible and extendable class interfaces, it is meant to be imported via **pip install** and utilized in a plug-and-play manner.
-
+<!--
 ---
 
 |<img src="img/sumo_sim_temporal_1.gif" width="420" height="330" />|<img src="img/DEU_Munich-1_104-step-0-to-step-400.gif" width="420" height="330"/>|
@@ -13,7 +13,7 @@ The package aims to serve as a flexible framework that, without putting restrict
 |<img src="img/CR-v0-DEU_Munich-1_19-2022-09-21-172426-step-0-to-step-20000.gif" width="420" height="330"/>|<img src="img/occupancy_predictive_training.gif" width="420" height="330"/>|
 
 
----
+--- -->
 
 ## Highlighted features
 
