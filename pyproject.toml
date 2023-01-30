@@ -1,6 +1,6 @@
 [project]
 name = "crgeo"
-version = "2023.1"
+version = "0.0.1"
 authors = [
   { name="Eivind Meyer", email="eivind.meyer@tum.de" },
 ]

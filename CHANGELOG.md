@@ -1,6 +1,6 @@
 # Changelog
 
-## [2023.1] - 2023-01-31
+## [0.0.1] - 2023-01-30
 ### Added
 - Initial version
 
