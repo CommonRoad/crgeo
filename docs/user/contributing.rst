@@ -3,23 +3,23 @@
 Contributing
 ======================
 
-Everything in here is opinionated and subject to change. Suggestions welcome!
+.. Everything in here is opinionated and subject to change. Suggestions welcome!
 
-Code formatting
---------------
+.. Code formatting
+.. --------------
 
-Testing priority
----------------
+.. Testing priority
+.. ---------------
 
-As the core components and functionalities of commonroad-geometric have become quite stable and we aim to open source the framework, we will prioritize testing in the following manner:
+.. As the core components and functionalities of commonroad-geometric have become quite stable and we aim to open source the framework, we will prioritize testing in the following manner:
 
-1.  Core framework (e.g. TrafficExtractor): Unit tests mandatory, reviewed very strictly
+.. 1.  Core framework (e.g. TrafficExtractor): Unit tests mandatory, reviewed very strictly
 
-2.  Extended framework (e.g. GeometricLearner): Unit tests recommended, reviewed
+.. 2.  Extended framework (e.g. GeometricLearner): Unit tests recommended, reviewed
 
-3.  Implementations (i.e. everything in "implementations" folders): Unit tests optional, recommended for heavily used and complex components, usually not reviewed
+.. 3.  Implementations (i.e. everything in "implementations" folders): Unit tests optional, recommended for heavily used and complex components, usually not reviewed
 
-4.  Projects (i.e. everything in the "projects" folder): Almost anything goes
+.. 4.  Projects (i.e. everything in the "projects" folder): Almost anything goes
 
 Commit Guideline
 ----------------
@@ -53,16 +53,40 @@ More specific, in descending order of importance:
 
 For examples, check the blog post or the history of the repository.
 
-Merge requests
---------------
+.. Merge requests
+.. --------------
 
-CI/CD pipeline
---------------
+.. CI/CD pipeline
+.. --------------
 
-Determinism
------------
+.. Determinism
+.. -----------
 
-*   "Reproducibility of results is a cornerstone of science"
-*   Most of the experiments run using commonroad-geometric rely on random numbers and probabilistic methods, e.g. random exploration
-*   A long term goal of this project is ensuring that 2 runs of the same experiment with the same `random seed <https://en.wikipedia.org/wiki/Random_seed>`_ produce the **exact same** results
-*   Hence you should familiarize yourself with and observe our guideline for ensuring determinism
+.. *   "Reproducibility of results is a cornerstone of science"
+.. *   Most of the experiments run using commonroad-geometric rely on random numbers and probabilistic methods, e.g. random exploration
+.. *   A long term goal of this project is ensuring that 2 runs of the same experiment with the same `random seed <https://en.wikipedia.org/wiki/Random_seed>`_ produce the **exact same** results
+.. *   Hence you should familiarize yourself with and observe our guideline for ensuring determinisme requests
+.. --------------
+
+.. CI/CD pipeline
+.. --------------
+
+.. Determinism
+.. -----------
+
+.. *   "Reproducibility of results is a cornerstone of science"
+.. *   Most of the experiments run using commonroad-geometric rely on random numbers and probabilistic methods, e.g. random exploration
+.. *   A long term goal of this project is ensuring that 2 runs of the same experiment with the same `random seed <https://en.wikipedia.org/wiki/Random_seed>`_ produce the **exact same** results
+.. *   Hence e requests
+.. --------------
+
+.. CI/CD pipeline
+.. --------------
+
+.. Determinism
+.. -----------
+
+.. *   "Reproducibility of results is a cornerstone of science"
+.. *   Most of the experiments run using commonroad-geometric rely on random numbers and probabilistic methods, e.g. random exploration
+.. *   A long term goal of this project is ensuring that 2 runs of the same experiment with the same `random seed <https://en.wikipedia.org/wiki/Random_seed>`_ produce the **exact same** results
+.. *   Hence 
