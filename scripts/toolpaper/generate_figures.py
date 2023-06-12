@@ -8,7 +8,7 @@ import argparse
 from scripts.toolpaper.figures.generate_v2v_edges_plot import generate_v2v_edges_plot
 from scripts.toolpaper.figures.generate_vtv_edges_plot import generate_vtv_edges_plot
 from scripts.toolpaper.figures.generate_lanelet_graph_conversion_plot import generate_lanelet_graph_conversion_plot
-from crgeo.common.logging import setup_logging
+from commonroad_geometric.common.logging import setup_logging
 
 
 if __name__ == '__main__':

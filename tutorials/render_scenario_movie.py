@@ -5,8 +5,8 @@ from typing import List
 from commonroad.common.file_reader import CommonRoadFileReader
 from commonroad.scenario.scenario import Scenario
 
-from crgeo.rendering.video_recording import render_scenario_movie
-from crgeo.common.io_extensions.scenario import find_scenario_files, get_scenario_num_timesteps
+from commonroad_geometric.rendering.video_recording import render_scenario_movie
+from commonroad_geometric.common.io_extensions.scenario import find_scenario_files, get_scenario_num_timesteps
 
 NUM_SCENARIOS = 4
 MIN_TIMESTEPS = 10
@@ -14,7 +14,7 @@ MIN_TIMESTEPS = 10
 MAX_TIMESTEPS = -5
 VIDEO_OUTPUT_FILE = 'tutorials/output/scenario.gif'
 INPUT_SCENARIO_MANY = 'data/osm_recordings'
-INPUT_SCENARIO_ONE = 'data/other/USA_Peach-1_1_T-1.xml'
+INPUT_SCENARIO_ONE = 'data/osm_recordings/DEU_Munich-1_114_0_time_steps_1000_V1_0.xml'
 
 if __name__ == '__main__':
     input_scenarios: List[Scenario] = []

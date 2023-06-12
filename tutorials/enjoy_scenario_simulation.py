@@ -5,25 +5,20 @@ from typing import List; sys.path.insert(0, os.getcwd())
 import argparse
 import shutil
 
-from crgeo.common.utils.seeding import set_global_seed
-from crgeo.common.logging import stdout
-from crgeo.dataset.extraction.traffic.edge_drawers.implementations import *
-from crgeo.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractor, TemporalTrafficExtractorOptions
-from crgeo.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor, TrafficExtractorOptions
-from crgeo.dataset.iteration import ScenarioIterator
-from crgeo.dataset.preprocessing.implementations import *
-from crgeo.rendering.plugins import *
-from crgeo.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
-from crgeo.rendering.types import RenderParams
-from crgeo.simulation.interfaces.static.scenario_simulation import ScenarioSimulation, ScenarioSimulationOptions
-from crgeo.simulation.interfaces.interactive.sumo_simulation import SumoSimulation, SumoSimulationOptions
+from commonroad_geometric.common.utils.seeding import set_global_seed
+from commonroad_geometric.common.logging import stdout
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import *
+from commonroad_geometric.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractor, TemporalTrafficExtractorOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor, TrafficExtractorOptions
+from commonroad_geometric.dataset.iteration import ScenarioIterator
+from commonroad_geometric.dataset.preprocessing.implementations import *
+from commonroad_geometric.rendering.plugins import *
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
+from commonroad_geometric.rendering.types import RenderParams
+from commonroad_geometric.simulation.interfaces.static.scenario_simulation import ScenarioSimulation, ScenarioSimulationOptions
+from commonroad_geometric.simulation.interfaces.interactive.sumo_simulation import SumoSimulation, SumoSimulationOptions
 
-INPUT_SCENARIO = 'data/other/'
-#INPUT_SCENARIO = 'data/t_junction_test'
-# INPUT_SCENARIO = 'data/t_junction_recorded'
-# INPUT_SCENARIO = 'data/other_recordings'
-# INPUT_SCENARIO = 'data/highway_test'
-# INPUT_SCENARIO = 'data/osm_recordings'
+INPUT_SCENARIO = 'data/osm_recordings'
 
 PREPROCESSORS = [
     #LaneletNetworkSubsetPreprocessor(radius=95.0),
@@ -38,17 +33,17 @@ FILTERS = [
     # ValidTrajectoriesFilterer()
 ]
 
-EXPORT_DIR = 'output/enjoy'
-EDGE_DRAWER = VoronoiEdgeDrawer
+EXPORT_DIR = 'outputs/enjoy'
+EDGE_DRAWER = NoEdgeDrawer
 EDGE_DISTANCE_THRESHOLD = 30.0
-EXTRACT_TEMPORAL = True
+EXTRACT_TEMPORAL = False
 TEMPORAL_TIME_STEPS = 10
 TEMPORAL_ALPHA_MULTIPLIER = 0.7
-RENDERER_SIZE = (400, 400)
+RENDERER_SIZE = (1000, 800)
 SCREENSHOT_RATE = 20
 HD_RESOLUTION_MULTIPLIER = 5.0
 VIEW_RANGE = 75.0
-FPS = 15
+FPS = 60
 TRANSPARENT_SCREENSHOTS = True
 
 
@@ -59,7 +54,8 @@ def create_renderers(args) -> dict[str, TrafficSceneRenderer]:
         camera_follow=args.camera_follow,
         view_range=VIEW_RANGE, # if args.camera_follow else None,
         fps=FPS,
-        transparent_screenshots=TRANSPARENT_SCREENSHOTS
+        transparent_screenshots=TRANSPARENT_SCREENSHOTS,
+        camera_auto_rotation=True
     )
 
     renderers: dict[str, TrafficSceneRenderer] = {}
@@ -67,7 +63,9 @@ def create_renderers(args) -> dict[str, TrafficSceneRenderer]:
         options=TrafficSceneRendererOptions(
             plugins=[
                 RenderLaneletNetworkPlugin(),
-                RenderObstaclesPlugin(),
+                RenderObstaclesPlugin(
+                    skip_ego_id=False
+                ),
             ],
             caption="CommonRoad Viewer",
             **options
@@ -100,7 +98,9 @@ def create_renderers(args) -> dict[str, TrafficSceneRenderer]:
                 plugins=[
                     RenderLaneletNetworkPlugin(),
                     RenderLaneletGraphPlugin(),
-                    RenderObstaclesPlugin(),
+                    RenderObstaclesPlugin(
+                        skip_ego_id=False
+                    ),
                     RenderVehicleToLaneletEdgesPlugin(
                         edge_arc=0.05,
                         temporal_alpha_multiplier=TEMPORAL_ALPHA_MULTIPLIER
@@ -183,6 +183,8 @@ def enjoy(args) -> None:
                 dt=args.dt
             )
         )
+
+        print(f"Enjoying {scenario_bundle.input_scenario_file}")
         
         if args.extract:
             if EXTRACT_TEMPORAL:

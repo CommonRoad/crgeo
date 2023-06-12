@@ -7,36 +7,37 @@ import warnings
 from pathlib import Path
 from typing import Dict, Optional, Sequence
 
-from crgeo.common.logging import setup_logging
-from crgeo.dataset.generation.recording import TrajectoryMetadata
-from crgeo.dataset.generation.scenario_traffic_generation import generate_traffic
-from crgeo.dataset.iteration import ScenarioIterator
-from crgeo.dataset.preprocessing.base_scenario_filterer import BaseScenarioFilterer
-from crgeo.dataset.preprocessing.base_scenario_preprocessor import T_ScenarioPreprocessorsInput
-from crgeo.dataset.preprocessing.implementations.cut_leaf_lanelets_preprocessor import CutLeafLaneletsPreprocessor
-from crgeo.dataset.preprocessing.implementations.cycle_filterer import CycleFilterer
-from crgeo.dataset.preprocessing.implementations.intersection_filterer import IntersectionFilterer
-from crgeo.dataset.preprocessing.implementations.lanelet_length_filterer import LaneletLengthFilterer
-from crgeo.dataset.preprocessing.implementations.lanelet_network_size_filterer import LaneletNetworkSizeFilterer
-from crgeo.dataset.preprocessing.implementations.lanelet_network_subset_preprocessor import LaneletNetworkSubsetPreprocessor
-from crgeo.dataset.preprocessing.implementations.longest_path_length_filterer import LongestPathLengthFilterer
-from crgeo.dataset.preprocessing.implementations.merge_lanelets_preprocessor import MergeLaneletsPreprocessor
-from crgeo.dataset.preprocessing.implementations.multilane_filterer import MultiLaneFilterer
-from crgeo.dataset.preprocessing.implementations.remove_islands_preprocessor import RemoveIslandsPreprocessor
-from crgeo.dataset.preprocessing.implementations.segment_lanelet_preprocessor import SegmentLaneletsPreprocessor
-from crgeo.rendering.traffic_scene_renderer import TrafficSceneRenderer
-from crgeo.rendering.types import RenderParams
-from crgeo.simulation.interfaces.interactive.sumo_simulation import SumoSimulationOptions
-from crgeo.simulation.interfaces.interactive.traffic_spawning.base_traffic_spawner import BaseTrafficSpawner
-from crgeo.simulation.interfaces.interactive.traffic_spawning.implementations import ConstantPopulationSpawner, ConstantRateSpawner, OrnsteinUhlenbeckSpawner
-from crgeo.simulation.interfaces.static.compressed_scenario_simulation import CompressedScenarioSimulation, CompressedSimulationOptions
-from crgeo.simulation.interfaces.static.scenario_simulation import ScenarioSimulation
+from commonroad_geometric.common.logging import setup_logging
+from commonroad_geometric.dataset.generation.recording import TrajectoryMetadata
+from commonroad_geometric.dataset.generation.scenario_traffic_generation import generate_traffic
+from commonroad_geometric.dataset.iteration import ScenarioIterator
+from commonroad_geometric.dataset.preprocessing.base_scenario_filterer import BaseScenarioFilterer
+from commonroad_geometric.dataset.preprocessing.base_scenario_preprocessor import T_ScenarioPreprocessorsInput
+from commonroad_geometric.dataset.preprocessing.implementations.cut_leaf_lanelets_preprocessor import CutLeafLaneletsPreprocessor
+from commonroad_geometric.dataset.preprocessing.implementations.cycle_filterer import CycleFilterer
+from commonroad_geometric.dataset.preprocessing.implementations.intersection_filterer import IntersectionFilterer
+from commonroad_geometric.dataset.preprocessing.implementations.lanelet_length_filterer import LaneletLengthFilterer
+from commonroad_geometric.dataset.preprocessing.implementations.lanelet_network_size_filterer import LaneletNetworkSizeFilterer
+from commonroad_geometric.dataset.preprocessing.implementations.lanelet_network_subset_preprocessor import LaneletNetworkSubsetPreprocessor
+from commonroad_geometric.dataset.preprocessing.implementations.longest_path_length_filterer import LongestPathLengthFilterer
+from commonroad_geometric.dataset.preprocessing.implementations.merge_lanelets_preprocessor import MergeLaneletsPreprocessor
+from commonroad_geometric.dataset.preprocessing.implementations.multilane_filterer import MultiLaneFilterer
+from commonroad_geometric.dataset.preprocessing.implementations.remove_islands_preprocessor import RemoveIslandsPreprocessor
+from commonroad_geometric.dataset.preprocessing.implementations.segment_lanelet_preprocessor import SegmentLaneletsPreprocessor
+from commonroad_geometric.debugging.warnings import debug_warnings
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer
+from commonroad_geometric.rendering.types import RenderParams
+from commonroad_geometric.simulation.interfaces.interactive.sumo_simulation import SumoSimulationOptions
+from commonroad_geometric.simulation.interfaces.interactive.traffic_spawning.base_traffic_spawner import BaseTrafficSpawner
+from commonroad_geometric.simulation.interfaces.interactive.traffic_spawning.implementations import ConstantPopulationSpawner, ConstantRateSpawner, OrnsteinUhlenbeckSpawner
+from commonroad_geometric.simulation.interfaces.static.compressed_scenario_simulation import CompressedScenarioSimulation, CompressedSimulationOptions
+from commonroad_geometric.simulation.interfaces.static.scenario_simulation import ScenarioSimulation
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SCENARIO_INPUT_DIRECTORY = 'data/t_junction_test'
 #DEFAULT_SCENARIO_INPUT_DIRECTORY = 'data/other'
-DEFAULT_SCENARIO_OUTPUT_DIRECTORY = 'tutorials/output/trajectories/other/scenarios'
+DEFAULT_SCENARIO_OUTPUT_DIRECTORY = 'outputs/generated_scenarios/'
 
 
 def generate_traffic_parallel(
@@ -135,7 +136,8 @@ def main(args) -> None:
     sumo_simulation_options = SumoSimulationOptions(
         presimulation_steps='auto' if args.presimulation_steps is None else args.presimulation_steps,
         traffic_spawner=traffic_spawner,
-        init_vehicle_speed=args.initial_vehicle_speed
+        init_vehicle_speed=args.initial_vehicle_speed,
+        dt=args.dt
     )
 
     preprocessors = []
@@ -208,11 +210,12 @@ if __name__ == '__main__':
     parser.add_argument("--mute-workers", action="store_true", help="mute workers output to stdout")
     parser.add_argument("--initial-recorded-timestep", type=int, default=0, help="time-step at which recording starts")
     # Specifically chosen this low as to not crash machines with only 16GB of RAM
-    parser.add_argument("--timesteps-per-run", type=int, default=200, help="how many timesteps traffic should be generated for")
+    parser.add_argument("--timesteps-per-run", type=int, default=500, help="how many timesteps traffic should be generated for")
     parser.add_argument("--min-trajectory-length", type=int, default=50, help="minimum trajectory length of recorded vehicles")
     parser.add_argument("--max-input-scenarios", type=int, help="optional upper limit on the number of scenarios to process")
     parser.add_argument("--complete-trajectory-count", type=int, default=0, help="how many complete trajectories should be recorded")
     parser.add_argument("--presimulation-steps", type=int, help="how many presimulation steps to run before recording")
+    parser.add_argument("--dt", type=float, default=0.04, help="timestep size for simulation")
     parser.add_argument("--segment-length", type=float, help="whether to segment the lanelets as a preprocessing step")
     parser.add_argument("--merge-lanelets", action="store_true", help="whether to merge the lanelets as a preprocessing step")
     parser.add_argument("--subset-radius", type=float, help="radius of random subset to be sampled")
@@ -237,6 +240,7 @@ if __name__ == '__main__':
     parser.add_argument("--min-lanelet-length", type=float, help="minimum lanelet length in resulting lanelet graph")
     parser.add_argument("--max-lanelet-length", type=float, help="minimum lanelet length in resulting lanelet graph")
     parser.add_argument("--leaf-cutoff", type=float, help="cutoff exit and entrance lanelets")
+    parser.add_argument("--no-warn", action="store_true", help="disables warnings")
     parser.add_argument("--profile", action="store_true", help="profiles code")
     parser.add_argument("--debug", action="store_true", help="activates debug logging")
     parser.add_argument("--shuffle", action="store_true", help="shuffle scenarios")
@@ -245,12 +249,16 @@ if __name__ == '__main__':
 
     def run_main() -> None:
         if args.profile:
-            from crgeo.common.debugging.profiling import profile
+            from commonroad_geometric.debugging.profiling import profile
             profile(main, kwargs=dict(args=args))
         else:
             main(args)
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        run_main()
 
+    if args.no_warn:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            run_main()
+
+    else:
+        debug_warnings(run_main)

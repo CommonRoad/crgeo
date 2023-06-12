@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from commonroad.scenario.scenario import Scenario
-from crgeo.common.logging import setup_logging
-from crgeo.common.utils.seeding import get_random_seed
-from crgeo.dataset.scraping import OpenStreetMapExtractor, OpenStreetMapCrawler
+from commonroad_geometric.common.logging import setup_logging
+from commonroad_geometric.common.utils.seeding import get_random_seed
+from commonroad_geometric.dataset.scraping import OpenStreetMapExtractor, OpenStreetMapCrawler
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ async def main() -> None:
     callback: Optional[Callable[[Scenario], None]] = None
     if args.plot:
         def callback_fn(scenario: Scenario) -> None:
-            from crgeo.plotting.plot_scenario import plot_scenario
+            from commonroad_geometric.plotting.plot_scenario import plot_scenario
             logger.info(f"Extracted scenario {scenario}")
             plot_scenario(scenario, show=True)
         callback = callback_fn

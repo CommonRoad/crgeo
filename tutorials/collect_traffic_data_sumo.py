@@ -1,15 +1,15 @@
 import sys, os; sys.path.insert(0, os.getcwd())
 
-import torch_geometric.loader
+from torch_geometric.loader import DataLoader
 
-from crgeo.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
-from crgeo.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor, TrafficExtractorOptions
-from crgeo.rendering.traffic_scene_renderer import TrafficSceneRenderer
-from crgeo.rendering.types import RenderParams
-from crgeo.rendering.video_recording import save_video_from_frames
-from crgeo.simulation.interfaces.interactive.sumo_simulation import SumoSimulation, SumoSimulationOptions
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor, TrafficExtractorOptions
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer
+from commonroad_geometric.rendering.types import RenderParams
+from commonroad_geometric.rendering.video_recording import save_video_from_frames
+from commonroad_geometric.simulation.interfaces.interactive.sumo_simulation import SumoSimulation, SumoSimulationOptions
 
-INPUT_SCENARIO = 'data/osm_crawled/DEU_Munich_1-100.xml'
+INPUT_SCENARIO = 'data/osm_recordings/DEU_Munich-1_114_0_time_steps_1000_V1_0.xml'
 # INPUT_SCENARIO = 'data/other/USA_US101-26_1_T-1.xml'
 OUTPUT_SCENARIO = 'tutorials/output/sumo_sim.gif'
 
@@ -57,7 +57,7 @@ def collect_data() -> None:
 
     save_video_from_frames(frames, OUTPUT_SCENARIO)
 
-    data_loader = torch_geometric.loader.DataLoader(
+    data_loader = DataLoader(
         samples,
         batch_size=10,
         shuffle=True

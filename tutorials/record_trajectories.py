@@ -2,15 +2,15 @@ import sys, os; sys.path.insert(0, os.getcwd())
 
 from typing import List
 
-from crgeo.simulation.interfaces.interactive.sumo_simulation import SumoSimulation, SumoSimulationOptions
-from crgeo.simulation.interfaces.static.compressed_scenario_simulation import CompressedScenarioSimulation, CompressedSimulationOptions
-from crgeo.simulation.interfaces.static.scenario_simulation import ScenarioSimulation, ScenarioSimulationOptions
-from crgeo.dataset.generation.recording import TrajectoryRecorder, TrajectoryMetadata
-from crgeo.rendering.traffic_scene_renderer import TrafficSceneRenderer
+from commonroad_geometric.simulation.interfaces.interactive.sumo_simulation import SumoSimulation, SumoSimulationOptions
+from commonroad_geometric.simulation.interfaces.static.compressed_scenario_simulation import CompressedScenarioSimulation, CompressedSimulationOptions
+from commonroad_geometric.simulation.interfaces.static.scenario_simulation import ScenarioSimulation, ScenarioSimulationOptions
+from commonroad_geometric.dataset.generation.recording import TrajectoryRecorder, TrajectoryMetadata
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer
 
 
 TRAJECTORY_COUNT = 10
-INPUT_SCENARIO = 'data/other/USA_US101-26_1_T-1.xml'
+INPUT_SCENARIO = 'data/osm_recordings/DEU_Munich-1_114_0_time_steps_1000_V1_0.xml'
 OUTPUT_DIR = 'tutorials/output/trajectories'
 
 

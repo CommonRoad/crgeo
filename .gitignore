@@ -1,11 +1,5 @@
-# input
-data/
-# output
-output/
-profiles/
-wandb/
 # .vscode
-.vscode
+.vscode/
 
 # IntelliJ IDEs
 .idea
@@ -82,7 +76,6 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
 doc/_build/
 
 # PyBuilder
@@ -152,4 +145,17 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Commit message template
+.gitmessage
+
+# commonroad-geometric
+
+data/
+output/
+outputs/
+profiles/
+wandb/
+*.log
+
 tutorials/scenarios
+commonroad_geometric/simulation/interfaces/interactive/config_files

@@ -3,18 +3,18 @@ import sys, os; sys.path.insert(0, os.getcwd())
 import argparse
 import shutil
 
-from crgeo.common.logging import stdout
-from crgeo.dataset.extraction.traffic.edge_drawers.implementations import *
-from crgeo.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor, TrafficExtractorOptions
-from crgeo.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractor, TemporalTrafficExtractorOptions
-from crgeo.dataset.iteration import ScenarioIterator
-from crgeo.dataset.preprocessing.implementations.vehicle_filter_preprocessor import VehicleFilterPreprocessor
-from crgeo.rendering.plugins.render_lanelet_network_plugin import RenderLaneletNetworkPlugin
-from crgeo.rendering.plugins.render_obstacles_plugin import RenderObstaclesPlugin, RenderObstaclesStyle
-from crgeo.rendering.plugins.render_traffic_graph_plugin import RenderTrafficGraphPlugin, RenderTrafficGraphStyle
-from crgeo.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
-from crgeo.rendering.types import RenderParams
-from crgeo.simulation.interfaces.static.scenario_simulation import ScenarioSimulation, ScenarioSimulationOptions
+from commonroad_geometric.common.logging import stdout
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import *
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor, TrafficExtractorOptions
+from commonroad_geometric.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractor, TemporalTrafficExtractorOptions
+from commonroad_geometric.dataset.iteration import ScenarioIterator
+from commonroad_geometric.dataset.preprocessing.implementations.vehicle_filter_preprocessor import VehicleFilterPreprocessor
+from commonroad_geometric.rendering.plugins.render_lanelet_network_plugin import RenderLaneletNetworkPlugin
+from commonroad_geometric.rendering.plugins.render_obstacles_plugin import RenderObstaclesPlugin, RenderObstaclesStyle
+from commonroad_geometric.rendering.plugins.render_traffic_graph_plugin import RenderTrafficGraphPlugin, RenderTrafficGraphStyle
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
+from commonroad_geometric.rendering.types import RenderParams
+from commonroad_geometric.simulation.interfaces.static.scenario_simulation import ScenarioSimulation, ScenarioSimulationOptions
 
 # INPUT_SCENARIO = 'data/other/'
 # INPUT_SCENARIO = 'data/t_junction_test'
@@ -35,7 +35,7 @@ FILTERS = [
     # ValidTrajectoriesFilterer()
 ]
 
-EXPORT_DIR = 'output/toolpaper/vtv'
+EXPORT_DIR = 'outputs/toolpaper/vtv'
 EDGE_DRAWERS = [
     # VoronoiEdgeDrawer,
     # FullyConnectedEdgeDrawer,

@@ -1,2 +1,0 @@
-class TrafficExtractionException(ValueError):
-    pass

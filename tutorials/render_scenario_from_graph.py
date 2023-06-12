@@ -6,26 +6,23 @@ from typing import Iterable
 from commonroad.common.file_reader import CommonRoadFileReader
 from commonroad.planning.planning_problem import PlanningProblemSet
 from commonroad.scenario.scenario import Scenario
-import torch_geometric.loader
+from torch_geometric.loader import DataLoader
 
-
-from crgeo.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
-from crgeo.dataset.commonroad_data import CommonRoadData
-from crgeo.dataset.commonroad_dataset import CommonRoadDataset
-from crgeo.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
-from crgeo.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions
-from crgeo.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
-from crgeo.dataset.iteration.timestep_iterator import TimeStepIterator
-from crgeo.rendering.plugins import RenderLaneletNetworkPlugin, RenderObstaclesPlugin, RenderTrafficGraphPlugin
-from crgeo.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
-from crgeo.rendering.types import RenderParams
-from crgeo.simulation.interfaces.static.scenario_simulation import ScenarioSimulationOptions
-
-from crgeo.common.debugging.profiling import profile
+from commonroad_geometric.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
+from commonroad_geometric.dataset.commonroad_data import CommonRoadData
+from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
+from commonroad_geometric.dataset.iteration.timestep_iterator import TimeStepIterator
+from commonroad_geometric.debugging.profiling import profile
+from commonroad_geometric.rendering.plugins import RenderLaneletNetworkPlugin, RenderObstaclesPlugin, RenderTrafficGraphPlugin
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
+from commonroad_geometric.rendering.types import RenderParams
+from commonroad_geometric.simulation.interfaces.static.scenario_simulation import ScenarioSimulationOptions
 
 DATASET_DIR = 'tutorials/output/render_scenario_from_graph/dataset'
-#SCENARIO_DIR = 'data/highway_test'
-SCENARIO_DIR = 'data/other'
+SCENARIO_DIR = 'data/osm_recordings'
 FIGURE_DIR = 'tutorials/output/render_scenario_from_graph/figures'
 os.makedirs(FIGURE_DIR, exist_ok=True)
 DATA_COLLECTOR_CLS = ScenarioDatasetCollector
@@ -64,7 +61,7 @@ def main() -> None:
         pre_transform_workers=NUM_WORKERS,
         max_scenarios=MAX_SCENARIOS
     )
-    loader = torch_geometric.loader.DataLoader(dataset, batch_size=1, shuffle=False)
+    loader = DataLoader(dataset, batch_size=1, shuffle=False)
     for index, batch in enumerate(loader):
         scenario, _ = CommonRoadFileReader(next(x for x in dataset.raw_paths if batch.scenario_id[0] in x)).open()
         

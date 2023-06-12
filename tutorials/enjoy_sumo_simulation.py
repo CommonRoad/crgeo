@@ -2,20 +2,17 @@ import sys, os; sys.path.insert(0, os.getcwd())
 
 import logging
 
-from crgeo.common.logging import setup_logging
-from crgeo.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
-from crgeo.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor, TrafficExtractorOptions
-from crgeo.rendering.plugins import RenderLaneletNetworkPlugin, RenderObstaclesPlugin
-from crgeo.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
-from crgeo.rendering.types import RenderParams
-from crgeo.simulation.interfaces.interactive.sumo_simulation import SumoSimulation, SumoSimulationOptions
-from crgeo.simulation.interfaces.interactive.traffic_spawning.implementations import ConstantRateSpawner
+from commonroad_geometric.common.logging import setup_logging
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor, TrafficExtractorOptions
+from commonroad_geometric.rendering.plugins import RenderLaneletNetworkPlugin, RenderObstaclesPlugin
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
+from commonroad_geometric.rendering.types import RenderParams
+from commonroad_geometric.simulation.interfaces.interactive.sumo_simulation import SumoSimulation, SumoSimulationOptions
+from commonroad_geometric.simulation.interfaces.interactive.traffic_spawning.implementations import ConstantRateSpawner
 
-PRESIMULATION_STEPS = 0 # "auto" 
-#INPUT_SCENARIO = 'data/other/USA_Peach-1_1_T-1.xml'
-#INPUT_SCENARIO = 'data/t_junction_test/ZAM_Tjunction-1_4_T-1.xml'
-#INPUT_SCENARIO = 'data/osm_crawled/DEU_Berlin_2-2341.xml'
-INPUT_SCENARIO = 'data/other/FRA_Miramas-4_8_T-1.xml'
+PRESIMULATION_STEPS = 0 # "auto"
+INPUT_SCENARIO = 'data/osm_recordings//DEU_Munich-1_114_0_time_steps_1000_V1_0.xml'
 TIME_STEPS = 500
 
 
