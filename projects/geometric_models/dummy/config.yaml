@@ -1,0 +1,26 @@
+defaults:
+  - base_geometric_config
+  - _self_
+
+project_dir: ./projects/output/geometric/dummy
+seed: 42
+no_wandb: True
+warmstart: False
+device: auto
+profile: True
+
+training: 
+  batch_size: 8
+
+dataset: 
+  train_scenario_dir: &scenario_dir ./data/highd-sample/
+  test_scenario_dir: *scenario_dir
+  val_scenario_dir: *scenario_dir
+  max_samples_per_scenario: 100
+  max_scenarios: 1
+  pre_transform_workers: 1
+
+model: {}
+
+experiment: 
+  dist_threshold_v2v: 50.0

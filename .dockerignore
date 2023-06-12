@@ -1,0 +1,10 @@
+/img
+data/
+output/
+outputs/
+profiles/
+wandb/
+*.log
+
+tutorials/scenarios
+commonroad_geometric/simulation/interfaces/interactive/config_files

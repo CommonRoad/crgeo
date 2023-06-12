@@ -1,0 +1,186 @@
+defaults:
+  - base_geometric_config
+  - _self_
+
+project_dir: ./projects/output/geometric/trajectory_prediction
+seed: 0
+no_wandb: False
+warmstart: False
+device: auto
+logging_level: info
+disable_postprocessing_inference: True
+profile: True
+
+dataset: 
+  train_scenario_dir: &scenario_dir ./projects/output/geometric/trajectory_prediction/generated_dataset #./data/osm_recordings/
+  test_scenario_dir: *scenario_dir # TODO
+  #val_scenario_dir: ./data/osm_recordings/
+  val_scenario_dir: ./data/t_junction_recorded/
+  # val_scenario_dir: *scenario_dir
+  overwrite: True
+  pre_transform_workers: &num_workers 1
+  cache_data: False
+  max_samples_per_scenario: &max_samples_per_scenario 100
+  max_scenarios: &max_scenarios 5
+
+experiment: 
+  edge_range: 42.0
+  add_temporal_vehicle_edges: True
+  enable_feature_normalization: True
+  enable_waypoint_resampling: True
+  feature_normalization_max_fit_samples: 1000
+  feature_normalization_params_path: ${project_dir}/dataset/normalization_params.pt
+  lanelet_fill_offset: 0.4
+  lanelet_fill_resolution: 10
+  lanelet_waypoint_density: 10
+  remove_ego: False
+  render_collection: False
+
+  temporal:
+    enabled: True
+    # see sumo_simulation.max_samples
+    collect_time_steps: 20
+    # set collect_skip_time_steps to collect_time_steps - 1 for non-overlapping intervals
+    collect_skip_time_steps: 19
+    max_steps_temporal_edge: unlimited
+
+  dataset_generation:
+    input_directory: ./data/osm_crawled/
+    output_directory: *scenario_dir
+    num_workers: *num_workers
+    time_steps_per_run: *max_samples_per_scenario
+    overwrite: True
+    max_scenarios: *max_scenarios
+    sumo_simulation:
+        delta_time: &delta_time 0.2
+        presimulation_steps: auto
+        p_wants_lane_change: 0.8
+        p_spawn: 0.02
+
+  pre_transform:
+    lanelet_max_segment_length: 20.0
+    lanelet_sampling_weights_num_bins: 0.1
+
+model:
+  graph_features:
+    lanelet: &lanelet_features 2
+    lanelet_to_lanelet: &lanelet_to_lanelet_features 6
+    vehicle: 11
+    vehicle_to_vehicle: 9
+    lanelet_to_vehicle: 0
+    vehicle_to_lanelet: 3
+    vehicle_temporal_vehicle: 0 #8
+
+  lanelet_network_encoder: &lanelet_network_encoder_model
+    # Lanelet node features
+    lanelet_features: *lanelet_features
+    node_feature_size: &lanelet_node_feature_size 256
+    node_feature_mlp_layers: 2
+
+    # vertex_feature_encoder: LSTM
+    vertex_feature_encoder: GRU
+    # vertex_feature_encoder: DeepSet
+
+    # RNN to encode lanelet vertices
+    rnn_hidden_size: 64
+
+    # Invariant deep set model to encode lanelet vertices
+    deep_set_mlp_dropout: 0.1
+    deep_set_aggregation: sum
+
+    # Lanelet edge features
+    lanelet_to_lanelet_features: *lanelet_to_lanelet_features
+    edge_feature_size: &lanelet_edge_feature_size 32
+    node_type_embedding_dim: 10
+
+    # reweight_loss: false
+    # reweight_loss: 0.5
+
+  traffic: &traffic_model
+    # Drivable area prediction
+    temporal:
+      enabled: true
+      steps_observe: 15
+      steps_predict: 5
+      max_time_steps_temporal_edge: unlimited
+
+    lanelet_node_feature_size: *lanelet_node_feature_size
+    vehicle_node_feature_size: *lanelet_node_feature_size
+    temporal_time_to_vec_encoding_size: 16
+
+    # GNN
+    gnn_conv_layers: 8
+    gnn_global_context: false
+    gnn_global_context_size: 128
+    attention_channels: 128
+    gnn_attention_heads: 16
+    gnn_neighbor_aggregation: max
+    gnn_aggregation: max
+
+  trajectory_prediction:
+    # [s]
+    delta_time: *delta_time
+
+    kst_vehicle_constraints:  # kinematic single track model vehicle constraints
+      # from Table 1, vehicle identifier 2 https://gitlab.lrz.de/tum-cps/commonroad-vehicle-models/-/raw/master/vehicleModels_commonRoad.pdf
+      steering_angle_bound: 1.066
+      velocity_min: -13.6
+      velocity_max: 50.8
+      acceleration_max: 11.5
+      # negative acceleration (breaking) is not specified in vehicle models paper
+      acceleration_min: -11.5
+
+    rpo_vehicle_constraint:  # relative position and orientation vehicle constraints
+      max_orientation_delta: 1.066
+      max_velocity: 50.8
+
+    teacher_forcing_rate: 0.3
+    # decoder_type: GRU
+    # decoder_type: Transformer
+    decoder_type: GRU
+
+    rnn:
+      hidden_size: 512
+      time2vec_dim: 16
+
+    transformer:
+      num_layers: 4
+      model_size: 256
+      feedforward_size: 1024
+      attention_heads: 4
+      dropout: 0.1
+
+    cvae:
+      latent_dims: 16
+      hybrid_loss_alpha: 0.75
+
+training: 
+  backward_freq: 1
+  batch_size: 1
+  checkpoint_frequency: 50
+  early_stopping: 
+  enable_multi_gpu: False
+  enable_rendering: True
+  render_subprocess: True
+  gradient_clipping_threshold: 1.0
+  log_freq: 2000
+  max_epochs: 10000
+  max_optimize_samples: 1
+  overfit: True
+  shuffle: False
+  swallow_errors: False
+  test_freq: 1
+  test_split: 256
+  validate_inner: False
+  validation_freq:  1
+  validation_split:  1
+  verbose: 1
+  video_freq: 1000
+  video_length: 400
+  video_record_backoff: 1.5
+  lr_scheduler_cls: CosineAnnealingWarmRestarts
+  lr_scheduler_kwargs:
+    T_0: 80
+    T_mult: 1
+    eta_min: 0.0001
+
