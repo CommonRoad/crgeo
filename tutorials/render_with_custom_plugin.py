@@ -4,18 +4,18 @@ from typing import List
 
 import numpy as np
 
-from crgeo.common.caching.cached_rng import CachedRNG
-from crgeo.common.io_extensions.obstacle import state_at_time
-from crgeo.common.logging import stdout
-from crgeo.dataset.iteration import TimeStepIterator
-from crgeo.rendering.base_renderer_plugin import BaseRendererPlugin
-from crgeo.rendering.plugins import *
-from crgeo.rendering.traffic_scene_renderer import T_Frame, TrafficSceneRenderer, TrafficSceneRendererOptions
-from crgeo.rendering.types import RenderParams
-from crgeo.rendering.video_recording import save_video_from_frames
-from crgeo.rendering.viewer.viewer_2d import Viewer2D
+from commonroad_geometric.common.caching.cached_rng import CachedRNG
+from commonroad_geometric.common.io_extensions.obstacle import state_at_time
+from commonroad_geometric.common.logging import stdout
+from commonroad_geometric.dataset.iteration import TimeStepIterator
+from commonroad_geometric.rendering.base_renderer_plugin import BaseRendererPlugin
+from commonroad_geometric.rendering.plugins import *
+from commonroad_geometric.rendering.traffic_scene_renderer import T_Frame, TrafficSceneRenderer, TrafficSceneRendererOptions
+from commonroad_geometric.rendering.types import RenderParams
+from commonroad_geometric.rendering.video_recording import save_video_from_frames
+from commonroad_geometric.rendering.viewer.viewer_2d import Viewer2D
 
-INPUT_SCENARIO = 'data/other/ARG_Carcarana-1_7_T-1.xml'
+INPUT_SCENARIO = 'data/osm_recordings/DEU_Munich-1_114_0_time_steps_1000_V1_0.xml'
 MAX_TIMESTEPS = 300
 VIDEO_OUTPUT_FILE = 'tutorials/output/custom_rendering/video.gif'
 
@@ -27,11 +27,8 @@ class MyCustomRenderObstaclesPlugin(BaseRendererPlugin):  # noqa: 405
     def __call__(self, viewer: Viewer2D, params: RenderParams) -> None:  # noqa: 405
         assert params.time_step is not None
         assert params.scenario is not None
-        for obstacle in params.scenario.dynamic_obstacles:
+        for obstacle in params.simulation.current_obstacles:
             state = state_at_time(obstacle, params.time_step)
-            if state is None:
-                # Obstacle not present at this time-step
-                continue
             vertices = obstacle.obstacle_shape.vertices # type: ignore
             obstacle_color = self._rng_cache(obstacle.obstacle_id, n=3) + (1.0,)
             viewer.draw_shape(

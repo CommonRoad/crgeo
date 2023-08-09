@@ -1,0 +1,20 @@
+name: crgeo-3.10-cpu
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10.*
+  - pip=23.1 # We need to install pip in the environment through conda before we can run pip commands
+  # This will be installed with pip
+  - pip:
+    - --extra-index-url https://download.pytorch.org/whl/cpu
+    - torch==2.0.1
+    - torch_geometric==2.3.1
+
+    # Install commonroad-geometric[tests] in editable mode
+    # This will install all dependencies listed under "install_requires" in setup.cfg
+    # The [tests] option will install additional dependencies required for running tests
+    - -e .[tests]
+variables:
+  # Set SUMO_HOME according to https://sumo.dlr.de/docs/Installing/index.html
+  SUMO_HOME: ~/anaconda3/envs/crgeo-3.10-cpu/lib/python3.10/site-packages/sumo/

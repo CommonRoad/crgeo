@@ -10,15 +10,15 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from commonroad.planning.planning_problem import PlanningProblemSet
 from commonroad.scenario.scenario import Scenario
-import torch_geometric.loader
+from torch_geometric.loader import DataLoader
 
-from crgeo.dataset.collection.road_network_dataset_collector import RoadNetworkDatasetCollector
-from crgeo.dataset.commonroad_data import CommonRoadData
-from crgeo.dataset.commonroad_dataset import CommonRoadDataset
-from crgeo.dataset.extraction.road_network.base_road_network_graph import CanonicalTransform
-from crgeo.dataset.extraction.road_network.implementations import LaneletGraph
-from crgeo.dataset.extraction.road_network.road_network_extractor_factory import RoadNetworkExtractorFactory, RoadNetworkExtractorOptions
-from crgeo.common.plotting.plot_road_network_graph import plot_road_network_graph
+from commonroad_geometric.dataset.collection.road_network_dataset_collector import RoadNetworkDatasetCollector
+from commonroad_geometric.dataset.commonroad_data import CommonRoadData
+from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset
+from commonroad_geometric.dataset.extraction.road_network.base_road_network_graph import CanonicalTransform
+from commonroad_geometric.dataset.extraction.road_network.implementations import LaneletGraph
+from commonroad_geometric.dataset.extraction.road_network.road_network_extractor_factory import RoadNetworkExtractorFactory, RoadNetworkExtractorOptions
+from commonroad_geometric.plotting.plot_road_network_graph import plot_road_network_graph
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     print("Training dataset size:", len(dataset_train))
     print("Test dataset size:", len(dataset_test))
 
-    train_loader = torch_geometric.loader.DataLoader(dataset_train, batch_size=1, shuffle=False)
+    train_loader = DataLoader(dataset_train, batch_size=1, shuffle=False)
     print("Number of training batches:", len(train_loader))
 
     for idx, batch in enumerate(train_loader):

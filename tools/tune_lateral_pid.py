@@ -4,14 +4,14 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from crgeo.dataset.iteration import ScenarioIterator
-from crgeo.dataset.iteration.scenario_iterator import ScenarioBundle
-from crgeo.rendering.traffic_scene_renderer import TrafficSceneRenderer
-from crgeo.simulation.base_simulation import BaseSimulation
-from crgeo.simulation.ego_simulation.control_space.implementations.longitudinal_control_space import LongitudinalControlOptions, LongitudinalControlSpace
-from crgeo.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
-from crgeo.simulation.ego_simulation.respawning.implementations.random_respawner import RandomRespawner, RandomRespawnerOptions
-from crgeo.simulation.interfaces.static.unpopulated_scenario_simulation import UnpopulatedScenarioSimulation
+from commonroad_geometric.dataset.iteration import ScenarioIterator
+from commonroad_geometric.dataset.iteration.scenario_iterator import ScenarioBundle
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer
+from commonroad_geometric.simulation.base_simulation import BaseSimulation
+from commonroad_geometric.simulation.ego_simulation.control_space.implementations.longitudinal_control_space import LongitudinalControlOptions, LongitudinalControlSpace
+from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
+from commonroad_geometric.simulation.ego_simulation.respawning.implementations.random_respawner import RandomRespawner, RandomRespawnerOptions
+from commonroad_geometric.simulation.interfaces.static.unpopulated_scenario_simulation import UnpopulatedScenarioSimulation
 
 TEST_REF_VALUES = [-0.4, 0.0, 0.4]
 

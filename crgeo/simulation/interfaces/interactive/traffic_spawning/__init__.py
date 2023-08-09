@@ -1,1 +1,0 @@
-from crgeo.simulation.interfaces.interactive.traffic_spawning.base_traffic_spawner import BaseTrafficSpawner

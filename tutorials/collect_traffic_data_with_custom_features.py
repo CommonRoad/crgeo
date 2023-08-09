@@ -8,18 +8,20 @@ from typing import Dict
 
 import torch
 import torch.nn as nn
+from torch import Tensor
 
-from crgeo.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
-from crgeo.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
-from crgeo.dataset.extraction.traffic.feature_computers import VFeatureParams
-from crgeo.dataset.extraction.traffic.feature_computers.base_feature_computer import BaseFeatureComputer, FeatureDict
-from crgeo.dataset.extraction.traffic.feature_computers.implementations.defaults import DefaultFeatureComputers
-from crgeo.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions, TrafficFeatureComputerOptions
-from crgeo.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
-from crgeo.dataset.iteration import ScenarioIterator
-from crgeo.simulation.base_simulation import BaseSimulation
+from commonroad_geometric.common.torch_utils.helpers import flatten_data
+from commonroad_geometric.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
+from commonroad_geometric.dataset.extraction.traffic.feature_computers import VFeatureParams
+from commonroad_geometric.dataset.extraction.traffic.feature_computers.base_feature_computer import BaseFeatureComputer, FeatureDict
+from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.defaults import DefaultFeatureComputers
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions, TrafficFeatureComputerOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
+from commonroad_geometric.dataset.iteration import ScenarioIterator
+from commonroad_geometric.simulation.base_simulation import BaseSimulation
 
-SCENARIO_DIR = 'data/highway_test'
+SCENARIO_DIR = 'data/osm_recordings'
 MAX_SAMPLES = 200
 
 
@@ -28,7 +30,7 @@ class TutorialPytorchModule(nn.Module):
         super(TutorialPytorchModule, self).__init__()
         self.lin = nn.Linear(2, 1)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         return self.lin(x) # type: ignore
 
 
@@ -106,7 +108,6 @@ class TutorialFeatureComputer(BaseFeatureComputer[VFeatureParams]):
 
 
 if __name__ == '__main__':
-    from crgeo.common.torch_utils.helpers import flatten_data
 
     # We define the feature computers for vehicle nodes.
     # They will be executed in the given order.

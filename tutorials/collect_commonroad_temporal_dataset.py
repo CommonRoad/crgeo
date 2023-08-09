@@ -8,20 +8,20 @@ from typing import Iterable, cast
 from commonroad.planning.planning_problem import PlanningProblemSet
 from commonroad.scenario.scenario import Scenario
 
-from crgeo.common.types import T_CountParam, Unlimited
-from crgeo.common.utils.datetime import get_timestamp_filename
-from crgeo.common.utils.filesystem import load_dill, save_dill
-from crgeo.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
-from crgeo.dataset.commonroad_data_temporal import CommonRoadDataTemporal
-from crgeo.dataset.commonroad_dataset import CommonRoadDataset
-from crgeo.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
-from crgeo.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractorOptions
-from crgeo.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions
-from crgeo.dataset.extraction.traffic.traffic_extractor_factory import TemporalTrafficExtractorFactory, TrafficExtractorFactory
-from crgeo.learning.experiment import GeometricExperiment, GeometricExperimentConfig
+from commonroad_geometric.common.types import T_CountParam, Unlimited
+from commonroad_geometric.common.utils.datetime import get_timestamp_filename
+from commonroad_geometric.common.utils.filesystem import load_dill, save_dill
+from commonroad_geometric.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
+from commonroad_geometric.dataset.commonroad_data_temporal import CommonRoadDataTemporal
+from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
+from commonroad_geometric.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractorOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TemporalTrafficExtractorFactory, TrafficExtractorFactory
+from commonroad_geometric.learning.geometric.training.experiment import GeometricExperiment, GeometricExperimentConfig
 
 DATA_COLLECTOR_CLS = ScenarioDatasetCollector
-SCENARIO_DIR = 'data/highway_test'
+SCENARIO_DIR = 'data/osm_recordings'
 DATASET_DIR = 'tutorials/output/dataset_t40'
 EXPORT_FILENAME = 'experiment_config'
 EXPORT_FILETYPE = 'pkl'

@@ -5,16 +5,15 @@ sys.path.insert(0, os.getcwd())
 
 from typing import List
 
-from crgeo.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
-from crgeo.dataset.commonroad_data import CommonRoadData
-from crgeo.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
-from crgeo.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractorOptions
-from crgeo.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions
-from crgeo.dataset.extraction.traffic.traffic_extractor_factory import TemporalTrafficExtractorFactory, TrafficExtractorFactory
-from crgeo.dataset.iteration import ScenarioIterator
-from crgeo.dataset.preprocessing.base_scenario_preprocessor import BaseScenarioPreprocessor
+from commonroad_geometric.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
+from commonroad_geometric.dataset.commonroad_data import CommonRoadData
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import VoronoiEdgeDrawer
+from commonroad_geometric.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractorOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TemporalTrafficExtractorFactory, TrafficExtractorFactory
+from commonroad_geometric.dataset.iteration import ScenarioIterator
+from commonroad_geometric.dataset.preprocessing.base_scenario_preprocessor import BaseScenarioPreprocessor
 
-#SCENARIO_DIR = '.'
 SCENARIO_DIR = 'data/osm_recordings'
 SAMPLES_PER_SCENARIO = 100
 TOTAL_SAMPLES = 10

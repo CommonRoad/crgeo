@@ -6,22 +6,19 @@ from typing import Any, Dict, Tuple
 import matplotlib.pyplot as plt
 from commonroad.common.file_reader import CommonRoadFileReader
 
-from crgeo.common.io_extensions.scenario import find_scenario_files
-from crgeo.dataset.extraction.road_network.base_road_network_graph import BaseRoadNetworkGraph
-from crgeo.dataset.extraction.road_network.implementations import IntersectionGraph, LaneletEndpointGraph, LaneletGraph
-from crgeo.dataset.extraction.road_network.types import LaneletEdgeType
-from crgeo.common.plotting.plot_road_network_graph import plot_road_network_graph
-from crgeo.common.plotting.plot_scenario import plot_scenario
+from commonroad_geometric.common.io_extensions.scenario import find_scenario_files
+from commonroad_geometric.dataset.extraction.road_network.base_road_network_graph import BaseRoadNetworkGraph
+from commonroad_geometric.dataset.extraction.road_network.implementations import IntersectionGraph, LaneletEndpointGraph, LaneletGraph
+from commonroad_geometric.dataset.extraction.road_network.types import LaneletEdgeType
+from commonroad_geometric.debugging.errors import get_error_stack_summary
+from commonroad_geometric.plotting.plot_road_network_graph import plot_road_network_graph
+from commonroad_geometric.plotting.plot_scenario import plot_scenario
 
-#INPUT_SCENARIO = 'data/osm_crawled/'
-#INPUT_SCENARIO = 'data/other/USA_Peach-1_1_T-1.xml'
-#INPUT_SCENARIO = 'data/other/ZAM_Tjunction-1_50_T-1.xml'
-#INPUT_SCENARIO = 'data/t_junction_recorded'
+
 INPUT_SCENARIO = 'data/osm_recordings/'
 SHOW_PLOTS = True
 RAISE_EXCEPTIONS = True
 PLOT_SCENARIOS = False
-#INPUT_SCENARIO = 'data/processed/20220328-OSM/traffic/Munich_2_time_steps_1000_includes_ego_compressed/scenarios/'
 
 output_dirs = ['tutorials/output/road_network_graphs/endpoint', 'tutorials/output/road_network_graphs/lanelet', 'tutorials/output/road_network_graphs/intersection']
 
@@ -120,8 +117,10 @@ if __name__ == '__main__':
             else:
                 try:
                     plot_graph_wrapper()
-                except Exception as e:
-                    print(f"Exception occured while processing {scenario_file}: {repr(e)}")
+                except Exception:
+                    file_location, line_number, detail = get_error_stack_summary()
+                    print(f"Exception occured while processing {scenario_file}. Location: {file_location}, Line: {line_number}, Detail: {detail}")
+                    conversion_summary = populate_conversion_summary(conversion_summary, scenario_file, file_location, line_number, detail)
 
                     # Plot scenario even if graph conversion fails
                     plot_scenario_only(scenario_file, plot_kwargs_scenario=dict(lanelet_labels=False))

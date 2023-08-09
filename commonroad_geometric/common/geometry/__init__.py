@@ -1,0 +1,1 @@
+from commonroad_geometric.common.geometry.continuous_polyline import ContinuousPolyline

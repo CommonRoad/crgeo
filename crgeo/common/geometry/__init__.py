@@ -1,1 +1,0 @@
-from crgeo.common.geometry.continuous_polyline import ContinuousPolyline

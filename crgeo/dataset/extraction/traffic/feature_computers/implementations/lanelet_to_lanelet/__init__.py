@@ -1,1 +1,0 @@
-from crgeo.dataset.extraction.traffic.feature_computers.implementations.lanelet_to_lanelet.lanelet_connection_geometry_feature_computer import LaneletConnectionGeometryFeatureComputer
