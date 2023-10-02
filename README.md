@@ -20,7 +20,7 @@ The package aims to serve as a flexible framework that, without putting restrict
 - A framework for [PyTorch Geometric-based](https://pytorch-geometric.readthedocs.io/) heterogeneous graph data extraction from traffic scenes and road networks supporting user-made feature computers and edge drawers.
 - Built-in functionality for collection and storing of graph-based traffic datasets as [PyTorch datasets](https://pytorch.org/vision/stable/datasets.html).
 - Fully customizable live rendering support for showcasing and debugging.
-- The extension [Commonroad-Geometric-Learning](https://github.com/CommonRoad/crgeo-learning) offers high-level Python infrastructure code for training graph neural networks using this package.
+- High-level training infrastructure for crgeo research projects.
 
 
 <!-- --- -->
