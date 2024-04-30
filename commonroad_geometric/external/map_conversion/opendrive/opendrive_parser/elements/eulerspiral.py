@@ -51,7 +51,7 @@ class EulerSpiral:
         """
 
         Args:
-          s: 
+          s:
           x0:  (Default value = 0)
           y0:  (Default value = 0)
           kappa0:  (Default value = 0)

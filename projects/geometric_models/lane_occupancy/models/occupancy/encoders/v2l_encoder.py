@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional, Tuple, Type
 
 import torch
-from optuna import Trial
 from torch import Tensor, nn
 from torch.nn import Tanh
-from torch_geometric.nn import BatchNorm, HeteroConv
+from torch_geometric.nn.norm import BatchNorm
+from torch_geometric.nn.conv import HeteroConv
 from torch_geometric.nn.models import MLP
 from torch_geometric.utils.loop import add_self_loops
 
@@ -48,24 +48,27 @@ class V2LEncoder(BaseOccupancyEncoder):
         self,
         output_size: int,
         offset_conditioning: bool = False,
-        velocity_conditioning: bool = False, # TODO either remove or state unfinished features
+        velocity_conditioning: bool = False,  # TODO either remove or state unfinished features
         config: Optional[V2LEncoderConfig] = None,
         **kwargs: Any
     ):
         config = config or V2LEncoderConfig(**kwargs)
         self.config = config
-        super().__init__(output_size=output_size, offset_conditioning=offset_conditioning, velocity_conditioning=velocity_conditioning)
+        super().__init__(
+            output_size=output_size,
+            offset_conditioning=offset_conditioning,
+            velocity_conditioning=velocity_conditioning)
         self.input_size_l = V2LEncoder.INPUT_SIZE_L + int(self.offset_conditioning)
 
     def reset_config(self) -> None:
-        self.config = V2LEncoderConfig() # TODO
+        self.config = V2LEncoderConfig()  # TODO
 
     def build(
         self,
         data: Optional[CommonRoadData],
-        trial: Optional[Trial] = None
+        trial = None
     ) -> None:
-        self.config = V2LEncoderConfig() # TODO
+        self.config = V2LEncoderConfig()  # TODO
 
         self.v2l = HeteroConv(convs={
             ('vehicle', 'to', 'lanelet'): V2LConvLayer(
@@ -74,21 +77,22 @@ class V2LEncoder(BaseOccupancyEncoder):
                 out_channels=self.config.hidden_size - self.input_size_l,
                 num_layers=self.config.mlp_layers_v2l,
                 aggr=self.config.v2l_aggr,
-                #norm=self.config.batch_norm,
+                # norm=self.config.batch_norm,
                 dropout=self.config.dropout_prob,
-                act=self.config.activation_cls
+                act=self.config.activation_cls()
             )
         })
 
         self.v2l_act = self.config.activation_cls() if self.config.intermediate_act else nn.Identity()
-        self.v2l_norm = BatchNorm(self.config.hidden_size - self.input_size_l) if self.config.intermediate_norm else nn.Identity()
+        self.v2l_norm = BatchNorm(self.config.hidden_size -
+                                  self.input_size_l) if self.config.intermediate_norm else nn.Identity()
 
         if self.config.l2l_interaction_layers:
             # self.l2l = L2LConvLayer(
             #     input_size = 2*self.config.hidden_size + 2*self.input_size_l + V2LEncoder.INPUT_SIZE_L2L + self.config.lanelet_edge_type_embedding_dim,
             #     output_size=self.config.hidden_size,
             #     hidden_size=self.config.mlp_layers_l2l*[self.config.hidden_size],
-                
+
             # )
             self.l2l = L2LGNN(
                 in_channels=self.config.hidden_size,
@@ -111,18 +115,18 @@ class V2LEncoder(BaseOccupancyEncoder):
             hidden_channels=self.config.mlp_hidden_size_embed,
             out_channels=self.output_size,
             num_layers=self.config.mlp_layers_embed,
-            #norm=self.config.batch_norm,
+            # norm=self.config.batch_norm,
             dropout=self.config.dropout_prob,
-            act=self.config.activation_cls
+            act=self.config.activation_cls()
         )
 
         self.edge_types = [
             # LaneletEdgeType.PREDECESSOR,
             LaneletEdgeType.SUCCESSOR,
             LaneletEdgeType.ADJACENT_LEFT,
-            #LaneletEdgeType.OPPOSITE_LEFT,
+            # LaneletEdgeType.OPPOSITE_LEFT,
             LaneletEdgeType.ADJACENT_RIGHT,
-            #LaneletEdgeType.OPPOSITE_RIGHT,
+            # LaneletEdgeType.OPPOSITE_RIGHT,
             # LaneletEdgeType.DIVERGING,
             LaneletEdgeType.MERGING,
             LaneletEdgeType.CONFLICTING,
@@ -134,7 +138,7 @@ class V2LEncoder(BaseOccupancyEncoder):
         )
 
         if self.config.l2l_post_operation == 'embed':
-            self.emb_l2l_interaction_layers = nn.Linear(2*self.config.hidden_size, self.config.hidden_size)
+            self.emb_l2l_interaction_layers = nn.Linear(2 * self.config.hidden_size, self.config.hidden_size)
             self.emb_l2l_interaction_layers_act = self.config.activation_cls()
         if self.config.encoding_bias:
             self.encoding_bias = nn.Parameter(torch.zeros(self.output_size))
@@ -145,30 +149,30 @@ class V2LEncoder(BaseOccupancyEncoder):
         device = data.vehicle.velocity.device
 
         x_v = torch.cat([
-            (data.vehicle.velocity-25)/10.0,
-            (data.vehicle.acceleration-0.0)/1.0,
-            (data.vehicle.length-5)/10.0,
+            (data.vehicle.velocity - 25) / 10.0,
+            (data.vehicle.acceleration - 0.0) / 1.0,
+            (data.vehicle.length - 5) / 10.0,
             torch.log(torch.clamp(data.vehicle.velocity, 1e-3, 100.0)),
             data.vehicle.yaw_rate
-            #1/data.vehicle.num_lanelet_assignments
+            # 1/data.vehicle.num_lanelet_assignments
         ], dim=-1)
         x_l_components = [
-            data.lanelet.length/100.0,
-            torch.log(data.lanelet.length/10.0),
-            data.l.start_curvature*10.0,
-            data.l.end_curvature*10.0,
-            torch.abs(data.l.start_curvature)*10.0,
-            torch.abs(data.l.end_curvature)*10.0
+            data.lanelet.length / 100.0,
+            torch.log(data.lanelet.length / 10.0),
+            data.l.start_curvature * 10.0,
+            data.l.end_curvature * 10.0,
+            torch.abs(data.l.start_curvature) * 10.0,
+            torch.abs(data.l.end_curvature) * 10.0
         ]
-        if not hasattr(self, 'offset_conditioning'): # TODO: Delete
+        if not hasattr(self, 'offset_conditioning'):  # TODO: Delete
             self.offset_conditioning = False
         if self.offset_conditioning:
             if hasattr(data.lanelet, 'random_offsets'):
-                x_l_components.append(data.lanelet.random_offsets / 10.0) 
+                x_l_components.append(data.lanelet.random_offsets / 10.0)
             else:
                 x_l_components.append(data.lanelet.length.new_zeros(data.lanelet.length.shape))
         x_l = torch.cat(x_l_components, dim=-1)
-        
+
         edge_attr_v2l = torch.cat([
             2.0 * (data.v2l.v2l_lanelet_arclength_rel - 0.5),
             torch.cos(data.v2l.v2l_heading_error),
@@ -177,14 +181,13 @@ class V2LEncoder(BaseOccupancyEncoder):
             torch.abs(data.v2l.v2l_lanelet_lateral_error),
         ], dim=-1)
 
-
         assert x_v.isfinite().all()
         assert x_l.isfinite().all()
         assert edge_attr_v2l.isfinite().all()
 
         sphi_v2l = self.v2l_act(self.v2l_norm(self.v2l(
             x_dict=dict(
-                vehicle=x_v, 
+                vehicle=x_v,
                 lanelet=x_l,
             ),
             edge_attr_dict={
@@ -225,10 +228,10 @@ class V2LEncoder(BaseOccupancyEncoder):
                 torch.sin(data.l2l.relative_start_angle),
                 torch.cos(data.l2l.relative_end_angle),
                 torch.log2(data.l2l.relative_source_length),
-                data.l2l.target_curvature*10,
-                data.l2l.source_curvature*10,
-                torch.abs(data.l2l.target_curvature)*10,
-                torch.abs(data.l2l.source_curvature)*10
+                data.l2l.target_curvature * 10,
+                data.l2l.source_curvature * 10,
+                torch.abs(data.l2l.target_curvature) * 10,
+                torch.abs(data.l2l.source_curvature) * 10
             ], dim=-1)
             assert edge_attr_l2l_all.isfinite().all()
 
@@ -245,14 +248,15 @@ class V2LEncoder(BaseOccupancyEncoder):
             if self.config.l2l_self_loops:
                 edge_index_l2l, edge_attr_l2l = add_self_loops(edge_index_l2l, edge_attr_l2l, fill_value=0.0)
 
-            sphi2_l2l = self.l2l( # TODO: self-loops
-                x=z_l2l, 
-                edge_attr=edge_attr_l2l, 
+            sphi2_l2l = self.l2l(  # TODO: self-loops
+                x=z_l2l,
+                edge_attr=edge_attr_l2l,
                 edge_index=edge_index_l2l
             )
 
             if not self.training:
-                message_intensities = torch.column_stack([self.l2l.convs[i].message_intensities for i in range(len(self.l2l.convs))])
+                message_intensities = torch.column_stack(
+                    [self.l2l.convs[i].message_intensities for i in range(len(self.l2l.convs))])
             else:
                 message_intensities = None
 
@@ -274,7 +278,7 @@ class V2LEncoder(BaseOccupancyEncoder):
 
         return z_r, x_v, x_l, edge_attr_l2l, edge_attr_v2l, message_intensities
 
-    def forward(self, data: CommonRoadData) -> Tensor:  
+    def forward(self, data: CommonRoadData) -> Tensor:
         z_r, x_v, x_l, edge_attr_l2l, edge_attr_v2l, message_intensities = self._compute_encodings(data)
 
         if self.embed_mlp.channel_list[0] == self.config.hidden_size:

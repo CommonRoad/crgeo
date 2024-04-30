@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-from gym.spaces import Box, Space
+from gymnasium.spaces import Box, Space
 
 from commonroad_geometric.common.geometry.helpers import make_valid_orientation, relative_orientation
 from commonroad_geometric.simulation.ego_simulation.control_space.base_control_space import BaseControlSpace, BaseControlSpaceOptions
-from commonroad_geometric.simulation.ego_simulation.control_space.controllers.pid_controller import PIDController
+from commonroad_geometric.simulation.ego_simulation.control_space.implementations.utils.pid_controller import PIDController
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle import ActionBase
 from commonroad_geometric.common.geometry.continuous_polyline import ContinuousPolyline
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
@@ -21,21 +21,23 @@ class PIDLaneChangeControlOptions(BaseControlSpaceOptions):
     upper_bound_velocity: Optional[float] = None
     upper_bound_steering: Optional[float] = None
     lower_bound_steering: float = 0.0
-    k_P_orientation: float = 0.5 # increase to increase aggresiveness
-    k_D_orientation: float = 0.4 # increase to counter overshooting behavior
-    k_I_orientation: float = 0.1 # increase to counter stationary error
+    k_P_orientation: float = 0.5  # increase to increase aggresiveness
+    k_D_orientation: float = 0.4  # increase to counter overshooting behavior
+    k_I_orientation: float = 0.1  # increase to counter stationary error
     k_P_velocity: float = 6.0
     k_D_velocity: float = 0.5
     k_I_velocity: float = 0.0
     finish_action_threshold: float = 0.02
+    start_action_threshold: float = 0.5
     use_lanelet_coordinate_frame: bool = True
 
 
 class PIDLaneChangeControlSpace(BaseControlSpace):
     """
-    High level lane change control space implemented with PID-based 
+    High level lane change control space implemented with PID-based
     low-level motion planning.
     """
+
     def __init__(
         self,
         options: Optional[PIDLaneChangeControlOptions] = None
@@ -92,7 +94,8 @@ class PIDLaneChangeControlSpace(BaseControlSpace):
         steering_max = self._upper_bound_steering if self._upper_bound_steering is not None else ego_vehicle.parameters.steering.v_max
 
         if ego_vehicle_simulation.current_lanelet_center_polyline is not None:
-            lanelet_orientation = ego_vehicle_simulation.current_lanelet_center_polyline.get_projected_direction(position)
+            lanelet_orientation = ego_vehicle_simulation.current_lanelet_center_polyline.get_projected_direction(
+                position)
             self._last_lanelet_orientation = lanelet_orientation
         else:
             lanelet_orientation = self._last_lanelet_orientation
@@ -101,12 +104,13 @@ class PIDLaneChangeControlSpace(BaseControlSpace):
         if action[1] < 0:
             desired_velocity = v_min if v_min * action[1] < v_min else v_min * action[1]
         else:
-            desired_velocity = v_max if v_max * action[1] > v_max else v_min if v_max * action[1] < v_min else v_max * action[1]
+            desired_velocity = v_max if v_max * \
+                action[1] > v_max else v_min if v_max * action[1] < v_min else v_max * action[1]
 
         if self._subsubstep == 0 and substep_index == 0:
             self._lateral_error_prior = None
             desired_lanechange = action[0]
-            desired_lanechange_disc = -1 if desired_lanechange < -0.5 else (1 if desired_lanechange > 0.5 else 0)
+            desired_lanechange_disc = -1 if desired_lanechange < -self._options.start_action_threshold else (1 if desired_lanechange > self._options.start_action_threshold else 0)
             current_lanelet = ego_vehicle_simulation.current_lanelets[0]
 
             if desired_lanechange_disc == 1 and current_lanelet.adj_left_same_direction:
@@ -122,7 +126,8 @@ class PIDLaneChangeControlSpace(BaseControlSpace):
 
             if desired_lanelet is not None:
                 self._desired_lanelet = desired_lanelet
-                self._desired_lanelet_polyline = ego_vehicle_simulation.simulation.get_lanelet_center_polyline(desired_lanelet.lanelet_id)
+                self._desired_lanelet_polyline = ego_vehicle_simulation.simulation.get_lanelet_center_polyline(
+                    desired_lanelet.lanelet_id)
             else:
                 self._desired_lanelet_polyline = None
                 self._desired_lanelet = None
@@ -132,7 +137,7 @@ class PIDLaneChangeControlSpace(BaseControlSpace):
         else:
             lateral_error = 0.0
         current_lanelet_id = ego_vehicle_simulation.current_lanelets[0].lanelet_id
-        desired_orientation = make_valid_orientation(-lateral_error/20)
+        desired_orientation = make_valid_orientation(-lateral_error / 20)
         error_velocity = desired_velocity - velocity
         error_orientation = relative_orientation(orientation, desired_orientation)
 
@@ -141,17 +146,18 @@ class PIDLaneChangeControlSpace(BaseControlSpace):
 
         acceleration = np.clip(acceleration, a_min, a_max)
         if self._desired_lanelet_polyline is not None:
-            print((f'orientation: {orientation:+.4f}, d_orientation: {desired_orientation:+.4f}, e_o {error_orientation:+.4f}, l_e: {lateral_error:+.4f}, s_a_c: {steering_angle:+.4f}, l_id: {ego_vehicle_simulation.current_lanelets[0].lanelet_id}, d_l_id: {self._desired_lanelet.lanelet_id}, disc_r: {self._desired_lanelet.adj_right}, disc_l: {self._desired_lanelet.adj_left}'))
+            print(
+                (f'orientation: {orientation:+.4f}, d_orientation: {desired_orientation:+.4f}, e_o {error_orientation:+.4f}, l_e: {lateral_error:+.4f}, s_a_c: {steering_angle:+.4f}, l_id: {ego_vehicle_simulation.current_lanelets[0].lanelet_id}, d_l_id: {self._desired_lanelet.lanelet_id}, disc_r: {self._desired_lanelet.adj_right}, disc_l: {self._desired_lanelet.adj_left}'))
         steering_angle = np.clip(steering_angle, steering_min, steering_max)
 
         if self._desired_lanelet is not None and self._desired_lanelet.adj_left == current_lanelet_id:
             steering_angle = steering_angle
 
-        if abs(steering_angle) < self._lower_bound_steering or abs(lateral_error) <= self._finish_action_threshold or self._desired_lanelet_polyline is None:
+        if abs(steering_angle) < self._lower_bound_steering or abs(
+                lateral_error) <= self._finish_action_threshold or self._desired_lanelet_polyline is None:
             steering_angle = 0.0
 
         # debug = [velocity, desired_velocity, error_velocity, acceleration, orientation, desired_orientation, error_orientation, steering_angle]
-        
 
         control_action = np.array([
             steering_angle,
@@ -162,13 +168,22 @@ class PIDLaneChangeControlSpace(BaseControlSpace):
             action_base=ActionBase.ACCELERATION
         )
 
-
-        finished_action = self._desired_lanelet_polyline is None or ((abs(lateral_error) < self._finish_action_threshold or self._desired_lanelet.lanelet_id == current_lanelet_id) and (self._desired_lanelet_polyline is not None) or self._desired_lanelet.lanelet_id == current_lanelet_id)
+        finished_action = self._desired_lanelet_polyline is None or (
+            (abs(lateral_error) < self._finish_action_threshold or self._desired_lanelet.lanelet_id == current_lanelet_id) and (
+                self._desired_lanelet_polyline is not None) or self._desired_lanelet.lanelet_id == current_lanelet_id)
         # if (abs(lateral_error) < self._finish_action_threshold) and (self._desired_lanelet_polyline is not None):
         #     print(f'substep_idx: {substep_index}, f_a: {finished_action}')
-        debug = [orientation, desired_orientation, error_orientation, steering_angle, finished_action, lateral_error, substep_index]
+        debug = [
+            orientation,
+            desired_orientation,
+            error_orientation,
+            steering_angle,
+            finished_action,
+            lateral_error,
+            substep_index]
 
-        if self._lateral_error_prior is not None and abs(self._lateral_error_prior) < abs(lateral_error) and self._desired_lanelet.lanelet_id == current_lanelet_id:
+        if self._lateral_error_prior is not None and abs(self._lateral_error_prior) < abs(
+                lateral_error) and self._desired_lanelet.lanelet_id == current_lanelet_id:
             finished_action = True
         self._lateral_error_prior = lateral_error
         from commonroad_geometric.common.logging import stdout
@@ -176,7 +191,7 @@ class PIDLaneChangeControlSpace(BaseControlSpace):
         self._subsubstep += 1
         if finished_action:
             self._subsubstep = 0
-        print(f'substep_idx: {substep_index}, f_a: {finished_action}')        
+        print(f'{action=}, {substep_index=}, {self._subsubstep=}, f_a: {finished_action}')
 
         return True
 

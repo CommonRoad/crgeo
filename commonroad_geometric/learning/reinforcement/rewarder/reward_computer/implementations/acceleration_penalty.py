@@ -5,15 +5,16 @@ import numpy as np
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.base_reward_computer import BaseRewardComputer
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.types import RewardLossMetric
+from commonroad_geometric.learning.reinforcement.observer.base_observer import T_Observation
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
 
 
 class AccelerationPenaltyRewardComputer(BaseRewardComputer):
     def __init__(
-        self, 
+        self,
         weight: float,
         loss_type: RewardLossMetric = RewardLossMetric.L1,
-        cutoff = 10.0
+        cutoff=10.0
     ) -> None:
         self._weight = weight
         self._loss_type = loss_type
@@ -24,7 +25,8 @@ class AccelerationPenaltyRewardComputer(BaseRewardComputer):
         self,
         action: np.ndarray,
         simulation: EgoVehicleSimulation,
-        data: CommonRoadData
+        data: CommonRoadData,
+        observation: T_Observation
     ) -> float:
         acceleration = abs(simulation.ego_vehicle.state.acceleration)
         acceleration = min(self._cutoff, acceleration) * simulation.dt
@@ -37,5 +39,5 @@ class AccelerationPenaltyRewardComputer(BaseRewardComputer):
             loss = math.exp(-acceleration**2)
         else:
             raise NotImplementedError()
-        penalty = -self._weight*loss
+        penalty = -self._weight * loss
         return penalty

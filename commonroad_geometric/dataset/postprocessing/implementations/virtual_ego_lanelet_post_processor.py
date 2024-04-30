@@ -20,7 +20,7 @@ class VirtualEgoLaneletPostProcessor(BaseDataPostprocessor):
     ) -> None:
         """
         Args:
-            lanelet_length (float): Length of ego-centered virtual lnaelet
+            length (float): Length of ego-centered virtual lnaelet
         """
         self.lanelet_length = lanelet_length
         super().__init__()
@@ -54,7 +54,7 @@ class VirtualEgoLaneletPostProcessor(BaseDataPostprocessor):
         while cumulative_arclength <= self.lanelet_length:
             remaining_lanelet_distance = current_lanelet_path.length - current_arclength
             distance_to_go = self.lanelet_length - cumulative_arclength
-            current_lanelet_idx = simulation.lanelet_id_to_lanelet_idx[current_lanelet_id]
+            current_lanelet_idx = (data.l.id == current_lanelet_id).nonzero(as_tuple=True)[0].item()
 
             if distance_to_go < remaining_lanelet_distance:
                 delta = distance_to_go
@@ -122,16 +122,16 @@ class VirtualEgoLaneletPostProcessor(BaseDataPostprocessor):
         ignore_keys = {'length', 'id', 'end_pos', 'start_pos', 'center_pos', 'x', 'left_vertices', 'center_vertices', 'right_vertices'}
 
 
-        data.lanelet.lanelet_length = torch.cat([data.lanelet.lanelet_length, data.lanelet.lanelet_length[route_idx_array].sum(0, keepdim=True)], 0)
+        data.lanelet.length = torch.cat([data.lanelet.length, data.lanelet.length[route_idx_array].sum(0, keepdim=True)], 0)
         data.lanelet.id = torch.cat([data.lanelet.id, torch.tensor([virtual_lanelet_id]).unsqueeze(0)], 0)
         data.lanelet.start_pos = torch.cat([data.lanelet.start_pos, start_pos], 0)
         data.lanelet.center_pos = torch.cat([data.lanelet.center_pos, start_pos], 0)
         data.lanelet.end_pos = torch.cat([data.lanelet.end_pos, end_pos], 0)
         data.lanelet.end_pos[start_lanelet_idx] = start_pos
-        data.lanelet.lanelet_length[start_lanelet_idx] = start_arclength
+        data.lanelet.length[start_lanelet_idx] = start_arclength
         if has_end_lanelet:
             data.lanelet.start_pos[end_lanelet_idx] = end_pos
-            data.lanelet.lanelet_length[end_lanelet_idx] -= end_arclength
+            data.lanelet.length[end_lanelet_idx] -= end_arclength
 
         padding_size = data.l.left_vertices.shape[1]
 

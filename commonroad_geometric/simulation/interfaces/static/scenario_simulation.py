@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
-
+from pathlib import Path
 from commonroad.common.file_reader import CommonRoadFileReader
 from commonroad.scenario.obstacle import DynamicObstacle
 from commonroad.scenario.scenario import Scenario
@@ -23,10 +23,10 @@ class ScenarioSimulationOptions(BaseSimulationOptions):
     remove_ego_vehicle_from_obstacles: bool = False
 
 
-class ScenarioSimulation(BaseSimulation):
+class ScenarioSimulation(BaseSimulation[ScenarioSimulationOptions]):
     def __init__(
         self,
-        initial_scenario: Union[Scenario, str],
+        initial_scenario: Union[Scenario, Path],
         options: Optional[ScenarioSimulationOptions] = None,
     ) -> None:
         """
@@ -38,8 +38,8 @@ class ScenarioSimulation(BaseSimulation):
         """
         options = options or ScenarioSimulationOptions()
         options.remove_ego_vehicle_from_obstacles = False
-        if isinstance(initial_scenario, str):
-            initial_scenario, _ = CommonRoadFileReader(filename=initial_scenario).open()
+        if isinstance(initial_scenario, Path):
+            initial_scenario, _ = CommonRoadFileReader(filename=str(initial_scenario)).open()
 
         # dt from initial_scenario must be used as this was the setting for recording the scenario
         options.dt = initial_scenario.dt
@@ -79,7 +79,7 @@ class ScenarioSimulation(BaseSimulation):
             if final_time_step == -1:
                 final_time_step = 0
         else:
-            initial_time_step, final_time_step = 0, 0
+            initial_time_step, final_time_step = 0, 500
         return initial_time_step, final_time_step
 
     def _start(self) -> None:
@@ -116,5 +116,5 @@ class ScenarioSimulation(BaseSimulation):
     def _reset(self) -> None:
         self._current_collision_checker = None
         if self._options.backup_current_scenario:
-            self._current_scenario = backup_scenario(self.initial_scenario) # TODO: Avoid?
+            self._current_scenario = backup_scenario(self.initial_scenario)  # TODO: Avoid?
         self._start()

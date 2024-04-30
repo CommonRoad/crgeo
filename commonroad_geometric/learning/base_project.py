@@ -5,11 +5,9 @@ from functools import partial
 from typing import Callable, Dict, List, Optional, Type, Union
 import logging
 from commonroad_geometric.debugging.profiling import profile
-from commonroad_geometric.common.logging import setup_logging
 
 
 logger = logging.getLogger(__name__)
-
 
 
 def register_run_command(func):
@@ -50,12 +48,12 @@ class BaseProject(metaclass=ABCMeta):
             return
 
         logger.info(f"Commands to be executed: {subcommands}")
-        
+
         for subcmd in subcommands:
             if subcmd not in self._commands:
-                raise ValueError(f"Received undefined command '{subcmd}'. Available commands are: {list(self._commands.keys())}")
+                raise ValueError(
+                    f"Received undefined command '{subcmd}'. Available commands are: {list(self._commands.keys())}")
 
         for idx, subcmd in enumerate(subcommands):
             logger.info(f"Running command {idx+1}/{len(subcommands)}: '{subcmd}'")
             self._commands[subcmd](self)
-        

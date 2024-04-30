@@ -27,7 +27,8 @@ class BaseProgressReporter(ABC, AutoReprMixin):
     def __enter__(self) -> BaseProgressReporter:
         return self
 
-    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> Literal[False]:
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException],
+                 traceback: Optional[TracebackType]) -> Literal[False]:
         self.close()
         return False
 
@@ -70,6 +71,8 @@ class ProgressReporter(BaseProgressReporter):
         report_memory: bool = False,
         **kwargs: Any,
     ) -> None:
+        if total is None:
+            total = 1e6
         self._name = name
         self._depth: int
         if parent_reporter is None:

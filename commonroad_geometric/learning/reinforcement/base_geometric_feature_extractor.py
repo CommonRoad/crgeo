@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
-import gym
+import gymnasium
 from stable_baselines3.common.running_mean_std import RunningMeanStd
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import Tensor, nn
@@ -24,7 +24,7 @@ class BaseGeometricFeatureExtractor(ABC, BaseFeaturesExtractor, AutoReprMixin, S
 
     def __init__(
         self,
-        observation_space: gym.Space,
+        observation_space: gymnasium.Space,
         normalize_output: bool = False
     ):
         super(BaseGeometricFeatureExtractor, self).__init__(observation_space, self.output_dim)
@@ -36,13 +36,13 @@ class BaseGeometricFeatureExtractor(ABC, BaseFeaturesExtractor, AutoReprMixin, S
             # self._normalizer = RunningMeanStd(shape=self.output_dim)
 
     @abstractmethod
-    def _build(self, observation_space: gym.Space) -> None: 
+    def _build(self, observation_space: gymnasium.Space) -> None:
         """
         Build the feature extractor. Initialize PyTorch components here to avoid
         "AttributeError: cannot assign module before Module.__init__() call".
 
         Args:
-            observation_space (gym.Space): Observation space.
+            observation_space (gymnasium.Space): Observation space.
         """
 
     @property
@@ -62,10 +62,10 @@ class BaseGeometricFeatureExtractor(ABC, BaseFeaturesExtractor, AutoReprMixin, S
                 nn.init.normal_(p)
             else:
                 # TODO fix
-                #nn.init.kaiming_uniform_(p, mode='fan_in', nonlinearity='relu')
+                # nn.init.kaiming_uniform_(p, mode='fan_in', nonlinearity='relu')
                 nn.init.xavier_normal_(p, gain=0.5)
 
-    def forward(self, obs: Dict[str, Tensor]) -> Tensor: # type: ignore
+    def forward(self, obs: Dict[str, Tensor]) -> Tensor:  # type: ignore
         # Converting the flattened observation dict back into a PyTorch Geometric data instance.
         # TODO: Use simplfied feature indexing when reconstruct method returns CommonRoadData
         data = CommonRoadData.reconstruct(obs)
@@ -81,5 +81,5 @@ class BaseGeometricFeatureExtractor(ABC, BaseFeaturesExtractor, AutoReprMixin, S
     def _normalize(self, z: Tensor) -> Tensor:
         assert self._normalizer is not None
         mu, std = self._normalizer.mean, self._normalizer.var ** 0.5
-        z_norm = (z -mu) / std
+        z_norm = (z - mu) / std
         return z_norm

@@ -103,7 +103,7 @@ class CommonRoadData(HeteroData):
         return self._global_store.get("dt", None)
 
     @property
-    def time_step(self) -> Optional[int]:
+    def time_step(self) -> int:
         # _global_storage does not store None values
         return self._global_store.get("time_step", None)
 
@@ -283,7 +283,8 @@ class VirtualAttributesBaseStorage(BaseStorage):
             else:
                 value = self._mapping[key]
         except KeyError as e:
-            raise KeyError(f"The feature '{key}' is not included in the CommonRoadData instance. Make sure that the corresponding feature computer is enabled.") from e
+            raise KeyError(
+                f"The feature '{key}' is not included in the CommonRoadData instance. Make sure that the corresponding feature computer is enabled.") from e
         if self._mask_key is not None and isinstance(value, Tensor):
             mask = self._mapping[self._mask_key].bool()
             value = value[mask.squeeze(-1)]

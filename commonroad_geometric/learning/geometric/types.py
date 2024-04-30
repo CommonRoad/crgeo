@@ -15,4 +15,5 @@ class Train_Categories(Enum):
     Test = 'test'
     Validation = 'validation'
 
+
 T_CommonRoadDataInput = TypeVar("T_CommonRoadDataInput", bound=CommonRoadData)

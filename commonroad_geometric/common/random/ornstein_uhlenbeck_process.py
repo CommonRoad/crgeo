@@ -2,6 +2,7 @@ import numpy as np
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 
+
 class OrnsteinUhlenbeckProcess(AutoReprMixin):
     """
     A Ornstein Uhlenbeck noise process designed to approximate brownian motion with friction.
@@ -25,7 +26,7 @@ class OrnsteinUhlenbeckProcess(AutoReprMixin):
 
     def __call__(self) -> np.ndarray:
         noise = self._noise_prev + self._theta * (self._mu - self._noise_prev) * self._dt + \
-                self._sigma * np.sqrt(self._dt) * np.random.normal(size=self._mu.shape)
+            self._sigma * np.sqrt(self._dt) * np.random.normal(size=self._mu.shape)
         self._noise_prev = noise
         return noise
 

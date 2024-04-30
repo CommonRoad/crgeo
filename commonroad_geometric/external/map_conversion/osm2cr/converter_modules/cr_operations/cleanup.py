@@ -164,7 +164,7 @@ def merge_lanelets(lanelet1: Lanelet, lanelet2: Lanelet) -> Lanelet:
     assert isinstance(lanelet1, Lanelet), '<Lanelet/merge_lanelets>: lanelet1 is not a valid lanelet object!'
     assert isinstance(lanelet2, Lanelet), '<Lanelet/merge_lanelets>: lanelet1 is not a valid lanelet object!'
     # check connection via successor / predecessor
-    assert lanelet1.lanelet_id in lanelet2.successor or lanelet2.lanelet_id in lanelet1.successor,\
+    assert lanelet1.lanelet_id in lanelet2.successor or lanelet2.lanelet_id in lanelet1.successor, \
         '<Lanelet/merge_lanelets>: cannot merge two not connected lanelets! successors of l1 = {}, ' \
         'successors of l2 = {}'.format(lanelet1.successor, lanelet2.successor)
 
@@ -417,9 +417,9 @@ def scenario_to_networkx_graph(scenario) -> nx.DiGraph:
     graph = nx.DiGraph(scenario=scenario)
     for la in lanelets:
         position = (
-                np.mean([p[0] for p in la.center_vertices]),
-                np.mean([p[1] for p in la.center_vertices])
-            )
+            np.mean([p[0] for p in la.center_vertices]),
+            np.mean([p[1] for p in la.center_vertices])
+        )
         graph.add_node(la.lanelet_id, pos=position, lanelet=la)
         edges = [(la.lanelet_id, s) for s in la.successor if s in lanelet_ids]
         if edges:

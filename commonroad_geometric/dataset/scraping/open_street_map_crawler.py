@@ -136,7 +136,7 @@ class OpenStreetMapExtractor:
                 country_id = iso3166.countries_by_alpha2[pos.raw["address"]["country_code"].upper()].alpha3
             scenario_id = ScenarioID(
                 country_id=country_id,
-                #map_name=f"lat{lat:.4f}-lon{lon:.4f}-radius{radius:.0f}m",
+                # map_name=f"lat{lat:.4f}-lon{lon:.4f}-radius{radius:.0f}m",
                 map_name="latlonextract_" + str(uuid.uuid4()),
                 map_id=0,
             )
@@ -148,7 +148,7 @@ class OpenStreetMapExtractor:
         )
 
         with NamedTemporaryFile() as f:
-            success = await self._download_map(f, lon1, lat1, lon2, lat2) # type: ignore
+            success = await self._download_map(f, lon1, lat1, lon2, lat2)  # type: ignore
             if not success:
                 raise MapDownloadFailed(f"Failed to download the map for scenario %s", scenario_id)
 
@@ -167,7 +167,6 @@ class OpenStreetMapExtractor:
             raise ValueError("Scenario contains invalid lanelet")
 
         if repair_scenario:
-            # https://gitlab.lrz.de/cps/commonroad-scenario-designer/-/tree/feature_map_validation_repairing
             from crdesigner.map_validation_repairing.map_validator_repairer import MapValidatorRepairer
             repairer = MapValidatorRepairer(scenario)
             repairer.validate_and_repair(iterations=100)
@@ -340,7 +339,7 @@ class OpenStreetMapCrawler(AutoReprMixin):
         Args:
             location (Location):
                 Location around which to collect scenarios.
-            scenario_name (str):
+            scenario_name (Path):
                 Name of the CommonRoad scenario, e.g. Munich.
             n (int, optional):
                 Number of scenarios to save. Defaults to -1.
@@ -495,7 +494,7 @@ class OpenStreetMapCrawler(AutoReprMixin):
         )
 
         # write scenario to file with planning problem
-        output_path = self._output_dir / f"{scenario.scenario_id}.xml"
+        output_path = Path(self._output_dir,f"{scenario.scenario_id}.xml")
         file_writer.write_to_file(
             str(output_path),
             overwrite_existing_file=OverwriteExistingFile.ALWAYS,

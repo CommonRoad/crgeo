@@ -29,7 +29,7 @@ class DefaultSumoConfig(DefaultConfig):
     country_id = 'ZAM'
 
     ##
-    ## simulation
+    # simulation
     ##
     dt = 0.1  # length of simulation step of the interface
     delta_steps = 1  # number of sub-steps simulated in SUMO during every dt
@@ -53,7 +53,7 @@ class DefaultSumoConfig(DefaultConfig):
     n_ego_vehicles = 0
 
     ##
-    ## Plotting
+    # Plotting
     ##
     video_start = 1
     video_end = simulation_steps
@@ -72,7 +72,7 @@ class DefaultSumoConfig(DefaultConfig):
     window_height = 200
 
     ##
-    ## Adjust Speed Limits
+    # Adjust Speed Limits
     ##
     # [m/s] if not None: use this speed limit instead of speed limit from CommonRoad files
     overwrite_speed_limit = 130 / 3.6
@@ -84,7 +84,7 @@ class DefaultSumoConfig(DefaultConfig):
     unrestricted_speed_limit_default = 130 / 3.6
 
     ##
-    ## ego vehicle sync parameters
+    # ego vehicle sync parameters
     ##
     # Time window to detect the lanelet change in seconds
     lanelet_check_time_window = int(2 / dt)
@@ -98,7 +98,7 @@ class DefaultSumoConfig(DefaultConfig):
     lane_change_tol = 0.00
 
     ##
-    ## TRAFFIC GENERATION
+    # TRAFFIC GENERATION
     ##
     # probability that vehicles will start at the fringe of the network (edges without
     # predecessor), and end at the fringe of the network (edges without successor).
@@ -195,7 +195,7 @@ class DefaultSumoConfig(DefaultConfig):
             ObstacleType.CAR: Interval(0.9, 1.1),
             ObstacleType.TRUCK: Interval(0.9, 1.1),
             ObstacleType.BUS: Interval(0.9, 1.1),
-            ObstacleType.BICYCLE:Interval(0.9, 1.1),
+            ObstacleType.BICYCLE: Interval(0.9, 1.1),
         },
     }
 

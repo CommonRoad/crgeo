@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Tuple, NamedTuple, Generic, TypeVar
+from typing import Dict, Generic, NamedTuple, Tuple, TypeVar
 
 import numpy as np
 import torch
-from torch import Tensor
 import torch.nn.functional as F
+from torch import Tensor
 
 from commonroad_geometric.common.torch_utils.helpers import assert_size
 
@@ -32,6 +32,7 @@ class VehicleModel(ABC, Generic[T_VehicleStates]):
     @abstractmethod
     def compute_single_step_loss(self, prediction: T_VehicleStates, target: T_VehicleStates) -> Dict[str, Tensor]:
         ...
+
 
 class RelativePositionVehicleStates(NamedTuple):
     position: Tensor
@@ -86,18 +87,18 @@ class RelativePositionVehicleModel(VehicleModel[RelativePositionVehicleStates]):
         # then scale such that its maximum 2-norm is self.max_velocity
         position_delta_local = self.max_velocity * position_delta_local
         # rotate such that position_delta is relative to the new orientation
-        #rotation_matrices = rotation_matrices_2d(states.orientation, dtype=input.dtype, device=input.device)
+        # rotation_matrices = rotation_matrices_2d(states.orientation, dtype=input.dtype, device=input.device)
         # torch.mv does not support batching so use for-loop instead
-        #position_delta = torch.empty_like(position_delta_local)
-        #for i in range(input.size(0)):  # TODO vectorize like in KinematicSingleTrackVehicleModel
+        # position_delta = torch.empty_like(position_delta_local)
+        # for i in range(input.size(0)):  # TODO vectorize like in KinematicSingleTrackVehicleModel
         #    position_delta[i] = rotation_matrices[i] @ position_delta_local[i]
 
-        #orientation_delta = self.max_orientation_delta * torch.tanh(input[:, 2:3])
-        #orientation = states.orientation + dt * orientation_delta
+        # orientation_delta = self.max_orientation_delta * torch.tanh(input[:, 2:3])
+        # orientation = states.orientation + dt * orientation_delta
 
         return RelativePositionVehicleStates(
             position=states.position + dt * position_delta_local,
-            #orientation=orientation,
+            # orientation=orientation,
         )
 
     def compute_single_step_loss(
@@ -111,7 +112,7 @@ class RelativePositionVehicleModel(VehicleModel[RelativePositionVehicleStates]):
         return {
             "primary": sum((
                 loss_fn(prediction.position, target.position),
-                #loss_fn(torch.zeros_like(prediction.orientation), relative_orientation(prediction.orientation, target.orientation)),
+                # loss_fn(torch.zeros_like(prediction.orientation), relative_orientation(prediction.orientation, target.orientation)),
             )),
             "position_only": loss_fn(prediction.position.detach(), target.position.detach()),
         }
@@ -201,7 +202,12 @@ class RelativePositionAndOrientationVehicleModel(VehicleModel[RelativePositionAn
         return {
             "primary": sum((
                 loss_fn(prediction.position, target.position),
-                loss_fn(torch.zeros_like(prediction.orientation), relative_orientation(prediction.orientation, target.orientation)),
+                loss_fn(
+                    torch.zeros_like(
+                        prediction.orientation),
+                    relative_orientation(
+                        prediction.orientation,
+                        target.orientation)),
             )),
             "position_only": loss_fn(prediction.position.detach(), target.position.detach()),
         }
@@ -350,7 +356,12 @@ class KinematicSingleTrackVehicleModel(VehicleModel[KinematicSingleTrackVehicleS
                 loss_fn(prediction.position, target.position),
                 loss_fn(prediction.velocity_long, target.velocity_long),
                 loss_fn(prediction.acceleration_long, target.acceleration_long),
-                loss_fn(torch.zeros_like(prediction.orientation), relative_orientation(prediction.orientation, target.orientation)),
+                loss_fn(
+                    torch.zeros_like(
+                        prediction.orientation),
+                    relative_orientation(
+                        prediction.orientation,
+                        target.orientation)),
             )),
             "position_only": loss_fn(prediction.position.detach(), target.position.detach()),
         }

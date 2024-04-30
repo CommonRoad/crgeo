@@ -7,7 +7,7 @@ import time
 import uuid
 from collections import defaultdict
 from functools import lru_cache
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Set
 
 import numpy as np
 from commonroad.common.util import Interval
@@ -17,7 +17,8 @@ from commonroad.prediction.prediction import TrajectoryPrediction
 from commonroad.scenario.lanelet import LaneletNetwork
 from commonroad.scenario.obstacle import DynamicObstacle
 from commonroad.scenario.scenario import Scenario, ScenarioID
-from commonroad.scenario.trajectory import State, Trajectory
+from commonroad.scenario.state import InitialState, State
+from commonroad.scenario.trajectory import Trajectory
 from numpy.random import RandomState, RandomState
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
@@ -57,11 +58,11 @@ class _CRSumoSimulation(AutoReprMixin):
     """
     Class for interfacing between the SUMO simulation and CommonRoad.
 
-    Modified version of https://gitlab.lrz.de/tum-cps/commonroad-sumo-interface
+    Modified version of crsumo
     supporting continuous simulation.
     """
 
-    def __init__(self, silent: bool = True, include_lanes: Set[int] = None,):
+    def __init__(self, silent: bool = True, include_lanes: set[int] = None,):
 
         try:
             import traci
@@ -110,7 +111,7 @@ class _CRSumoSimulation(AutoReprMixin):
         self._current_time_step = 0
         self._map_converter = None
         self.ids_sumo2cr, self.ids_cr2sumo = initialize_id_dicts(ID_DICT)
-        self._max_cr_id = 0 # keep track of all IDs in CR scenario
+        self._max_cr_id = 0  # keep track of all IDs in CR scenario
 
         # veh_id -> List[SignalState]
         self.signal_states: Dict[int, List[SignalState]] = defaultdict(list)
@@ -154,7 +155,7 @@ class _CRSumoSimulation(AutoReprMixin):
             return np.max([max_lanelet, max_intersection, max_traffic_light, max_traffic_sign]).item()
 
         if self.planning_problem_set is not None:
-            max_pp= max(list(self.planning_problem_set.planning_problem_dict.keys()))
+            max_pp = max(list(self.planning_problem_set.planning_problem_dict.keys()))
         else:
             max_pp = 0
 
@@ -192,12 +193,12 @@ class _CRSumoSimulation(AutoReprMixin):
             self._map_converter.lanelet_network = self.scenarios.lanelet_network
             self._map_converter._convert_map()
             veh_distr_sum = sum(self.conf.veh_distribution.values())
-            self._veh_distr = {k: v/veh_distr_sum for k, v in self.conf.veh_distribution.items()}
+            self._veh_distr = {k: v / veh_distr_sum for k, v in self.conf.veh_distribution.items()}
 
         import tempfile
         import shutil
 
-        dirpath = tempfile.mkdtemp()
+        dirpath = Path(tempfile.mkdtemp())
 
         try:
             self._map_converter.create_sumo_files(dirpath)
@@ -244,8 +245,8 @@ class _CRSumoSimulation(AutoReprMixin):
                 cmd_config.save_config()
                 cmd = cmd_config.generate_command()
                 self._traci.start(cmd, label=self.traci_label)
-            except Exception:
-                logger.warn(f"self._traci.start failing after cmd={cmd}")
+            except Exception as exp:
+                logger.warning(f"self._traci.start failing after cmd with exception {exp}")
                 raise
             self._running = True
             # simulate until ego_time_start
@@ -296,7 +297,7 @@ class _CRSumoSimulation(AutoReprMixin):
         #         except TraCIException:
         #             pass
 
-        #self.init_ego_vehicle()
+        # self.init_ego_vehicle()
         # initializes vehicle positions (and ego vehicles, if defined in .rou file)
         # if self.planning_problem_set is not None:
         #     if len(self.ego_vehicles) > 0:
@@ -333,7 +334,6 @@ class _CRSumoSimulation(AutoReprMixin):
 
         self.dummy_ego_simulation = False
 
-
         width = self.conf.ego_veh_width
         length = self.conf.ego_veh_length
 
@@ -351,22 +351,22 @@ class _CRSumoSimulation(AutoReprMixin):
         initial_state = copy.deepcopy(planning_problem.initial_state)
         initial_state.time_step = self.current_time_step
         self._add_ego_vehicle(EgoVehicle(cr_id, initial_state,
-                                            self.conf.delta_steps, width, length,
-                                            planning_problem)
-        )
+                                         self.conf.delta_steps, width, length,
+                                         planning_problem)
+                              )
 
     def _add_vehicle_to_sim(self, sumo_id: str) -> None:
         # retrieve arbitrary route id for initialization (will not be used by interface)
         generic_route_id = self.routedomain.getIDList()[0]
         self.vehicledomain.add(sumo_id, generic_route_id, typeID="DEFAULT_VEHTYPE",
-            depart=None,
-            departLane='first', departPos="base",
-            departSpeed=0.0,
-            arrivalLane="current", arrivalPos="max",
-            arrivalSpeed="current",
-            fromTaz="", toTaz="", line="", personCapacity=0,
-            personNumber=0
-        )
+                               depart=None,
+                               departLane='first', departPos="base",
+                               departSpeed=0.0,
+                               arrivalLane="current", arrivalPos="max",
+                               arrivalSpeed="current",
+                               fromTaz="", toTaz="", line="", personCapacity=0,
+                               personNumber=0
+                               )
 
     def spawn_vehicle(
         self,
@@ -389,7 +389,7 @@ class _CRSumoSimulation(AutoReprMixin):
             if n_depart_lanes == 1:
                 depart_lane = 0
             else:
-                depart_lane = rng.randint(0, n_depart_lanes-1)
+                depart_lane = rng.randint(0, n_depart_lanes - 1)
         else:
             route_id_candidates = [
                 (route_id, route_edges)
@@ -408,7 +408,7 @@ class _CRSumoSimulation(AutoReprMixin):
             if n_exit_lanes == 1:
                 exit_lane = 0
             else:
-                exit_lane = rng.randint(0, n_exit_lanes-1)
+                exit_lane = rng.randint(0, n_exit_lanes - 1)
             arrival_lane = str(exit_lane)
         else:
             arrival_lane = "current"
@@ -441,7 +441,6 @@ class _CRSumoSimulation(AutoReprMixin):
         self.vehicledomain.setParameter(sumo_id, 'jmIgnoreFoeSpeed', 1.0)
         self.vehicledomain.setParameter(sumo_id, 'jmIgnoreFoeProb', 1.0)
 
-        
         return sumo_id
 
     def _add_ego_vehicle(self, ego_vehicle: EgoVehicle):
@@ -469,7 +468,7 @@ class _CRSumoSimulation(AutoReprMixin):
         try:
             self._traci.getConnection(self.traci_label)
             return True
-        except:
+        except BaseException:
             return False
 
     @property
@@ -520,7 +519,7 @@ class _CRSumoSimulation(AutoReprMixin):
         """
 
         self.cr_scenario = Scenario(self.dt, ScenarioID.from_benchmark_id(self.conf.scenario_name, '2020a'))
-        self.cr_scenario.lanelet_network = self.scenarios.lanelet_network
+        self.cr_scenario._lanelet_network = self.scenarios.lanelet_network
 
         # remove old obstacles from lanes
         # this is only necessary if obstacles are added to lanelets
@@ -577,12 +576,10 @@ class _CRSumoSimulation(AutoReprMixin):
             # if state.velocity < 0.1:
             #     self.vehicledomain.remove(sumo_id)
 
-
         # get updated obstacles from sumo
         if not silent:
             self._current_time_step += 1
         self._fetch_sumo_vehicles(self.current_time_step)
-
 
     def presimulation_silent(self, pre_simulation_steps: int):
         """
@@ -605,7 +602,7 @@ class _CRSumoSimulation(AutoReprMixin):
         self._silent = False
 
     @property
-    def current_vehicle_ids(self) -> Set[int]:
+    def current_vehicle_ids(self) -> set[int]:
         return set(self.obstacle_states[self.current_time_step].keys())
 
     def _fetch_sumo_vehicles(self, time_step: int):
@@ -664,14 +661,14 @@ class _CRSumoSimulation(AutoReprMixin):
                 for t in range(0, self.conf.delta_steps):
                     state_tmp = copy.deepcopy(state)
                     state_tmp.position = state.position + (t + 1) * state.velocity \
-                                         * self.dt * np.array([np.cos(ori), np.sin(ori)])
+                        * self.dt * np.array([np.cos(ori), np.sin(ori)])
                     state_tmp.time_step = t + 1
                     state_list.append(state_tmp)
 
                 ego_veh.set_planned_trajectory(state_list)
 
     def _set_veh_params(
-        self, 
+        self,
         veh_id: int,
         vehicle_class: ObstacleType
     ) -> Rectangle:
@@ -739,12 +736,11 @@ class _CRSumoSimulation(AutoReprMixin):
         except AttributeError:
             acceleration = 0.0
 
-        state = State(position=position,
-                     orientation=orientation,
-                     velocity=velocity,
-                     velocity_y=velocity_y,
-                     acceleration=acceleration,
-                     time_step=self.current_time_step)
+        state = InitialState(position=position,
+                      orientation=orientation,
+                      velocity=velocity,
+                      acceleration=acceleration,
+                      time_step=self.current_time_step)
 
         return state
 
@@ -808,7 +804,6 @@ class _CRSumoSimulation(AutoReprMixin):
                     shape=self.obstacle_shapes[veh_id],
                     center_lanelet_assignment=None
                 )
-
 
             dynamic_obstacle = DynamicObstacle(
                 obstacle_id=veh_id,
@@ -891,7 +886,7 @@ class _CRSumoSimulation(AutoReprMixin):
         return obstacles
 
     @lru_cache()
-    def _get_ids_of_map(self) -> Set[int]:
+    def _get_ids_of_map(self) -> set[int]:
         """
         Get a list of ids of all the lanelets from the cr map which is converted from a osm map.
         :return: list of lanelets' ids
@@ -952,7 +947,7 @@ class _CRSumoSimulation(AutoReprMixin):
                 # Execute MoveXY or SUMO lane change according to the sync mechanism
                 planned_state = ego_vehicle.get_planned_state(delta_step)
                 self.forward_info2sumo(planned_state, sync_mechanism, lc_duration,
-                                        id_cr)
+                                       id_cr)
 
     def _get_ego_ids(self) -> Dict[int, str]:
         """
@@ -1011,11 +1006,11 @@ class _CRSumoSimulation(AutoReprMixin):
         """ Exits SUMO Simulation"""
         try:
             self._traci.close()
-        except:
+        except BaseException:
             pass
         self.reset_variables()
         self._running = False
-        #sys.stdout.flush()
+        # sys.stdout.flush()
 
     def __del__(self) -> None:
         self.stop()
@@ -1087,10 +1082,10 @@ class _CRSumoSimulation(AutoReprMixin):
         if lc_future_status == 'NO_LC' or not id in self.lateral_position_buffer:
             lc_status = 'NO_LC'
         elif lc_future_status == 'RIGHT_LC' \
-            and self.lateral_position_buffer[id] > self.conf.lane_change_tol + lateral_position:
+                and self.lateral_position_buffer[id] > self.conf.lane_change_tol + lateral_position:
             lc_status = 'RIGHT_LC_STARTED'
         elif lc_future_status == 'LEFT_LC' \
-            and self.lateral_position_buffer[id] < -self.conf.lane_change_tol + lateral_position:
+                and self.lateral_position_buffer[id] < -self.conf.lane_change_tol + lateral_position:
             lc_status = 'LEFT_LC_STARTED'
         else:
             lc_status = 'NO_LC'

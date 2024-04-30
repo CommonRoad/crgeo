@@ -12,7 +12,7 @@ from commonroad.common.util import AngleInterval, Interval
 from commonroad.geometry.shape import Rectangle
 from commonroad.planning.planning_problem import GoalRegion, PlanningProblem, PlanningProblemSet
 from commonroad.scenario.lanelet import Lanelet
-from commonroad.scenario.trajectory import State
+from commonroad.scenario.state import State, InitialState, KSState
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 from commonroad_geometric.common.class_extensions.string_resolver_mixing import StringResolverMixin
@@ -131,8 +131,11 @@ class BaseRespawner(ABC, AutoReprMixin, StringResolverMixin):
                     goal_lanelet=goal_lanelet
                 )
                 assert ego_vehicle_simulation.planning_problem is not None
-                ego_vehicle_simulation.planning_problem.initial_state.time_step = ego_vehicle_simulation.current_time_step
-                ego_vehicle.reset(initial_state=ego_vehicle_simulation.planning_problem.initial_state)
+                ego_state = ego_vehicle_simulation.planning_problem.initial_state
+                ego_state.time_step = ego_vehicle_simulation.current_time_step
+                ego_state.steering_angle = 0.0
+                
+                ego_vehicle.reset(initial_state=ego_state)
                 if not validate_spawn_location():
                     continue
                 success_spawn = True
@@ -218,12 +221,14 @@ class BaseRespawner(ABC, AutoReprMixin, StringResolverMixin):
             lanelet_id = ego_vehicle_simulation.current_scenario.lanelet_network.find_lanelet_by_position([position])[0][0]
             lanelet = ego_vehicle_simulation.simulation.find_lanelet_by_id(lanelet_id)
         if recompute_position:
-            position = ego_vehicle_simulation.simulation.get_lanelet_center_polyline(lanelet.lanelet_id).get_projected_position(position)
+            position = ego_vehicle_simulation.simulation.get_lanelet_center_polyline(
+                lanelet.lanelet_id,
+            ).get_projected_position(position, linear_projection=True)
 
         orientation = lanelet_orientation_at_position(lanelet, position)
         goal_region = GoalRegion(
             state_list=[
-                State(
+                InitialState(
                     time_step=Interval(0.0, 1e6),
                     position=Rectangle(
                         length=length,

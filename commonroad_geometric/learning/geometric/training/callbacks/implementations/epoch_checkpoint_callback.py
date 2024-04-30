@@ -22,7 +22,7 @@ class EpochCheckpointCallback(BaseCallback[CheckpointCallbackParams]):
         time_since_last_checkpoint = current_time - self._last_checkpoint_time
         if time_since_last_checkpoint > self._checkpoint_cooldown:
             best_validation_loss = len(params.ctx.losses[Train_Categories.Validation.value][Train_Features.Avg.value]) > 0 and \
-                                   params.ctx.losses[Train_Categories.Validation.value][Train_Features.Avg.value][-1] == min(
+                params.ctx.losses[Train_Categories.Validation.value][Train_Features.Avg.value][-1] == min(
                 params.ctx.losses[Train_Categories.Validation.value][Train_Features.Avg.value])
             if best_validation_loss:
                 self._last_checkpoint_time = current_time

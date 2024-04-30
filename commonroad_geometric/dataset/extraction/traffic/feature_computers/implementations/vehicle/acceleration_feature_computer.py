@@ -21,7 +21,7 @@ class AccelerationFeatureComputer(BaseFeatureComputer[VFeatureParams]):
         params: VFeatureParams,
         simulation: BaseSimulation,
     ) -> FeatureDict:
-        
+
         if not self.from_velocity and hasattr(params.state, 'acceleration'):
             return {V_Feature.Acceleration.value: float(params.state.acceleration)}
 

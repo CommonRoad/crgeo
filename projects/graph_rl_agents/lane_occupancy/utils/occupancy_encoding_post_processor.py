@@ -1,6 +1,7 @@
 import logging
 from copy import deepcopy
 from typing import List, Optional
+from pathlib import Path
 
 import torch
 
@@ -8,6 +9,7 @@ from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.dataset.postprocessing.base_data_postprocessor import BaseDataPostprocessor
 from commonroad_geometric.simulation.base_simulation import BaseSimulation
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle import EgoVehicle
+from commonroad_geometric.learning.geometric.base_geometric import BaseGeometric
 from projects.geometric_models.lane_occupancy.models.occupancy.occupancy_model import OccupancyModel
 
 logger = logging.getLogger(__name__)
@@ -21,7 +23,8 @@ class OccupancyEncodingPostProcessor(BaseDataPostprocessor):
 
     def __init__(
         self,
-        model_filepath: str,
+        model_cls: BaseGeometric,
+        model_filepath: Path,
         include_path_decodings: bool = True,
         include_ego_vehicle_decodings: bool = True,
         decoding_resolution_route: int = 50,
@@ -33,23 +36,11 @@ class OccupancyEncodingPostProcessor(BaseDataPostprocessor):
         deepcopy_data: bool = False,
         masking: bool = False
     ) -> None:
-
-        # TODO: retrain model and remove this...
-        # Hack to resolve below error when loading old pre-trained model that has changed directory:
-        #
-        # File "/home/eivind/anaconda3/envs/cr39/lib/python3.9/site-packages/dill/_dill.py", line 525, in load
-        #     obj = StockUnpickler.load(self)
-        # File "/home/eivind/anaconda3/envs/cr39/lib/python3.9/site-packages/dill/_dill.py", line 515, in find_class
-        #     return StockUnpickler.find_class(self, module, name)
-        # ModuleNotFoundError: No module named ...
-        import sys
-        import projects.geometric_models.lane_occupancy.models as models_module
-        sys.modules['tutorials.train_geometric_model.models'] = models_module
-
-        self._model = OccupancyModel.load(
+        self._model = model_cls.load(
             model_filepath,
             device='cpu',
-            retries=0
+            retries=0,
+            from_torch=True
         )
         self._model.eval()
         self._model_filepath = model_filepath
@@ -87,7 +78,7 @@ class OccupancyEncodingPostProcessor(BaseDataPostprocessor):
                 logger.warning(f"Cannot encode data, equ sequence post processing not applied")
                 continue
 
-            encode_data = deepcopy(data) if self._deepcopy_data else data # hack to avoid interference
+            encode_data = deepcopy(data) if self._deepcopy_data else data  # hack to avoid interference
             encode_data.walk_velocity = torch.tensor(
                 [ego_vehicle.state.velocity],
                 device=data.device,
@@ -95,7 +86,6 @@ class OccupancyEncodingPostProcessor(BaseDataPostprocessor):
             )
 
             if self._model.config.path_conditioning:
-
                 self._model.preprocess_conditioning(
                     encode_data,
                     encode_data.walks,
@@ -121,9 +111,13 @@ class OccupancyEncodingPostProcessor(BaseDataPostprocessor):
                 if self._include_ego_vehicle_decodings:
                     assert ego_vehicle is not None
                     d = self._ego_length_multiplier * ego_vehicle.shape.length / data.path_length
-                    t_vec = torch.arange(self._decoding_time_horizon, device=data.device, dtype=torch.float32) * simulation.dt
+                    t_vec = torch.arange(
+                        self._decoding_time_horizon,
+                        device=data.device,
+                        dtype=torch.float32) * simulation.dt
                     pos_t = ego_vehicle.state.velocity / data.path_length * t_vec
-                    linspace = torch.linspace(0, 1, self._decoding_resolution_vehicle, device=data.device, dtype=torch.float32)
+                    linspace = torch.linspace(0, 1, self._decoding_resolution_vehicle,
+                                              device=data.device, dtype=torch.float32)
                     lower_t = torch.clamp(pos_t - d / 2, 0.0, 1.0)[:, None]
                     upper_t = torch.clamp(pos_t + d / 2, 0.0, 1.0)[:, None]
                     diff_t = upper_t - lower_t

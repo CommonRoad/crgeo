@@ -44,7 +44,7 @@ class DebugCallback(GeometricTrainingCallback):
             self.running_avg_train_loss = 0.99 * self.running_avg_train_loss + 0.01 * train_loss
 
         callback_dict = {Train_Categories.__getitem__(i).value + '_' + Train_Features.__getitem__(j).value: self.get_loss_value(ctx, i, j)[-1] if len(self.get_loss_value(ctx, i, j)) > 0 and isfinite(self.get_loss_value(ctx, i, j)[-1]) else None
-            for i in Train_Categories._member_names_ if Train_Categories.__getitem__(i).value in ctx.losses for j in Train_Features._member_names_}
+                         for i in Train_Categories._member_names_ if Train_Categories.__getitem__(i).value in ctx.losses for j in Train_Features._member_names_}
 
         callback_dict['step'] = ctx.step
         callback_dict['epoch'] = ctx.epoch
@@ -59,16 +59,17 @@ class OptimizationMetricsCallback(GeometricTrainingCallback):
         ...
 
     def __call__(self, ctx: GeometricTrainingContext, *args) -> None:
-        if not ctx.losses[Train_Categories.Validation.value] or len(ctx.losses[Train_Categories.Validation.value][Train_Features.Current.value]) == 0:
+        if not ctx.losses[Train_Categories.Validation.value] or len(
+                ctx.losses[Train_Categories.Validation.value][Train_Features.Current.value]) == 0:
             return False
         return ctx.losses[Train_Categories.Validation.value][Train_Features.Current.value][-1]
 
 
 T_Data = TypeVar("T_Data", Data, HeteroData, CommonRoadData, CommonRoadDataTemporal)
-T_Batch = TypeVar("T_Batch",Batch,CommonRoadDataTemporalBatch)
+T_Batch = TypeVar("T_Batch", Batch, CommonRoadDataTemporalBatch)
 
 
-def custom_collate_fn( data_list: List[T_Data], follow_batch=None, exclude_keys=None) -> T_Batch:
+def custom_collate_fn(data_list: List[T_Data], follow_batch=None, exclude_keys=None) -> T_Batch:
     """
     creates assignment vectors for each key in :obj:`follow_batch`.
     Will exclude any keys given in :obj:`exclude_keys`.

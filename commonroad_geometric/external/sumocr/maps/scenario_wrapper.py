@@ -16,4 +16,3 @@ class AbstractScenarioWrapper(metaclass=ABCMeta):
     network_file = ""
 
     lanelet_network: LaneletNetwork = None
-

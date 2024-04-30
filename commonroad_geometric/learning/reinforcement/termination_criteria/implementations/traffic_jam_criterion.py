@@ -6,6 +6,7 @@ from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation impor
 
 VELOCITY_THRESHOLD = 0.5
 
+
 class TrafficJamCriterion(BaseTerminationCriterion):
     def __init__(
         self,
@@ -30,6 +31,9 @@ class TrafficJamCriterion(BaseTerminationCriterion):
         self._call_count += 1
         if self._call_count % self.check_frequency != 0:
             return False, None
+        
+        if len(ego_vehicle_simulation.current_lanelets) == 0:
+            return False, None
 
         current_lanelet_id = ego_vehicle_simulation.current_lanelets[0].lanelet_id
         current_lanelet_polyline = ego_vehicle_simulation._simulation.get_lanelet_center_polyline(current_lanelet_id)
@@ -41,17 +45,19 @@ class TrafficJamCriterion(BaseTerminationCriterion):
             return False, None
         obstacle_states = [
             state_at_time(
-                ego_vehicle_simulation._simulation.current_scenario._dynamic_obstacles[oid], 
+                ego_vehicle_simulation._simulation.current_scenario._dynamic_obstacles[oid],
                 ego_vehicle_simulation.current_time_step,
                 assume_valid=True
             ) for oid in obstacle_ids
         ]
         obstacle_arclenghts = np.array([current_lanelet_polyline.get_projected_arclength(
-            state.position
+            state.position,
+            linear_projection=ego_vehicle_simulation.simulation.options.linear_lanelet_projection
         ) for state in obstacle_states])
         obstacle_speeds = np.array([state.velocity for state in obstacle_states])
         ego_arclength = current_lanelet_polyline.get_projected_arclength(
-            ego_vehicle_simulation.ego_vehicle.state.position
+            ego_vehicle_simulation.ego_vehicle.state.position,
+            linear_projection=ego_vehicle_simulation.simulation.options.linear_lanelet_projection
         )
 
         ego_distances = obstacle_arclenghts - ego_arclength

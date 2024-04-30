@@ -36,8 +36,8 @@ class AttentionDecoder(BaseDecoder):
             remainder = x
 
         query = self.lin_query(remainder)
-        unscaled_extraction = (query + 1e-4)*remainder
-        
+        unscaled_extraction = (query + 1e-4) * remainder
+
         extraction = torch.nn.functional.normalize(unscaled_extraction, p=1, dim=1)
         truncated_extraction = torch.minimum(extraction, remainder)
 

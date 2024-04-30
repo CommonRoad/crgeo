@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 from enum import Enum
 from typing import List, Generator, Set
-
+from pathlib import Path
 import networkx as nx
 import numpy as np
 from commonroad.planning.planning_problem import PlanningProblem
@@ -133,8 +133,8 @@ class RoutePlanner:
     def _init_logger(self, log_to_console=True, log_to_file=True, add_timestamp_to_log_file=True):
         """Initializes a logger."""
         # path relative to the running script
-        log_file_dir = "solutions/logs/scenario_logs"
-        log_file_name = "route_planner_result_with_priority_queue_backend"
+        log_file_dir = Path("solutions/logs/scenario_logs")
+        log_file_name = Path("route_planner_result_with_priority_queue_backend")
 
         # release_logger(self.logger)
         self.logger.setLevel(logging.INFO)
@@ -373,7 +373,7 @@ class RoutePlanner:
             - it only considers lanes with same driving direction
             - the priorities of right and left should be swapped for left-hand traffic countries, e.g. UK
             - it goes until the end of the lanelet network or when it is hits itself (like dying in the Snake game)
-            
+
         :param id_lanelet_start: the initial lanelet where we start from
         :return: route that consists of a list of lanelet IDs
         """
@@ -583,7 +583,7 @@ class RoutePlanner:
                                                        weight='weight', method='dijkstra'))
         except nx.exception.NetworkXNoPath:
             # it is a normal behaviour because of the overlapping lanelets in a road network
-            self.logger.debug(f"""The goal lanelet with ID [{id_lanelet_goal}] cannot be reached 
+            self.logger.debug(f"""The goal lanelet with ID [{id_lanelet_goal}] cannot be reached
                               from the start lanelet with ID [{id_lanelet_start}]""")
         return list_lanelets
 
@@ -610,7 +610,7 @@ class RoutePlanner:
                                                        weight='weight', method='dijkstra'))[::-1])
         except nx.exception.NetworkXNoPath:
             # it is a normal behaviour because of the overlapping lanelets in a road network
-            self.logger.debug(f"""The goal lanelet with ID [{id_lanelet_goal}] cannot be reached 
+            self.logger.debug(f"""The goal lanelet with ID [{id_lanelet_goal}] cannot be reached
                                           from the start lanelet with ID [{id_lanelet_start}]""")
         return list_lanelets
 
@@ -636,7 +636,7 @@ class RoutePlanner:
                 list_lanelets.append(self._find_route_astar(id_lanelet_start, id_lanelet_goal))
             except self.NoPathFound:
                 # it is a normal behaviour because of the overlapping lanelets in a road network
-                self.logger.debug(f"""The goal lanelet with ID [{id_lanelet_goal}] cannot be reached 
+                self.logger.debug(f"""The goal lanelet with ID [{id_lanelet_goal}] cannot be reached
                                                           from the start lanelet with ID [{id_lanelet_start}]""")
         return list_lanelets
 

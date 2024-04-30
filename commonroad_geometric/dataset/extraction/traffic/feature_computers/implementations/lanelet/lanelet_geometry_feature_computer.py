@@ -8,8 +8,6 @@ from commonroad_geometric.simulation.base_simulation import BaseSimulation
 
 
 class LaneletGeometryFeatureComputer(BaseFeatureComputer[LFeatureParams]):
-
-
     def __init__(
         self,
     ) -> None:
@@ -33,8 +31,8 @@ class LaneletGeometryFeatureComputer(BaseFeatureComputer[LFeatureParams]):
         start_curvature = source_lanelet_path.get_curvature(0.0)
         end_curvature = source_lanelet_path.get_curvature(source_lanelet_path.length)
         direction_change = relative_orientation(
-             source_lanelet_path.get_direction(0.0),
-             source_lanelet_path.get_direction(source_lanelet_path.length)
+            source_lanelet_path.get_direction(0.0),
+            source_lanelet_path.get_direction(source_lanelet_path.length)
         )
         features: FeatureDict = {
             L_Feature.StartCurvature.value: start_curvature,

@@ -16,6 +16,7 @@ class VehicleSortingPostProcessor(BaseDataPostprocessor):
     """
     Facilitates ordering of vehicle nodes based on predefined metrics.
     """
+
     def __init__(
         self,
         sort_key: V_Feature,

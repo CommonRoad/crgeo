@@ -8,7 +8,7 @@ class DebugTrainBackwardGradientsCallback(BaseCallback[StepCallbackParams]):
         self,
         frequency: int,
         return_gradients: bool = False,
-        gradient_callback: Optional[ Callable[[Dict, List[str]], None]] = None
+        gradient_callback: Optional[Callable[[Dict, List[str]], None]] = None
     ):
         self.return_gradients = return_gradients
         self.gradient_callback = gradient_callback

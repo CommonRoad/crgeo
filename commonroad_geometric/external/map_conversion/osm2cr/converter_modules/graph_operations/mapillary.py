@@ -51,10 +51,10 @@ def get_mappilary_traffic_signs(bbox: Bbox):
         return signs
 
     except ValueError:
-        #print("mapillary Device ID is not set")
+        # print("mapillary Device ID is not set")
         return None
     except URLError:
-        #print("error while connecting to mapillary servers. Skipping Mapillary signs")
+        # print("error while connecting to mapillary servers. Skipping Mapillary signs")
         return None
 
 

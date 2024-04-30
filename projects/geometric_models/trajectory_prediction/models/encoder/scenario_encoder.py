@@ -2,8 +2,8 @@ from typing import Dict, Union
 
 import torch
 from torch import Tensor, nn
-from torch_geometric.typing import EdgeType, NodeType
-from torch_geometric.nn import BatchNorm
+from torch_geometric.nn.norm import BatchNorm
+from torch_geometric.typing import EdgeType
 
 from commonroad_geometric.common.config import Config
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
@@ -38,7 +38,8 @@ class ScenarioEncoderModel(nn.Module):
         # == Lanelet nodes and lanelet-to-lanelet edges ==
         self.lanelet_encoder = LaneletNetworkEncoder(cfg=cfg.lanelet_network_encoder)
         assert self.lanelet_encoder.output_feature_size == self.cfg.lanelet_node_feature_size
-        # freeze_weights(self.lanelet_encoder)  # TODO ensure that weights are still frozen after .load_state_dict has been called
+        # freeze_weights(self.lanelet_encoder)  # TODO ensure that weights are
+        # still frozen after .load_state_dict has been called
 
         self.vehicle_lin = nn.Linear(cfg.graph_features.vehicle, self.cfg.vehicle_node_feature_size)
 
@@ -54,13 +55,14 @@ class ScenarioEncoderModel(nn.Module):
                 ("vehicle", "to", "lanelet"): cfg.graph_features.vehicle_to_lanelet,
             }
             if self.cfg.temporal.enabled:
-                in_channels_edge[("vehicle", "temporal", "vehicle")] = cfg.graph_features.vehicle_temporal_vehicle + self.cfg.temporal_time_to_vec_encoding_size
+                in_channels_edge[("vehicle", "temporal", "vehicle")] = cfg.graph_features.vehicle_temporal_vehicle + \
+                    self.cfg.temporal_time_to_vec_encoding_size
 
             in_channels_node = {
                 "vehicle": self.cfg.vehicle_node_feature_size,
                 "lanelet": self.cfg.lanelet_node_feature_size
-            } 
-            out_channels_node={
+            }
+            out_channels_node = {
                 "vehicle": self.cfg.vehicle_node_feature_size,
                 "lanelet": self.cfg.lanelet_node_feature_size
             }
@@ -122,7 +124,7 @@ class ScenarioEncoderModel(nn.Module):
             data.v2v.distance_ego,
             data.v2v.rel_velocity_ego,
             data.v2v.rel_acceleration_ego,
-            data.v2v.lanelet_distance 
+            data.v2v.lanelet_distance
         ], dim=-1)
 
         edge_attr_v2l = torch.cat([
@@ -136,7 +138,7 @@ class ScenarioEncoderModel(nn.Module):
             ('lanelet', 'to', 'lanelet'): edge_attr_lanelet,
             ('vehicle', 'to', 'lanelet'): self.batch_norm_v2l(edge_attr_v2l),
             ('lanelet', 'to', 'vehicle'): data.l2v.edge_attr,
-        }       
+        }
         if isinstance(data, CommonRoadDataTemporal):
             delta_time_edge_attr = self.temporal_edge_encoder(data.vehicle_temporal_vehicle.delta_time)
             edge_attr_dict[('vehicle', 'temporal', 'vehicle')] = torch.cat([

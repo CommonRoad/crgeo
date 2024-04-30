@@ -77,7 +77,7 @@ class TrafficSignParser:
                     # unknown traffic sign
                     except ValueError:
                         pass
-                        #print("Unknown traffic sign in" + str(sign_data) + " found")
+                        # print("Unknown traffic sign in" + str(sign_data) + " found")
                         # sign_id = traffic_sign_map['unknown']
                         # value = 'unknown sign'
                         # elements.append(TrafficSignElement(sign_id, [value]))

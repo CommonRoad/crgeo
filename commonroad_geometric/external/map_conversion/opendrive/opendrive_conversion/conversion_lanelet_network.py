@@ -790,7 +790,7 @@ class ConversionLaneletNetwork(LaneletNetwork):
         # calculate all incoming angle from the reference incoming vector
         for index in range(1, len(incomings)):
             new_v = self.find_lanelet_by_id(list(incomings[index].incoming_lanelets)[0]).center_vertices[-1] - \
-                    self.find_lanelet_by_id(list(incomings[index].incoming_lanelets)[0]).center_vertices[-3]
+                self.find_lanelet_by_id(list(incomings[index].incoming_lanelets)[0]).center_vertices[-3]
             angle = geometry.get_angle(ref, new_v)
             if angle < 0:
                 angle += 360

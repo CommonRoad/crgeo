@@ -1,4 +1,5 @@
-import sys, os; sys.path.insert(0, os.getcwd())
+import sys
+import os; sys.path.insert(0, os.getcwd())
 import hydra
 from omegaconf import OmegaConf
 from commonroad_geometric.learning.reinforcement.project.hydra_rl_config import RLProjectConfig

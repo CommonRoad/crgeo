@@ -14,12 +14,11 @@ class VehicleLaneletPoseFeatureComputer(VehicleLaneletPoseEdgeFeatureComputer):
     """
     In comparison with VehicleLaneletPoseEdgeFeatureComputer for V2L feature extraction,
     VehicleLaneletPoseFeatureComputer provides the most likely lanelet association of each vehicle,
-    while VehicleLaneletPoseEdgeFeatureComputer provides all lanelet association when vehicle is on multiple lanelets. 
+    while VehicleLaneletPoseEdgeFeatureComputer provides all lanelet association when vehicle is on multiple lanelets.
     """
     @classproperty
     def skip_normalize_features(cls) -> Set[str]:
         return {V_Feature.HeadingError.value}
-
 
     def __init__(
         self,
@@ -30,6 +29,9 @@ class VehicleLaneletPoseFeatureComputer(VehicleLaneletPoseEdgeFeatureComputer):
         include_lateral_error: bool = True,
         include_heading_error: bool = True,
         update_exact_interval: int = 1,
+        allow_outside_arclengths: bool = True,
+        nan_if_missing: bool = False,
+        linear_lanelet_projection: bool = False
     ) -> None:
         if not any((
             include_longitudinal_abs,
@@ -47,7 +49,11 @@ class VehicleLaneletPoseFeatureComputer(VehicleLaneletPoseEdgeFeatureComputer):
             include_lateral_left=include_lateral_left,
             include_lateral_right=include_lateral_right,
             include_lateral_error=include_lateral_error,
-            include_heading_error=include_heading_error
+            include_heading_error=include_heading_error,
+            update_exact_interval=update_exact_interval,
+            allow_outside_arclengths=allow_outside_arclengths,
+            nan_if_missing=nan_if_missing,
+            linear_lanelet_projection=linear_lanelet_projection
         )
 
     def __call__(
@@ -55,12 +61,12 @@ class VehicleLaneletPoseFeatureComputer(VehicleLaneletPoseEdgeFeatureComputer):
         params: VFeatureParams,
         simulation: BaseSimulation,
     ) -> FeatureDict:
-        features=self.compute_features(
+        features = self.compute_features(
             params,
             lanelet=simulation.get_obstacle_lanelet(params.obstacle),
             simulation=simulation
         )
-            
+
         return features
 
     def _return_undefined_features(self) -> Dict[str, float]:
@@ -80,8 +86,3 @@ class VehicleLaneletPoseFeatureComputer(VehicleLaneletPoseEdgeFeatureComputer):
             features[V_Feature.HeadingError.value] = np.nan
 
         return features
-
-
-
-
-

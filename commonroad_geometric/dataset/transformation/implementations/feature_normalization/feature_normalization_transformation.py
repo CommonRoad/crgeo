@@ -6,6 +6,7 @@ from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset
 from commonroad_geometric.dataset.transformation.base_transformation import BaseDataTransformation
 from commonroad_geometric.dataset.transformation.implementations.feature_normalization.normalize_features import FeatureNormalizer, normalize_features, get_normalization_params_file_path
 
+
 class FeatureNormalizationTransformation(BaseDataTransformation):
     def __init__(
         self,
@@ -29,15 +30,16 @@ class FeatureNormalizationTransformation(BaseDataTransformation):
             ignore_keys=self.ignore_keys
         )
         return dataset
-    
+
     def _transform_data(self, data: CommonRoadData) -> CommonRoadData:
         assert self.feature_normalizer.is_fitted
-        return self.feature_normalizer.normalize_features_(data) 
+        return self.feature_normalizer.normalize_features_(data)
+
 
 class FeatureUnnormalizationTransformation(FeatureNormalizationTransformation):
     def _transform_dataset(self, dataset: CommonRoadDataset) -> CommonRoadDataset:
         raise NotImplementedError("Cannot unnormalize dataset")
-    
+
     def _transform_data(self, data: CommonRoadData) -> CommonRoadData:
         assert self.feature_normalizer.is_fitted
         return self.feature_normalizer.unnormalize_features_(data)

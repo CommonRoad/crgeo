@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-import gym
+import gymnasium
 import torch
 from torch import Tensor
 
@@ -22,7 +22,7 @@ class LaneletGraphFeatureExtractor(BaseGeometricFeatureExtractor):
 
     def __init__(
         self,
-        observation_space: gym.Space,
+        observation_space: gymnasium.Space,
         path_length: float,
         device: str,
         encoding_size: int = 32,
@@ -32,9 +32,9 @@ class LaneletGraphFeatureExtractor(BaseGeometricFeatureExtractor):
         self._path_length = path_length
         self._encoding_size = encoding_size
         self._encoder_config = encoder_config
-        super().__init__(observation_space,device=device)
+        super().__init__(observation_space, device=device)
 
-    def _build(self, observation_space: gym.Space, device: str) -> None:
+    def _build(self, observation_space: gymnasium.Space, device: str) -> None:
         self._encoder = V2LGlobalEncoder(
             output_size=self._encoding_size,
             config=self._encoder_config
@@ -53,10 +53,11 @@ class LaneletGraphFeatureExtractor(BaseGeometricFeatureExtractor):
         walk_masks = data.ego_trajectory_sequence_mask.bool()
         padding_size = data.ego_trajectory_sequence_mask.shape[1]
         # walk_batch_sizes = data.ego_trajectory_sequence_mask.sum(dim=1).long()
-        walks_flattened = data.walks.flatten().long() # [walk_masks.flatten()]
+        walks_flattened = data.walks.flatten().long()  # [walk_masks.flatten()]
         walk_batch = torch.arange(batch_size, dtype=torch.long, device=data.device).repeat_interleave(padding_size)
         lanelet_batch_sizes = get_batch_sizes(data.lanelet.batch)
-        lanelet_batch_offset = torch.cumsum(torch.cat([torch.zeros([1], device=data.device), lanelet_batch_sizes], dim=0), 0)
+        lanelet_batch_offset = torch.cumsum(
+            torch.cat([torch.zeros([1], device=data.device), lanelet_batch_sizes], dim=0), 0)
         walk_batch_offsets = torch.index_select(lanelet_batch_offset, 0, walk_batch)
         data.walks = (walks_flattened + walk_batch_offsets).view(batch_size, -1)
         # data.l.batch.index_select(0, data.walks.flatten())

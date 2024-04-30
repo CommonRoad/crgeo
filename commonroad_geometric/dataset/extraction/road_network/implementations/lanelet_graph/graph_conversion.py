@@ -41,7 +41,7 @@ class LaneletGraphConverter:
         graph = nx.DiGraph()
 
         for lanelet in lanelet_network.lanelets:
-           
+
 
             assert lanelet.lanelet_id is not None
 
@@ -154,7 +154,7 @@ class LaneletGraphConverter:
                     polyline = chaikins_corner_cutting(polyline, corner_cutting_iterations)
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore")
-                    node[attr] = np.array(resample_polyline(polyline, waypoint_density))
+                    node[attr] = resample_polyline(polyline, waypoint_density)
         return graph
 
     @staticmethod
@@ -213,7 +213,7 @@ class LaneletGraphConverter:
                         continue
                     if other_node_projection >= other_node_shape.length:
                         continue
-                    
+
                     location = np.array(node_shape.interpolate(node_projection).coords)
 
                     # Adding links between conflict nodes

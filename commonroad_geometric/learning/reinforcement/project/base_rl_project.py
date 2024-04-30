@@ -15,7 +15,7 @@ from commonroad_geometric.learning.reinforcement import RLTrainer
 from commonroad_geometric.learning.reinforcement.experiment import RLExperiment, RLExperimentConfig
 from commonroad_geometric.learning.reinforcement.project.hydra_rl_config import RLProjectConfig
 from commonroad_geometric.learning.reinforcement.training.rl_trainer import RLModelConfig, RLTrainerParams
-from commonroad_geometric.learning.training.wandb_service.wandb_service import WandbService
+from stable_baselines3.common.callbacks import BaseCallback  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,9 @@ class BaseRLProject(BaseProject):
     def configure_model(self, cfg: Config, experiment: RLExperiment) -> RLModelConfig:
         ...
 
+    def configure_custom_callbacks(self, cfg: Config) -> list[BaseCallback]:
+        return []
+
     def __init__(
         self, 
         cfg: RLProjectConfig
@@ -44,17 +47,18 @@ class BaseRLProject(BaseProject):
 
         self.experiment = RLExperiment(self.configure_experiment(Config(self.cfg.experiment)))
         self.model_cfg = self.configure_model(Config(self.cfg.model), self.experiment)
+        self.custom_callbacks = self.configure_custom_callbacks(Config(self.cfg.experiment))
 
         if self.cfg.device == 'auto':
             self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self._device = torch.device(self.cfg.device)
 
-        self.project_name = f"RLProject_{self.experiment.config.control_space_cls.__name__}"
+        self.project_name = f"RLProject_{type(self).__name__}"
 
     @register_run_command
     def train(self) -> None:
-        checkpoint = self._get_model_checkpoint(self.cfg.checkpoint)
+        checkpoint = self._get_agent_checkpoint(self.cfg.checkpoint)
 
         trainer = RLTrainer(
             params=RLTrainerParams(
@@ -66,16 +70,23 @@ class BaseRLProject(BaseProject):
                 scenario_dir=self.cfg.scenario_dir,
                 seed=self.cfg.seed,
                 train_cfg=self.cfg.training,
-                warmstart=self.cfg.warmstart
+                project_cfg=self.cfg,
+                warmstart=self.cfg.warmstart,
+                custom_callbacks=self.custom_callbacks
             )
         )
-        trainer.train(device=self._device)
+        trainer.train(
+            device=self._device
+        )
 
     @register_run_command
     def record(self) -> None:
         # TODO: cleanup
         trainer = self._init_trainer()
-        trainer.init_agent(device='cpu', scenario_dir=self.cfg.scenario_dir)
+        trainer.init_agent(
+            device='cpu', 
+            scenario_dir=self.cfg.scenario_dir,
+        )
         trainer.record(
             video_folder=self.cfg.project_dir / 'videos/',
             video_length=None,
@@ -88,106 +99,23 @@ class BaseRLProject(BaseProject):
         # TODO: cleanup
         trainer = self._init_trainer()
         trainer.init_agent(device='cpu', scenario_dir=self.cfg.scenario_dir)
-        trainer.enjoy()
+        for episode_summary in trainer.enjoy():
+            print(episode_summary)
 
     @register_run_command
     def play(self) -> None:
-        # TODO: cleanup
         trainer = self._init_trainer()
         trainer.init_agent(device='cpu', scenario_dir=self.cfg.scenario_dir)
         trainer.play(predict_agent=False)
 
     @register_run_command
-    def benchmark(self) -> None:
-        # TODO
-        raise NotImplementedError()
-
-        benchmark_dir = Config.BENCHMARKING_DIR
-        os.makedirs(benchmark_dir, exist_ok=True)
-
-        model_dir = model_dir if model_dir is not None else Config.DEFAULT_OUTPUT_DIR
-
-        model_paths = list_files(
-            model_dir,
-            file_name='best_model',
-            file_type='zip',
-            join_paths=True,
-            sub_directories=True
-        )
-
-        def setup_wandb_service(
-            project_name: str,
-            experiment_name: str
-        ) -> WandbService:
-            wandb_service = WandbService(disable=args.no_wandb, project_name=project_name)
-            experiment_name = wandb_service.start_experiment(
-                name=experiment_name,
-                include_timestamp=False
-            )
-            return wandb_service
-
-        for model_path in model_paths:
-            experiment_path = search_file(os.path.dirname(os.path.dirname(model_path)), 'experiment_config')
-            experiment = RLExperiment.load(experiment_path)
-            env = experiment.make_env(
-                scenario_dir,
-                seed=seed,
-                renderer_options=RenderConfig.RENDERER_OPTION_LIST[0],
-                render_debug_overlays=False
-            )
-
-            model_benchmark_dir = os.path.join(benchmark_dir, model_path.name)
-            os.makedirs(model_benchmark_dir, exist_ok=True)
-
-            agent = model_cls.load(
-                path=model_path,
-                env=env,
-                device=device,
-                seed=seed
-            )
-
-            print("\n----------")
-            print(f"Benchmarking {model_path}")
-            wandb_service = setup_wandb_service(
-                project_name=f"benchmark-graph-rl",
-                experiment_name=message.replace(' ', '-') + '-' + model_path.name.replace(' ', '-')
-            )
-
-            aggregate_statistics: Dict[str, List[float]] = defaultdict(list)
-
-            for obs, reward, done, info in render_agent(
-                agent=agent,
-                experiment=experiment,
-                env=env,
-                scenario_dir=scenario_dir,
-                video_folder=model_benchmark_dir,
-                total_timesteps=3000,
-                deterministic=True,
-                seed=seed
-            ):
-                if done:
-                    episode_summary = on_episode_end(env, info)
-                    print(episode_summary)
-                    for k, v in episode_summary.items():
-                        aggregate_statistics[k].append(v)
-            
-            log_dict: Dict[str, float] = {}
-            for k, v in aggregate_statistics.items():
-                values = np.array(v)
-                mean_value = values.mean()
-                max_value = values.max()
-                min_value = values.min()
-                std_value = values.std()
-                log_dict[f"{k}_mean"] = mean_value
-                log_dict[f"{k}_max"] = max_value
-                log_dict[f"{k}_min"] = min_value
-                log_dict[f"{k}_std"] = std_value
-
-            wandb_service.log(log_dict)
-            wandb_service.finish_experiment()
+    def play_agent(self) -> None:
+        trainer = self._init_trainer()
+        trainer.init_agent(device='cpu', scenario_dir=self.cfg.scenario_dir)
+        trainer.play(predict_agent=True)
 
     def _init_trainer(self) -> RLTrainer:
-        checkpoint = self._get_model_checkpoint(self.cfg.checkpoint)
+        checkpoint = self._get_agent_checkpoint(self.cfg.checkpoint)
         trainer = RLTrainer(
             params=RLTrainerParams(
                 checkpoint=checkpoint,
@@ -198,15 +126,17 @@ class BaseRLProject(BaseProject):
                 scenario_dir=self.cfg.scenario_dir,
                 seed=self.cfg.seed,
                 train_cfg=self.cfg.training,
-                warmstart=self.cfg.warmstart
+                warmstart=self.cfg.warmstart,
+                project_cfg=self.cfg,
+                custom_callbacks=self.custom_callbacks
             )
         )
         return trainer
 
-    def _get_model_checkpoint(self, checkpoint: Optional[str]) -> Optional[str]:
+    def _get_agent_checkpoint(self, checkpoint: Optional[str]) -> Optional[str]:
         if checkpoint is None:
             files = list_files(
-                os.path.dirname(self.cfg.project_dir),
+                self.cfg.project_dir.parent,
                 file_type='zip',
                 sub_directories=True
             )

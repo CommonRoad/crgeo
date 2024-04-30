@@ -6,14 +6,16 @@ from commonroad_geometric.learning.geometric.training.callbacks.base_callback im
 from commonroad_geometric.learning.geometric.training.callbacks.implementations.save_checkpoints_callback import SaveCheckpointCallback
 from commonroad_geometric.learning.geometric.types import Train_Categories, Train_Features
 
+
 logger = logging.getLogger(__name__)
 
+
 class ExportLatestModelCallback(BaseCallback[StepCallbackParams]):
-    def __init__(self, 
-        directory: Path,
-        save_frequency: int,
-        only_best: bool = True
-    ):
+    def __init__(self,
+                 directory: Path,
+                 save_frequency: int,
+                 only_best: bool = True
+                 ):
         self._directory = directory
         self._save_checkpoint = SaveCheckpointCallback(
             directory=self._directory
@@ -41,6 +43,5 @@ class ExportLatestModelCallback(BaseCallback[StepCallbackParams]):
             self._save_checkpoint(self._checkpoint_to_save)
             self._call_count_since_save = 0
             self._checkpoint_to_save = None
-            logger.debug(f"Saved model checkpoint to {self._save_checkpoint.checkpoint_path}")
         else:
             self._call_count_since_save += 1

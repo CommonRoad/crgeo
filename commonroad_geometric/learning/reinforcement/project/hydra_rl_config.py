@@ -1,10 +1,10 @@
 from pathlib import Path
-from enum import Enum
 from typing import Optional
 from dataclasses import dataclass, field
 from omegaconf import MISSING
 from hydra.core.config_store import ConfigStore
 from commonroad_geometric.learning.reinforcement.training.rl_trainer import RLTrainerConfig, RLModelConfig
+
 
 @dataclass
 class RLProjectConfig:

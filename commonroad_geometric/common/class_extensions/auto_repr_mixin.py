@@ -4,13 +4,14 @@ import json
 
 from commonroad_geometric.common.utils.filesystem import SafeJsonEncoder
 
+
 class AutoReprMixin:
     """
     Automatically generates __repr__ str for class.
     """
 
     def _get_repr_attributes(self) -> Dict[str, Any]:
-        init_params = inspect.signature(self.__init__).parameters # type: ignore
+        init_params = inspect.signature(self.__init__).parameters  # type: ignore
         repr_attributes: Dict[str, Any] = {}
         for param in init_params:
             if param in self.__dict__:
@@ -28,4 +29,3 @@ class AutoReprMixin:
         repr_attributes = self._get_repr_attributes()
         repr_str = f"{type(self).__name__}({json.dumps(repr_attributes, indent=2, cls=SafeJsonEncoder)})"
         return repr_str
-

@@ -1,66 +1,53 @@
 import sys, os; sys.path.insert(0, os.getcwd())
 
-import logging
 import argparse
+from functools import partial
+from pathlib import Path
 
-from commonroad.common.file_writer import CommonRoadFileWriter
-from commonroad.common.file_writer import OverwriteExistingFile
-from commonroad_geometric.common.io_extensions.scenario import find_scenario_files
-from commonroad_geometric.common.logging import setup_logging
-from commonroad_geometric.dataset.iteration import ScenarioIterator
-from commonroad_geometric.dataset.preprocessing.implementations.depopulate_scenario_preprocessor import DepopulateScenarioPreprocessor
-from commonroad_geometric.dataset.preprocessing.implementations.intersection_filterer import IntersectionFilterer
-from commonroad_geometric.dataset.preprocessing.implementations.lanelet_network_subset_preprocessor import LaneletNetworkSubsetPreprocessor
-from commonroad_geometric.dataset.preprocessing.implementations.multilane_filterer import MultiLaneFilterer
-from commonroad_geometric.dataset.preprocessing.implementations.remove_islands_preprocessor import RemoveIslandsPreprocessor
-from commonroad_geometric.dataset.preprocessing.implementations.segment_lanelet_preprocessor import SegmentLaneletsPreprocessor
-from commonroad_geometric.dataset.preprocessing.implementations.valid_trajectories_filterer import ValidTrajectoriesFilterer
-from commonroad_geometric.debugging.profiling import profile
+from commonroad.common.file_writer import CommonRoadFileWriter, OverwriteExistingFile
+
+from commonroad_geometric.common.io_extensions.scenario_files import filter_scenario_paths, find_scenario_paths
+from commonroad_geometric.dataset.scenario.iteration.scenario_iterator import ScenarioIterator
+from commonroad_geometric.dataset.scenario.preprocessing.filters.implementations import OverlappingTrajectoriesFilter
 
 SCENARIO_DIR = 'data/osm_recordings'
-OUTPUT_DIR = 'tutorials/output/osm_recordings_processed'
-SCENARIO_PREPROCESSORS = [
-    #SegmentLaneletsPreprocessor(),
-    #(LaneletNetworkSubsetPreprocessor(), 1),
-    #RemoveIslandsPreprocessor(),
-    #(DepopulateScenarioPreprocessor(5), 3),
-    #FixLaneletNetworkPreprocessor()
-]
-SCENARIO_PREFILTERS = [
-    ValidTrajectoriesFilterer(),
-    #MultiLaneFilterer(keep_multilane=False),
-]
-SCENARIO_POSTFILTERS = [
-    #IntersectionFilterer(min_intersections=1)
-]
+OUTPUT_DIR = Path('tutorials/output/osm_recordings_processed')
 SKIP_EXISTING = True
+
 
 def process(args) -> None:
     if SKIP_EXISTING:
-        skip_scenarios = find_scenario_files(args.output_dir)
+        skip_scenarios = find_scenario_paths(args.output_dir)
         print(f"Skipping {len(skip_scenarios)} scenarios")
     else:
         skip_scenarios = None
 
+    preprocessor = OverlappingTrajectoriesFilter()
+    # preprocessor >>= HighwayFilter()
+
+    # preprocessor >>= SegmentLaneletPreprocessor()
+    # preprocessor >>= LaneletNetworkSubsetPreprocessor()
+    # preprocessor >>= RemoveIslandsPreprocessor()
+    # depopulation_preprocessor = DepopulateScenarioPreprocessor(5)
+    # preprocessor >>= (depopulation_preprocessor | depopulation_preprocessor | depopulation_preprocessor)
+
+    # preprocessor >>= MinIntersectionFilter(min_intersections=1)
+
     iterator = ScenarioIterator(
-        args.scenario_dir,
-        preprocessors=SCENARIO_PREPROCESSORS,
-        prefilters=SCENARIO_PREFILTERS,
-        postfilters=SCENARIO_POSTFILTERS,
-        load_scenario_pickles=True,
-        save_scenario_pickles=False,
-        verbose=1,
-        max_scenarios=args.max_scenarios,
-        skip_scenarios=skip_scenarios
+        directory=Path(args.scenario_dir),
+        filter_scenario_paths=partial(filter_scenario_paths,
+                                      max_scenarios=args.max_scenarios,
+                                      excluded_scenario_names=skip_scenarios),
+        preprocessor=preprocessor,
     )
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    print(f"Created scenario iterator of length {len(iterator)}")
+    print(f"Created scenario iterator of length {iterator.max_result_scenarios}")
 
     for scenario_bundle in iterator:
-        output_path = os.path.join(args.output_dir, scenario_bundle.input_scenario_file.name)
-        print(f"Processing scenario {scenario_bundle.input_scenario_file}")
+        output_path = os.path.join(args.output_dir, scenario_bundle.scenario_path.name)
+        print(f"Processing scenario {scenario_bundle.scenario_path}")
         file_writer = CommonRoadFileWriter(
             scenario=scenario_bundle.preprocessed_scenario,
             planning_problem_set=scenario_bundle.preprocessed_planning_problem_set
@@ -71,8 +58,8 @@ def process(args) -> None:
             check_validity=False
         )
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Process and filter scenarios.")
     parser.add_argument("--scenario-dir", type=str, default=SCENARIO_DIR, help="path to scenario directory")
     parser.add_argument("--output-dir", type=str, default=OUTPUT_DIR, help="output directory")
@@ -80,4 +67,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     process(args)
-

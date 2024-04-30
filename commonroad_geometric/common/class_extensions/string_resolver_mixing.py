@@ -1,13 +1,14 @@
 import re
 from typing import List, Sequence, Type, Union
 
+
 class StringResolverMixin:
     """
     Resolves subclass for base class.
     """
 
     @classmethod
-    def resolve(cls, value: str) -> Type: # TODO: how to refer to base class?
+    def resolve(cls, value: str) -> Type:  # TODO: how to refer to base class?
         """
         Resolves the provided string to a subtype of this type.
 
@@ -15,7 +16,7 @@ class StringResolverMixin:
             KeyError: If string could not be resolved.
 
         Returns:
-            _type_: Subclass whose name matches the specified value. 
+            _type_: Subclass whose name matches the specified value.
         """
         subclasses = cls.__subclasses__()
         lookup_dict = {subcls.__name__.lower(): subcls for subcls in subclasses}
@@ -35,10 +36,10 @@ class StringResolverMixin:
             KeyError: If a string could not be resolved.
 
         Returns:
-            List[_type_]: Subclasses whose name matches the specified value. 
+            List[_type_]: Subclasses whose name matches the specified value.
         """
 
         if isinstance(values, str):
-            values = re.split('\W+', values) # split by non-alpha characters
+            values = re.split('\\W+', values)  # split by non-alpha characters
 
         return [cls.resolve(value) for value in values]

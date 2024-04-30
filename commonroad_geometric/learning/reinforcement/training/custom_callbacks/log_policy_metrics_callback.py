@@ -30,23 +30,25 @@ class LogPolicyMetricsCallback(BaseCallback):
                 continue
             absweights = torch.abs(weights)
             absgrad = torch.abs(grad)
-            
-            #self.logger.record(f"gradients/{name}_mean", torch.mean(grad).item())
+
+            # self.logger.record(f"gradients/{name}_mean", torch.mean(grad).item())
             self.logger.record(f"gradients/{name}_max", torch.max(grad).item())
             self.logger.record(f"gradients/{name}_min", torch.min(grad).item())
-            self.logger.record(f"gradients/{name}_std", torch.std(grad).item())
+            if grad.numel() > 1:
+                self.logger.record(f"gradients/{name}_std", torch.std(grad).item())
             self.logger.record(f"gradients/{name}_absmean", torch.mean(absgrad).item())
             self.logger.record(f"gradients/{name}_absmax", torch.max(absgrad).item())
-            #self.logger.record(f"gradients/{name}_absmin", torch.min(absgrad).item())
+            # self.logger.record(f"gradients/{name}_absmin", torch.min(absgrad).item())
             self.logger.record(f"gradients/{name}_vanished", torch.mean((absgrad < EPS).float()).item())
 
-            #self.logger.record(f"weights/{name}_mean", torch.mean(weights).item())
+            # self.logger.record(f"weights/{name}_mean", torch.mean(weights).item())
             self.logger.record(f"weights/{name}_max", torch.max(weights).item())
             self.logger.record(f"weights/{name}_min", torch.min(weights).item())
-            self.logger.record(f"weights/{name}_std", torch.std(weights).item())
+            if weights.numel() > 1:
+                self.logger.record(f"weights/{name}_std", torch.std(weights).item())
             self.logger.record(f"weights/{name}_absmean", torch.mean(absweights).item())
             self.logger.record(f"weights/{name}_absmax", torch.max(absweights).item())
-            #self.logger.record(f"weights/{name}_absmin", torch.min(absweights).item())
+            # self.logger.record(f"weights/{name}_absmin", torch.min(absweights).item())
             self.logger.record(f"weights/{name}_dead", torch.mean((absweights < EPS).float()).item())
 
             self.logger.record("info/n_rollouts", self.num_timesteps)

@@ -11,6 +11,7 @@ if sys.version_info >= (3, 8):
 else:
     from typing_extensions import Literal
 
+
 class MLP(torch.nn.Module):
     """Multilayer perceptron (MLP) module."""
 
@@ -37,7 +38,7 @@ class MLP(torch.nn.Module):
         net_arch += [output_size]
 
         if not isinstance(activation_cls, list):
-            activation_cls = [activation_cls]*(len(net_arch))
+            activation_cls = [activation_cls] * (len(net_arch))
 
         self.highway = highway
 
@@ -66,17 +67,17 @@ class MLP(torch.nn.Module):
         for h_idx in range(len(net_arch) - 1):
             h = net_arch[h_idx]
             if norm_method == 'batch' and h_idx < len(net_arch) - 2:
-                seq.extend([Linear(h, net_arch[h_idx+1], bias=False)])
+                seq.extend([Linear(h, net_arch[h_idx + 1], bias=False)])
             elif h_idx < len(net_arch) - 2:
-                seq.extend([Linear(h, net_arch[h_idx+1], bias=bias_hidden)])
+                seq.extend([Linear(h, net_arch[h_idx + 1], bias=bias_hidden)])
             else:
-                seq.extend([Linear(h, net_arch[h_idx+1], bias=bias_out)])
+                seq.extend([Linear(h, net_arch[h_idx + 1], bias=bias_out)])
 
             if h_idx < len(net_arch) - 2:
                 if norm_method == 'layer':
-                    seq.append(LayerNorm(net_arch[h_idx+1]))
+                    seq.append(LayerNorm(net_arch[h_idx + 1]))
                 elif norm_method == 'batch':
-                    seq.append(BatchNorm1d(net_arch[h_idx+1], momentum=norm_momentum))
+                    seq.append(BatchNorm1d(net_arch[h_idx + 1], momentum=norm_momentum))
                 seq.extend([activation_cls[h_idx + 1]()])
                 if dropout > 0:
                     seq.append(Dropout(p=dropout))
@@ -89,7 +90,7 @@ class MLP(torch.nn.Module):
             gate = torch.sigmoid(self.gate(x))
             linear = self.linear(x)
 
-            y = gate*z + (1-gate)*linear
+            y = gate * z + (1 - gate) * linear
         else:
             y = z
         return y

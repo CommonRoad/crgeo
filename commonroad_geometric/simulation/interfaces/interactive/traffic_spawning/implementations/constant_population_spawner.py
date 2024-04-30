@@ -15,7 +15,7 @@ class ConstantPopulationSpawner(BaseTrafficSpawner):
     """
 
     def __init__(
-        self, 
+        self,
         population_size: int,
         included_lanelet_ids: Optional[Set[int]] = None,
         max_wait_time_steps: int = 30,

@@ -1,4 +1,5 @@
-import sys, os; sys.path.insert(0, os.getcwd())
+import sys
+import os; sys.path.insert(0, os.getcwd())
 import hydra
 from omegaconf import OmegaConf
 from commonroad_geometric.learning.geometric.project.hydra_geometric_config import GeometricProjectConfig
@@ -19,10 +20,10 @@ if __name__ == '__main__':
     """
     Example of config overloading from command line (powered by hydra):
 
-    python projects/geometric_models/dummy/run.py 
-        cmd=collect 
-        dataset.pre_transform_workers=8 
-        dataset.max_scenarios=100 
-        dataset.max_samples_per_scenario=1000 
+    python projects/geometric_models/dummy/run.py
+        cmd=collect
+        dataset.pre_transform_workers=8
+        dataset.max_scenarios=100
+        dataset.max_samples_per_scenario=1000
         dataset.scenario_dir=../../data/Munich_2
     """

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Set
 import numpy as np
+from collections import defaultdict
 import networkx as nx
 from commonroad.scenario.lanelet import Lanelet, LaneletNetwork
 from commonroad.scenario.scenario import Scenario
@@ -33,6 +34,7 @@ class LaneletNetworkInfo(AutoReprMixin):
             graph_conversion_steps=graph_conversion_steps,
             add_adj_opposite_dir=False
         )
+        self._lanelet_hops = dict(nx.shortest_path_length(self._lanelet_graph))
         self._traffic_flow_graph = self._lanelet_graph.get_traffic_flow_graph()
         self._lanelet_graph_data: Data = self._lanelet_graph.get_torch_data()
 
@@ -59,12 +61,20 @@ class LaneletNetworkInfo(AutoReprMixin):
         return self._lanelet_graph
 
     @property
+    def traffic_flow_graph(self) -> LaneletGraph:
+        return self._traffic_flow_graph
+
+    @property
     def lanelet_graph_data(self) -> Data:
         return self._lanelet_graph_data
 
     @property
     def lanelet_id_to_lanelet_idx(self) -> Dict[int, int]:
         return self._lanelet_id_to_lanelet_idx
+
+    @property
+    def lanelet_hops(self) -> Dict[int, Dict[int, int]]:
+        return self._lanelet_hops
 
     @property
     def num_lanelets(self) -> int:
@@ -100,7 +110,27 @@ class LaneletNetworkInfo(AutoReprMixin):
                     continue
                 routes[from_lanelet_id][to_lanelet_id] = shortest_path[from_lanelet_id][to_lanelet_id]
         return routes
+    
+    def get_all_connected_lanelets(self) -> dict:
+        """
+        Create all possible lanes by merging predecessors and successors, then create a dict with its keys as lanelet id
+        and values as connected lanelet ids.
         
+        :return: dict
+        """
+        merged_lanelet_dict = defaultdict(set)
+        for l in self.lanelet_network.lanelets:  # iterate in all lanelet in this scenario
+            if not l.predecessor and not l.successor:  # the lanelet is a lane itself
+                merged_lanelet_dict[l.lanelet_id].add(l.lanelet_id)
+            elif not l.predecessor:
+                max_lane_merge_range = 1000.0
+                _, sub_lanelet_ids = Lanelet.all_lanelets_by_merging_successors_from_lanelet(l, self.lanelet_network,
+                                                                                            max_lane_merge_range)
+                for s in sub_lanelet_ids:
+                    for i in s:
+                        merged_lanelet_dict[i].update(s)
+        return merged_lanelet_dict
+
     def find_lanelet_by_id(self, lanelet_id: int) -> Lanelet:
         return find_lanelet_by_id(self._lanelet_network, lanelet_id)
 

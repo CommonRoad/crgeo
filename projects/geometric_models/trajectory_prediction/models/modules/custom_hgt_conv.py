@@ -28,6 +28,7 @@ def zip_dict_items(*dicts: Dict[K, V]) -> Iterable[Tuple[K, V]]:
 
 ActivationFunction = Callable[[Tensor], Tensor]
 
+
 class CustomHGTConv(MessagePassing):
 
     GLOBAL_CONTEXT_NODE: NodeType = "global context"
@@ -54,6 +55,7 @@ class CustomHGTConv(MessagePassing):
         **kwargs (optional): Additional arguments of
             :class:`torch_geometric.nn.conv.MessagePassing`.
     """
+
     def __init__(
         self,
         in_channels_node: Dict[NodeType, int],
@@ -122,7 +124,8 @@ class CustomHGTConv(MessagePassing):
         self.aggr_lin = ModuleDict()
         self.residual_weight = ParameterDict()  # beta
         self.residual_layer_norm = ModuleDict()
-        for node_type, in_channels, out_channels in ((t, self.in_channels_node[t], self.out_channels_node[t]) for t in node_types):
+        for node_type, in_channels, out_channels in (
+                (t, self.in_channels_node[t], self.out_channels_node[t]) for t in node_types):
             # matrices for all attention heads combined
             # attention
             self.k_node_lin[node_type] = Linear(in_channels, attention_channels)
@@ -233,7 +236,8 @@ class CustomHGTConv(MessagePassing):
             out_aggr_dict[node_type] = []
 
         if self.global_context:
-            q_node_dict[self.GLOBAL_CONTEXT_NODE] = self.q_node_lin[self.GLOBAL_CONTEXT_NODE](x_dict[self.GLOBAL_CONTEXT_NODE])
+            q_node_dict[self.GLOBAL_CONTEXT_NODE] = self.q_node_lin[self.GLOBAL_CONTEXT_NODE](
+                x_dict[self.GLOBAL_CONTEXT_NODE])
 
         # Iterate over edge-types / meta relations
         for edge_type, edge_index, edge_attr in zip_dict_items(edge_index_dict, edge_attr_dict):

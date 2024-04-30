@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Iterable, Tuple
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 
 import numpy as np
-from gym.spaces import Box
+from gymnasium.spaces.box import Box
 
 from commonroad_geometric.common.class_extensions.safe_pickling_mixin import SafePicklingMixin
 from commonroad_geometric.common.class_extensions.string_resolver_mixing import StringResolverMixin
@@ -24,7 +24,7 @@ class BaseControlSpace(ABC, SafePicklingMixin, AutoReprMixin, StringResolverMixi
     """
     Base class for facilitating learning-based agents' interaction with the traffic scene
     via the application of control signals on the simulated ego vehicle. The step and _substep
-    methods allow for actions of any granularity to be supported, ranging from low-level control signals 
+    methods allow for actions of any granularity to be supported, ranging from low-level control signals
     to high-level maneuver planning.
     """
 
@@ -58,7 +58,7 @@ class BaseControlSpace(ABC, SafePicklingMixin, AutoReprMixin, StringResolverMixi
         """
         num_substeps = 0
         self._steps_since_reset += 1
-        while 1:
+        while True:
             action_completed = self._substep(
                 ego_vehicle_simulation=ego_vehicle_simulation,
                 action=action,
@@ -96,4 +96,3 @@ class BaseControlSpace(ABC, SafePicklingMixin, AutoReprMixin, StringResolverMixi
         ego_vehicle_simulation: EgoVehicleSimulation,
     ) -> None:
         ...
-

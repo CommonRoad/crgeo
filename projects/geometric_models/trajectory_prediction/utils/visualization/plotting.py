@@ -1,10 +1,9 @@
 import contextlib
 import typing as t
 
-import torch
-import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
+import seaborn as sns
+import torch
 from matplotlib.axes import Axes
 from torch import Tensor
 

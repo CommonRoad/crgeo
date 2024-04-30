@@ -1,5 +1,6 @@
 import uuid
 
+
 class AutoHashMixin:
     """
     Automatically generates hash for instances of class.

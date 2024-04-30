@@ -13,7 +13,6 @@ from commonroad_geometric.dataset.extraction.road_network.types import LaneletEd
 
 class LaneletConnectionGeometryFeatureComputer(BaseFeatureComputer[L2LFeatureParams]):
 
-
     def __init__(
         self,
     ) -> None:

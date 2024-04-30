@@ -4,25 +4,25 @@ from typing import Any, Dict, Tuple, TypeVar, Union
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 from commonroad_geometric.common.types import AnyCallable
 
-RandomNumber = Union[int, float]
-RandomObject = Union[RandomNumber, Tuple[RandomNumber, ...]]
+RandomNumber = int | float
+RandomObject = RandomNumber | tuple[float, ...] | tuple[int, ...]
 T_CachedProperty = TypeVar("T_CachedProperty")
 
 
 class CachedRNG(AutoReprMixin):
     def __init__(
-        self, 
+        self,
         rng: AnyCallable[float]
     ) -> None:
         self._rng = rng
         self._cache: Dict[Hashable, RandomObject] = {}
 
     def __call__(
-        self, 
+        self,
         key: Hashable,
         n: int = 1,
         **rng_kwargs: Any
-    ) -> Any:
+    ) -> RandomObject:
         if key not in self._cache:
             if n == 1:
                 self._cache[key] = self._rng(**rng_kwargs)

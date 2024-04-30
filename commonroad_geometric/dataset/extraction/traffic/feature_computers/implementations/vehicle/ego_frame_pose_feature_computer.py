@@ -23,7 +23,7 @@ class EgoFramePoseFeatureComputer(BaseFeatureComputer[VFeatureParams]):
         simulation: BaseSimulation,
     ) -> FeatureDict:
         # TODO: Unit test
-        
+
         pos = params.state.position
         v = params.state.velocity * np.array([np.cos(params.state.orientation), np.sin(params.state.orientation)])
 

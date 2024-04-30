@@ -5,7 +5,8 @@ from commonroad_geometric.learning.reinforcement.commonroad_gym_env import Commo
 
 def on_episode_end(env: CommonRoadGymEnv, info: CommonRoadGymStepInfo) -> Dict[str, float]:
 
-    termination_reasons = env.termination_reasons if isinstance(env, CommonRoadGymEnv) else env.get_attr('termination_reasons')[0]
+    termination_reasons = env.termination_reasons if isinstance(
+        env, CommonRoadGymEnv) else env.get_attr('termination_reasons')[0]
     termination_criteria_flags = dict.fromkeys(termination_reasons, False)
     termination_reason = info.get('termination_reason')
     termination_criteria_flags[termination_reason] = True
@@ -33,9 +34,9 @@ def on_episode_end(env: CommonRoadGymEnv, info: CommonRoadGymStepInfo) -> Dict[s
     out_dict["next_reset_ready"] = float(next_reset_ready)
 
     episode_length = info.get('time_step')
-    out_dict["ep_length"] =  episode_length
+    out_dict["ep_length"] = episode_length
 
     for termination_criteria in termination_reasons:
-        out_dict["termination_{termination_criteria}"] =  termination_criteria_flags[termination_criteria]
+        out_dict["termination_{termination_criteria}"] = termination_criteria_flags[termination_criteria]
 
     return out_dict

@@ -22,16 +22,24 @@ class CallbackComputerContainerService(Generic[TypeVar_CallbackParams]):
             callback_return = callback(params=params)
             if callback_return is not None:
                 computations.update(callback_return)
-        return computations                 
+        return computations
 
 
 @dataclass
 class CallbackComputersContainer(ABC):
-    logging_callbacks: CallbackComputerContainerService[LoggingCallbacksParams] = field(default_factory=lambda: CallbackComputerContainerService([]))
-    training_step_callbacks: CallbackComputerContainerService[StepCallbackParams] = field(default_factory=lambda: CallbackComputerContainerService([]))
-    validation_step_callbacks: CallbackComputerContainerService[StepCallbackParams] = field(default_factory=lambda: CallbackComputerContainerService([]))
-    test_step_callbacks: CallbackComputerContainerService[StepCallbackParams] = field(default_factory=lambda: CallbackComputerContainerService([]))
-    initialize_training_callbacks: CallbackComputerContainerService[InitializeTrainingCallbacksParams] = field(default_factory=lambda: CallbackComputerContainerService([]))
-    interrupt_callbacks: CallbackComputerContainerService[InterruptCallbacksParams] = field(default_factory=lambda: CallbackComputerContainerService([]))
-    early_stopping_callbacks: CallbackComputerContainerService[EarlyStoppingCallbacksParams] = field(default_factory=lambda: CallbackComputerContainerService([]))
-    checkpoint_callbacks: CallbackComputerContainerService[CheckpointCallbackParams] = field(default_factory=lambda: CallbackComputerContainerService([]))
+    logging_callbacks: CallbackComputerContainerService[LoggingCallbacksParams] = field(
+        default_factory=lambda: CallbackComputerContainerService([]))
+    training_step_callbacks: CallbackComputerContainerService[StepCallbackParams] = field(
+        default_factory=lambda: CallbackComputerContainerService([]))
+    validation_step_callbacks: CallbackComputerContainerService[StepCallbackParams] = field(
+        default_factory=lambda: CallbackComputerContainerService([]))
+    test_step_callbacks: CallbackComputerContainerService[StepCallbackParams] = field(
+        default_factory=lambda: CallbackComputerContainerService([]))
+    initialize_training_callbacks: CallbackComputerContainerService[InitializeTrainingCallbacksParams] = field(
+        default_factory=lambda: CallbackComputerContainerService([]))
+    interrupt_callbacks: CallbackComputerContainerService[InterruptCallbacksParams] = field(
+        default_factory=lambda: CallbackComputerContainerService([]))
+    early_stopping_callbacks: CallbackComputerContainerService[EarlyStoppingCallbacksParams] = field(
+        default_factory=lambda: CallbackComputerContainerService([]))
+    checkpoint_callbacks: CallbackComputerContainerService[CheckpointCallbackParams] = field(
+        default_factory=lambda: CallbackComputerContainerService([]))

@@ -29,7 +29,8 @@ class OccupancyPredictionModel(BaseGeometric):
         )
 
         # TODO add Jumping Knowledge skip connections to stabilize training with more graph convolutional layers
-        self.lanelet_feature_dim = sum(batch["lanelet"][attr].shape[1] for attr in ["length", "start_pos", "center_pos", "end_pos"])
+        self.lanelet_feature_dim = sum(batch["lanelet"][attr].shape[1]
+                                       for attr in ["length", "start_pos", "center_pos", "end_pos"])
         self.lanelet_feature_dim += self.vehicle_embedding_dim
         self.lanelet_net = GCN(
             layers=5,
@@ -50,7 +51,7 @@ class OccupancyPredictionModel(BaseGeometric):
             batch["vehicle"].x,
             batch["vehicle"].length,
             batch["vehicle"].lanelet_arclength,
-            #batch["vehicle"].pos,
+            # batch["vehicle"].pos,
         ), dim=-1)
         assert vehicle_features.size(-1) == self.vehicle_feature_dim
         vehicle_emb = self.vehicle_net(x=vehicle_features, edge_index=batch["vehicle", "lanelet", "vehicle"].edge_index)
@@ -59,15 +60,18 @@ class OccupancyPredictionModel(BaseGeometric):
         # vehicle_emb_graph = Data(batch=batch.batch, x=vehicle_emb, edge_index=batch["vehicle", "lanelet", "vehicle"].edge_index)
         # vehicle_emd_pooled = pyg_nn.avg_pool(cluster=batch["vehicle", "lanelet"].edge_index, data=vehicle_emb_graph)
 
-        vehicle_emb_lanelet = torch.zeros((batch["lanelet"].num_nodes, self.vehicle_embedding_dim), dtype=vehicle_features.dtype)
+        vehicle_emb_lanelet = torch.zeros(
+            (batch["lanelet"].num_nodes,
+             self.vehicle_embedding_dim),
+            dtype=vehicle_features.dtype)
         vehicle_emb_lanelet_count = torch.zeros((batch["lanelet"].num_nodes,), dtype=torch.int)
         v2l_lanelet = batch["vehicle", "lanelet"].edge_index[1]
         num_vehicles = batch["vehicle"].num_nodes
         # the vehicle -> lanelet edge_index tensor is sorted by the vehicle node index
         # assert batch["vehicle", "lanelet"].edge_index[0, i] == i
         # v2l_lanelet[i] is the lanelet node index corresponding to vehicle node i
-        #vehicle_emb_lanelet[v2l_lanelet] += vehicle_emb  # add up all vehicle embeddings for vehicles which share a lanelet
-        #vehicle_emb_lanelet_count[v2l_lanelet] += 1
+        # vehicle_emb_lanelet[v2l_lanelet] += vehicle_emb  # add up all vehicle embeddings for vehicles which share a lanelet
+        # vehicle_emb_lanelet_count[v2l_lanelet] += 1
         for i in range(num_vehicles):
             vehicle_emb_lanelet[v2l_lanelet[i]] += vehicle_emb[i]
             vehicle_emb_lanelet_count[v2l_lanelet[i]] += 1
@@ -81,7 +85,8 @@ class OccupancyPredictionModel(BaseGeometric):
             vehicle_emb_lanelet,
         ), dim=-1)
         assert lanelet_features.size(-1) == self.lanelet_feature_dim
-        lanelet_occupancies_unnorm: Tensor = self.lanelet_net(x=lanelet_features, edge_index=batch["lanelet", "lanelet"].edge_index)
+        lanelet_occupancies_unnorm: Tensor = self.lanelet_net(
+            x=lanelet_features, edge_index=batch["lanelet", "lanelet"].edge_index)
         lanelet_occupancies = torch.sigmoid(lanelet_occupancies_unnorm)
 
         return lanelet_occupancies

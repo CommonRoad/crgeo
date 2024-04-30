@@ -13,14 +13,16 @@ class VehicleVerticesFeatureComputer(BaseFeatureComputer[VFeatureParams]):
     @classproperty
     def skip_normalize_features(cls) -> Set[str]:
         return {V_Feature.Vertices.value}
-        
+
     def __call__(
         self,
         params: VFeatureParams,
         simulation: BaseSimulation,
     ) -> FeatureDict:
         features = {
-            V_Feature.Vertices.value: torch.from_numpy(params.obstacle.obstacle_shape.vertices).to(torch.float32).flatten()
+            V_Feature.Vertices.value: torch.from_numpy(
+                params.obstacle.obstacle_shape.vertices).to(
+                torch.float32).flatten()
         }
 
         return features

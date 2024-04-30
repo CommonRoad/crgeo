@@ -45,7 +45,8 @@ class FeatureNormalizer:
     @staticmethod
     def is_feature(data: T_CommonRoadData, store: str, key: str) -> bool:
         tensor = data[store][key]
-        is_feature = isinstance(tensor, Tensor) and torch.is_floating_point(tensor) and tensor.ndim <= 2 and tensor.size(-1) > 0
+        is_feature = isinstance(tensor, Tensor) and torch.is_floating_point(
+            tensor) and tensor.ndim <= 2 and tensor.size(-1) > 0
         return is_feature
 
     def partial_fit(self, data: T_CommonRoadData) -> None:
@@ -120,11 +121,15 @@ def normalize_features(
     with ProgressReporter(total=len(processed_files) + 1, unit="sample") as progress:
         cpu = torch.device("cpu")
         for i, path in enumerate(processed_files):
-            feature_normalizer.partial_fit(torch.load(path, map_location=cpu))
+            data = torch.load(path, map_location=cpu)
+            if isinstance(data, tuple):
+                data = data[-1]
+            feature_normalizer.partial_fit(data)
             progress.update(i)
         progress.update(len(processed_files))
 
-    def transform_normalize(scenario_index: int, sample_index: int, data: T_CommonRoadData) -> Iterable[T_CommonRoadData]:
+    def transform_normalize(scenario_index: int, sample_index: int,
+                            data: T_CommonRoadData) -> Iterable[T_CommonRoadData]:
         yield feature_normalizer.normalize_features_(data)
 
     # normalize features
@@ -139,4 +144,3 @@ def normalize_features(
     feature_normalizer.store_parameters(file=normalization_params_file)
 
     return feature_normalizer
-

@@ -1,4 +1,4 @@
-from typing import Union, Callable
+from typing import Union
 from torch import Tensor
 import torch
 

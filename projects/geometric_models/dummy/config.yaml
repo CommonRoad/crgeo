@@ -4,15 +4,15 @@ defaults:
 
 project_dir: ./projects/output/geometric/dummy
 seed: 42
-no_wandb: True
+wandb_logging: True
 warmstart: False
 device: auto
-profile: True
+profile: False
 
-training: 
+training:
   batch_size: 8
 
-dataset: 
+dataset:
   train_scenario_dir: &scenario_dir ./data/highd-sample/
   test_scenario_dir: *scenario_dir
   val_scenario_dir: *scenario_dir
@@ -22,5 +22,5 @@ dataset:
 
 model: {}
 
-experiment: 
+experiment:
   dist_threshold_v2v: 50.0

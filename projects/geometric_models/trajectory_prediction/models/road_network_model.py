@@ -1,13 +1,14 @@
 from typing import Dict, Optional, Tuple, Union
 
 import torch.nn.functional as F
-from torch import Tensor, nn
+from torch import Tensor
 from torch_geometric.data import Batch, Data
 
 from commonroad_geometric.common.config import Config
+from commonroad_geometric.learning.geometric.base_geometric import BaseGeometric
 from projects.geometric_models.drivable_area.models.decoder.drivable_area_decoder import DrivableAreaDecoder
 from projects.geometric_models.drivable_area.models.decoder.road_coverage_prediction import LaneletNetworkGNN
-from commonroad_geometric.learning.geometric.base_geometric import BaseGeometric
+
 
 class RoadCoveragePredictionModel(BaseGeometric):
 
@@ -21,7 +22,6 @@ class RoadCoveragePredictionModel(BaseGeometric):
     ) -> None:
         self.encoder = LaneletNetworkGNN(cfg=self.cfg)
         self.decoder = DrivableAreaDecoder(cfg=self.cfg.drivable_area_decoder)
-
 
     def forward(
         self,

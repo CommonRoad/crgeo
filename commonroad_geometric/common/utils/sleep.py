@@ -1,5 +1,6 @@
 from time import sleep
 
+
 class _Sleeper:
     def __init__(self, duration: float) -> None:
         self._duration = duration

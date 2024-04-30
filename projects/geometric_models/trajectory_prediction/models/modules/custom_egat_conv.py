@@ -1,15 +1,13 @@
 import enum
-from typing import List, Dict, Tuple, Optional
+from typing import Optional
 
 import torch
-from torch import Tensor, nn
 import torch.nn.functional as F
 import torch_geometric.nn as pyg_nn
 import torch_geometric.nn.inits as pyg_inits
-from torch_geometric.utils import softmax, contains_self_loops
-
+from torch import Tensor, nn
 from torch_geometric.typing import Adj
-from torch_geometric.utils import add_self_loops
+from torch_geometric.utils import add_self_loops, contains_self_loops, softmax
 
 
 @enum.unique

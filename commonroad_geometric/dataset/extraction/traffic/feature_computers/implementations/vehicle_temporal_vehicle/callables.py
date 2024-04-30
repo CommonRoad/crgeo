@@ -21,14 +21,14 @@ def ft_rel_state_vtv(params: VTVFeatureParams) -> List[float]:
 
     target_pos_in_source_coord_sys = translate_rotate_2d(
         x=target_pos,
-        t=-source_pos, 
+        t=-source_pos,
         r=-rel_orientation,
     )
     rel_position = target_pos_in_source_coord_sys
     distance = np.linalg.norm(rel_position)
 
     target_vel_in_source_coord_sys = rotate_2d(
-        target_velocity, 
+        target_velocity,
         r=-rel_orientation
     )
     rel_velocity = torch.tensor([

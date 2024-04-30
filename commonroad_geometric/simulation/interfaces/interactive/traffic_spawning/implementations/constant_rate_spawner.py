@@ -9,7 +9,7 @@ from commonroad_geometric.simulation.interfaces.interactive.traffic_spawning.bas
 class ConstantRateSpawner(BaseTrafficSpawner):
 
     def __init__(
-        self, 
+        self,
         p_spawn: float = 0.05,
         included_lanelet_ids: Optional[Set[int]] = None,
         max_vehicles: Optional[int] = None,

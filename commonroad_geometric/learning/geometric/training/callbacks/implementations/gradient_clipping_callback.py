@@ -2,6 +2,7 @@ from typing import Optional
 from commonroad_geometric.learning.geometric.training.callbacks.base_callback import BaseCallback, CheckpointCallbackParams, EarlyStoppingCallbacksParams
 import torch
 
+
 class GradientClippingCallback(BaseCallback[EarlyStoppingCallbacksParams]):
     def __init__(self, gradient_threshold: Optional[float] = None):
         self.gradient_threshold = gradient_threshold

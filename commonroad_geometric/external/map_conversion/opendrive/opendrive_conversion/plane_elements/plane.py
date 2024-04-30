@@ -109,7 +109,7 @@ class ParametricLane:
         type_: str,
         border_group: ParametricLaneBorderGroup,
         length: float = None,
-        line_marking = None,
+        line_marking=None,
         side: str = None
     ):
         self.border_group = border_group

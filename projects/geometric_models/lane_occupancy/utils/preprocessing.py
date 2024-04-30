@@ -32,12 +32,12 @@ def preprocess_conditioning(
     walk_lanelet_lengths = data.l.length[walks].squeeze(-1)
     if walk_masks is not None:
         if walk_masks.ndim == 3:
-            walk_masks = walk_masks.squeeze(-1) # TODO ?????????????
+            walk_masks = walk_masks.squeeze(-1)  # TODO ?????????????
         if walk_masks.ndim > 1 and walk_masks.shape[1] == walk_lanelet_lengths.shape[0] and walk_masks.shape[0] == walk_lanelet_lengths.shape[1]:
             walk_masks = walk_masks.permute(1, 0)
             # TODO: WHAT???
         walk_lanelet_lengths *= walk_masks
-    
+
     if walk_start_length is None:
         walk_total_length = walk_lanelet_lengths.sum(dim=1)
         walk_start_length = (walk_total_length - path_length) * torch.rand(walk_total_length.shape, device=device)
@@ -59,8 +59,8 @@ def preprocess_conditioning(
     walk_post_cum_length_offset = walk_post_cum_length - walk_start_length.unsqueeze(-1)
     walk_prior_cum_length_offset = torch.clamp(torch.cat(
         [walk_post_cum_length_offset.new_zeros((walk_post_cum_length_offset.shape[0], 1)),
-        walk_post_cum_length_offset
-    ], dim=-1)[:, :-1], min=0.0)
+         walk_post_cum_length_offset
+         ], dim=-1)[:, :-1], min=0.0)
     walk_prior_cum_length_offset_rel = walk_prior_cum_length_offset / path_length
 
     walk_start_mask = walk_post_cum_length_offset > 0
@@ -71,12 +71,18 @@ def preprocess_conditioning(
         walk_mask = walk_mask & walk_masks
 
     lower_limits = torch.clamp(walk_lanelet_lengths - torch.clamp(walk_post_cum_length_offset, min=0.0), min=0.0)
-    upper_limits = torch.clamp(walk_lanelet_lengths - torch.clamp(walk_post_cum_length_offset - path_length, min=0.0), min=0.0)
+    upper_limits = torch.clamp(
+        walk_lanelet_lengths -
+        torch.clamp(
+            walk_post_cum_length_offset -
+            path_length,
+            min=0.0),
+        min=0.0)
     lower_limits_rel = lower_limits / walk_lanelet_lengths
     upper_limits_rel = upper_limits / walk_lanelet_lengths
 
     # assert (walk_total_length > self.config.path_length).all()
-    
+
     # lower_limits = torch.clamp((lower_bounds.unsqueeze(-1) - walk_indeces), 0, 1)
     # upper_limits = torch.clamp((upper_bounds.unsqueeze(-1) - walk_indeces), 0, 1)
     # limit_intervals = upper_limits - lower_limits
@@ -93,7 +99,7 @@ def preprocess_conditioning(
     cumulative_prior_length_flattened_abs = walk_prior_cum_length_offset.flatten()[walk_mask_flattened]
     integration_lower_limits_flattened_abs = lower_limits.flatten()[walk_mask_flattened]
     integration_upper_limits_flattened_abs = upper_limits.flatten()[walk_mask_flattened]
-    #integration_lengths_flattened = integration_lengths.flatten()[walk_mask_flattened]
+    # integration_lengths_flattened = integration_lengths.flatten()[walk_mask_flattened]
 
     # data.walks_batch = walks
     # data.walk_masks_batch = walk_masks

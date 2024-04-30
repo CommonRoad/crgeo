@@ -1,0 +1,27 @@
+name: crgeo-3.10
+channels:
+  - defaults
+  - conda-forge # required for e.g. pip
+dependencies:
+  - python=3.10.*
+  - pip=23.0.* # We need to install pip in the environment through conda before we can run pip commands
+  # This will be installed with pip
+  - pip:
+      # PyTorch and PyTorch Geometric installed from PyPI
+    - torch==2.2.*
+    - torch_geometric==2.5.*
+    # PyTorch Geometric dependencies installed from this link
+    - --find-links https://data.pyg.org/whl/torch-2.2.0+cu118.html
+    # Versions of dependencies can be resolved by pip
+    - pyg_lib
+    - torch_scatter
+    - torch_sparse
+    - torch_cluster
+    - torch_spline_conv
+    # Install commonroad-geometric[tests] in editable mode
+    # This will install all dependencies listed under "install_requires" in setup.cfg
+    # The [tests] option will install additional dependencies required for running tests
+    - -e .[tests]
+variables:
+  # Set SUMO_HOME according to https://sumo.dlr.de/docs/Installing/index.html
+  SUMO_HOME: ~/miniconda3/envs/crgeo-3.10/lib/python3.10/site-packages/sumo/

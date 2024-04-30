@@ -3,4 +3,4 @@ from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementation
 from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations.voronoi import VoronoiEdgeDrawer
 from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations.chain_edge_drawer import ChainEdgeDrawer
 from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations.no_edge_drawer import NoEdgeDrawer
-
+from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations.traffic_flow_edge_drawer import TrafficFlowEdgeDrawer

@@ -1,14 +1,26 @@
 import os
 import sys
+
+# Get the directory of the current file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the base path by going up directories to the project base
+base_path = os.path.join(current_dir, '../../../../..')
+
+# Add the base path to sys.path
+if base_path not in sys.path:
+    sys.path.append(base_path)
+
 from typing import Callable, Dict, Iterable, Optional, Tuple, Union, cast
 import numpy as np
+import logging
+from pathlib import Path
 
-from gym.wrappers.record_video import RecordVideo
+from gymnasium.wrappers.record_video import RecordVideo
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
-from commonroad_geometric.common.logging import stdout
 from commonroad_geometric.common.progress_reporter import ProgressReporter
 from commonroad_geometric.common.utils.datetime import get_timestamp_filename
 from commonroad_geometric.common.utils.filesystem import get_most_recent_file, list_files
@@ -18,6 +30,9 @@ from commonroad_geometric.learning.reinforcement.constants import COMMONROAD_GYM
 from commonroad_geometric.learning.reinforcement.experiment import RLExperiment
 
 
+logger = logging.getLogger(__name__)
+
+
 PYTHON_PATH_RECORD_AGENT = os.path.realpath(__file__)
 
 
@@ -25,8 +40,8 @@ def render_agent(
     agent: BaseAlgorithm,
     experiment: Optional[RLExperiment] = None,
     env: Optional[VecEnv] = None,
-    scenario_dir: Optional[str] = None,
-    video_folder: Optional[str] = None,
+    scenario_dir: Optional[Path] = None,
+    video_folder: Optional[Path] = None,
     total_timesteps: Optional[int] = None,
     override_step_id: Optional[int] = None,
     break_on_done: bool = False,
@@ -34,6 +49,9 @@ def render_agent(
     verbose: int = 0,
     seed: Optional[int] = None,
 ) -> Iterable[Tuple[Dict[str, np.ndarray], float, bool, CommonRoadGymStepInfo]]:
+
+    logger.info(f"Rendering agent - video will be exported to {video_folder=}")
+
     assert total_timesteps is None or total_timesteps > 0
     assert experiment is not None or env is not None
 
@@ -45,12 +63,13 @@ def render_agent(
         env.seed(seed)
 
     if video_folder is not None:
+        video_folder = Path(video_folder)
         total_timesteps = total_timesteps if total_timesteps is not None else np.inf
         venv = VecVideoRecorder(
-            RecordVideo(env, os.path.join(video_folder, "gym-results")), 
-            video_folder=video_folder, 
-            record_video_trigger=lambda x: x == 0, 
-            video_length=total_timesteps, 
+            RecordVideo(env, video_folder.joinpath("gym-results")),
+            video_folder=video_folder,
+            record_video_trigger=lambda x: x == 0,
+            video_length=total_timesteps,
             name_prefix=f"{COMMONROAD_GYM_ENV_ID}-{env.get_attr('current_scenario_id')[0]}-{get_timestamp_filename()}"
         )
     else:
@@ -58,37 +77,58 @@ def render_agent(
 
     if override_step_id is not None:
         venv.step_id = override_step_id
-    obs = venv.reset()
-    
-    if verbose > 0 and video_folder is not None:
+
+    if hasattr(venv, 'env'):
+        obs = venv.env.env.reset()
+    else:
+        obs = venv.reset()
+    try:
+        venv.start_video_recorder()
+    except AttributeError:
+        logger.warn("Failed to start video recorder")
+
+    if verbose > 0:
         progress = ProgressReporter(total=total_timesteps, unit="epoch")
 
     t = 0
     total_reward = 0.0
     while True:
         deterministic_step = deterministic if isinstance(deterministic, bool) else deterministic(t)
-        action, states = agent.predict(obs, deterministic=deterministic_step)
+
+        obs_tensor, vectorized_env = agent.policy.obs_to_tensor(obs)
+        features = agent.policy.extract_features(obs_tensor, features_extractor=agent.policy.features_extractor)
+        if isinstance(features, tuple):
+            features, feature_info = features
+        else:
+            feature_info = dict()
+        latent_pi = agent.policy.mlp_extractor.forward_actor(features)
+        action_tensor = agent.policy._get_action_dist_from_latent(latent_pi).get_actions(deterministic=deterministic_step)
+        action = action_tensor.detach().numpy()
+        agent_info = dict(
+            features=features,
+            feature_info=feature_info,
+            latent_pi=latent_pi,
+            action=action
+        )
+
+        # action, states = agent.predict(obs, deterministic=deterministic_step)
         obs, reward, done, info = venv.step(action)
-        reward = float(reward)
+        reward = reward.item()
         info = info[0] if isinstance(info, list) else info
 
         yield obs, reward, done, info
 
         total_reward += reward
         if video_folder is None and not venv.get_attr('options')[0].render_on_step:
-            venv.render()
+            venv.envs[0].unwrapped.render(agent_info=agent_info)
         if verbose > 0:
-            if video_folder is not None:
-                progress.update(t + 1)
-            else:
-                stdout(f"reward: {reward:.3f}, cum. reward: {total_reward:.3f}, t: {info['time_step']}, deterministic: {deterministic_step}")
-        if done:
-            if break_on_done:
-                break
-            elif video_folder is not None:
-                venv.env.reset()
-            else:
-                venv.reset()
+            status_msg = f"reward: {reward:.3f}, cum. reward: {total_reward:.3f}"
+            progress.update(t + 1)
+            progress.set_postfix_str(status_msg)
+        if done and break_on_done:
+            break
+        if done and video_folder is not None:
+            venv.env.env.reset()
         t += 1
         if total_timesteps is not None and t >= total_timesteps:
             break
@@ -96,6 +136,8 @@ def render_agent(
     venv.close()
     if verbose > 0 and video_folder is not None:
         progress.close()
+
+    logger.info(f"Rendering completed")
 
 
 if __name__ == '__main__':
@@ -115,7 +157,7 @@ if __name__ == '__main__':
     parser.add_argument("--n-videos", type=int, help="number of videos", default=1)
     parser.add_argument("--seed", type=int, help="seeding", default=0)
     parser.add_argument("--device", type=str, default="cpu")
-    
+
     args = parser.parse_args()
     if args.cwd is not None:
         sys.path.insert(0, args.cwd)

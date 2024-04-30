@@ -3,7 +3,7 @@ from typing import Any, Optional, Tuple, Type
 import torch
 from torch import Tensor, nn
 from torch.nn.parameter import Parameter
-from torch_geometric.nn import MessagePassing
+from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import normal
 from torch_geometric.nn.models import MLP
 from torch_geometric.nn.models.basic_gnn import BasicGNN
@@ -24,7 +24,7 @@ class L2LConvLayer(MessagePassing):
         **mlp_kwargs: Any
     ):
         super(L2LConvLayer, self).__init__(aggr=aggr)
-        
+
         self.bias = Parameter(torch.Tensor(output_size)) if out_bias else 0.0
         self.add_previous = add_previous
         self.msg_mlp = MLP(
@@ -38,20 +38,20 @@ class L2LConvLayer(MessagePassing):
         self.act = act()
 
         self.reset_parameters()
-    
+
     def reset_parameters(self):
-        #normal(self.weights, mean=0, std=2)
+        # normal(self.weights, mean=0, std=2)
         normal(self.bias, mean=0, std=2)
 
-    def forward(self, x: Tensor, edge_index: Tensor, edge_attr: Optional[Tensor]=None) -> Tensor:
+    def forward(self, x: Tensor, edge_index: Tensor, edge_attr: Optional[Tensor] = None) -> Tensor:
         msg_agg = self.propagate(
-            edge_index=edge_index, 
+            edge_index=edge_index,
             edge_attr=edge_attr,
             x=x
         )
 
         z = msg_agg + self.bias
-        if self.add_previous: # and z.shape[1] == x.shape[1]:
+        if self.add_previous:  # and z.shape[1] == x.shape[1]:
             y = x + z
         else:
             y = z
@@ -105,7 +105,7 @@ class L2LGNN(BasicGNN):
 
 class V2LConvLayer(MessagePassing):
     def __init__(
-        self, 
+        self,
         in_channels: int,
         hidden_channels: int,
         out_channels: int,
@@ -125,16 +125,16 @@ class V2LConvLayer(MessagePassing):
         self.bias = Parameter(torch.Tensor(out_channels))
 
         self.reset_parameters()
-    
+
     def reset_parameters(self):
         normal(self.bias, mean=0, std=2)
         self.msg_encoder.reset_parameters()
-        
-    def forward(self, x: Tuple[Tensor, Tensor], edge_index: Tensor, edge_attr: Tensor, dim_size: int) -> Tensor:        
+
+    def forward(self, x: Tuple[Tensor, Tensor], edge_index: Tensor, edge_attr: Tensor, dim_size: int) -> Tensor:
         msg_agg = self.propagate(
-            edge_index=edge_index, 
+            edge_index=edge_index,
             x=x,
-            edge_attr=edge_attr, 
+            edge_attr=edge_attr,
             dim_size=dim_size
         )
 

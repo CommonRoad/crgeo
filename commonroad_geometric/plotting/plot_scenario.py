@@ -44,7 +44,7 @@ def plot_scenario(
             plt.title(str(scenario.scenario_id) + ' (' + coordinates + ')')
         else:
             plt.title(str(scenario.scenario_id))
-            
+
     if show:
         plt.show()
 

@@ -50,11 +50,15 @@ def is_finite(x: Any) -> bool:
 
 def to_float32(data: T_Data) -> T_Data:
     """Converts all attributes of PyTorch Geometric graph instance to float32 dtype."""
-    for k in data.keys:
+    for k in keys(data):
         if hasattr(data[k], 'dtype') and data[k].dtype == torch.float64:
             data[k] = data[k].to(torch.float32)
     return data
 
+def keys(data: T_Data):
+    if isinstance(data.keys, list):
+        return data.keys # older pygeo
+    return data.keys() # newer pygeo
 
 def to_float32_tensors(ndarrays: List[np.ndarray]) -> List[Tensor]:
     return [
@@ -164,12 +168,14 @@ def flatten_data(
             v = v.unsqueeze(1)
         if k[-1] == 'edge_index':
             if not v.shape[1] <= padding:
-                raise FlattenDataInsufficientPaddingSize(f"padding was exceeded for {k_str}: ({v.shape[1]} > {padding}), please increase in RLEnvironmentOptions")
+                raise FlattenDataInsufficientPaddingSize(
+                    f"padding was exceeded for {k_str}: ({v.shape[1]} > {padding}), please increase in RLEnvironmentOptions")
             v_padded = pad(v, (0, padding - v.shape[1], 0, 0))
             assert v_padded.shape[1] == padding
         else:
-            if not v.shape[0] <= padding: 
-                raise FlattenDataInsufficientPaddingSize(f"padding was exceeded for {k_str}: ({v.shape[0]} > {padding}), please increase in RLEnvironmentOptions")
+            if not v.shape[0] <= padding:
+                raise FlattenDataInsufficientPaddingSize(
+                    f"padding was exceeded for {k_str}: ({v.shape[0]} > {padding}), please increase in RLEnvironmentOptions")
             if v.shape[1] == 0:
                 # skipping empty feature tensors
                 continue
@@ -187,7 +193,8 @@ def flatten_data(
             out[k] = v
 
     if validate:
-        reconstructed_dict = reconstruct_data(out).to_dict()
+        reconstructed_data = reconstruct_data(out)
+        reconstructed_dict = reconstructed_data.to_dict()
         data_dict = data.to_dict()
         for k, v in data_dict.items():
             if ignore_keys is not None and k in ignore_keys:
@@ -299,8 +306,14 @@ def reconstruct_data(
             batch_widths = tensors[f'_{k0_str}']
             batch_size = v.shape[0]
             width = v.shape[1]
-            full_batch_matrix = torch.arange(batch_size, dtype=torch.long, device=v.device).unsqueeze(-1).repeat(1, width)
-            full_int_idx_matrix = torch.arange(width, dtype=torch.long, device=v.device).unsqueeze(0).repeat(batch_size, 1)
+            full_batch_matrix = torch.arange(batch_size, dtype=torch.long,
+                                             device=v.device).unsqueeze(-1).repeat(1, width)
+            full_int_idx_matrix = torch.arange(
+                width,
+                dtype=torch.long,
+                device=v.device).unsqueeze(0).repeat(
+                batch_size,
+                1)
             batch_masks = full_int_idx_matrix < batch_widths
             batch = full_batch_matrix[batch_masks]
             batch_masks_dict[key] = batch_masks
@@ -315,12 +328,13 @@ def reconstruct_data(
                 from_widths = from_widths.unsqueeze(1)
             if to_widths.ndim == 1:
                 to_widths = to_widths.unsqueeze(1)
-            from_cumsum = torch.cat([torch.tensor([0.0], device=v.device).unsqueeze(1), torch.cumsum(from_widths, 0)])[:-1]
+            from_cumsum = torch.cat([torch.tensor([0.0], device=v.device).unsqueeze(1),
+                                    torch.cumsum(from_widths, 0)])[:-1]
             to_cumsum = torch.cat([torch.tensor([0.0], device=v.device).unsqueeze(1), torch.cumsum(to_widths, 0)])[:-1]
 
             from_indices = v[:, :, 0] + from_cumsum
             to_indices = v[:, :, 1] + to_cumsum
-            batch_idx_full = torch.stack([from_indices, to_indices], dim=-1) # TODO optimize
+            batch_idx_full = torch.stack([from_indices, to_indices], dim=-1)  # TODO optimize
             value_select = batch_idx_full[batch_masks_dict[key]].transpose(0, 1).long()
         else:
             value_select = v[batch_masks_dict[key]]
@@ -345,3 +359,12 @@ def assert_size(t: Tensor, size: Tuple[Union[int, None], ...]) -> None:
     for i, s in enumerate(size):
         if s is not None and t_size[i] != s:
             raise TensorSizeMismatch(f"Expected dimension {i} to be of size {s} but got {t_size[i]}")
+
+
+def reset_module(value: Any) -> None:
+    # copied from torch_geometric/nn/inits.py
+    if hasattr(value, "reset_parameters"):
+        value.reset_parameters()
+    elif hasattr(value, "children"):
+        for child in value.children():
+            reset_module(child)

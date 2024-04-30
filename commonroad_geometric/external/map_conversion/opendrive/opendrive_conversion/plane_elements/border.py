@@ -41,14 +41,14 @@ class Border:
           Index for self.width_coefficient_offsets or self.width_coefficients.
         """
         return next((
-                self.width_coefficient_offsets.index(n)
-                for n in self.width_coefficient_offsets[::-1]
-                if (
+            self.width_coefficient_offsets.index(n)
+            for n in self.width_coefficient_offsets[::-1]
+            if (
                     (n <= s_pos and (not is_last_pos or s_pos == 0))
                     or (n < s_pos and is_last_pos)
-                )
-            ),
-            len(self.width_coefficient_offsets)-1,
+                    )
+        ),
+            len(self.width_coefficient_offsets) - 1,
         )
 
     def get_next_width_coeffs(self, s_pos: float, is_last_pos: bool = False) -> list:

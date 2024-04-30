@@ -1,7 +1,7 @@
-from typing import List, Dict, Tuple, Optional, overload, Union, Callable, TypeVar, Generic
+from typing import Callable, Dict, Generic, Optional, Tuple, TypeVar, Union, overload
 
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 from torch.distributions import Normal
 
 from commonroad_geometric.common.torch_utils.helpers import assert_size
@@ -140,7 +140,7 @@ class ConditionalVariationalAutoencoder(nn.Module, Generic[T_GeneratorOutput, T_
         loss_gsnn = reconstruction_loss(output=output_from_prior, target=target)
         hybrid_loss = alpha * loss_cvae["primary"] + (1. - alpha) * loss_gsnn  # hybrid CVAE + GSNN loss
 
-        return hybrid_loss, { 
+        return hybrid_loss, {
             "reconstruction": loss_cvae["reconstruction"],
             "kl_divergence": loss_cvae["kl_divergence"],
             "cvae": loss_cvae["primary"].detach(),
@@ -159,4 +159,5 @@ def kl_divergence_diagonal_normal(
     means2: Tensor, log_variances2: Tensor,
 ) -> Tensor:
     variances1, variances2 = torch.exp(log_variances1), torch.exp(log_variances2)
-    return 0.5 * torch.sum(variances1 / variances2 + (means2 - means1)**2 / variances2 + log_variances2 - log_variances1 - 1.0, dim=-1)
+    return 0.5 * torch.sum(variances1 / variances2 + (means2 - means1)**2 /
+                           variances2 + log_variances2 - log_variances1 - 1.0, dim=-1)

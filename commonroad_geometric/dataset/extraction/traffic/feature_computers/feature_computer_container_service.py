@@ -9,7 +9,8 @@ import torch
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 from commonroad_geometric.common.torch_utils.helpers import is_finite
-from commonroad_geometric.dataset.extraction.traffic.feature_computers.base_feature_computer import (BaseFeatureComputer, FunctionalFeatureComputer, T_FeatureParams)
+from commonroad_geometric.dataset.extraction.traffic.feature_computers.base_feature_computer import (
+    BaseFeatureComputer, FunctionalFeatureComputer, T_FeatureParams)
 # from commonroad_geometric.common.online_normalization import OnlineNormalizer
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.types import FeatureDict, T_FeatureComputer
 from commonroad_geometric.simulation.base_simulation import BaseSimulation, BaseSimulationOptions
@@ -38,7 +39,8 @@ class FeatureComputerContainerService(Generic[T_FeatureParams], AutoReprMixin):
             if isinstance(feature_computer, BaseFeatureComputer):
                 self._feature_computers.append(feature_computer)
             else:  # feature callable (T_FeatureCallable)
-                self._feature_computers.append(FunctionalFeatureComputer[T_FeatureComputer](feature_computer)) # TODO: fix type
+                self._feature_computers.append(
+                    FunctionalFeatureComputer[T_FeatureComputer](feature_computer))  # TODO: fix type
 
         # self.reset_all_feature_computers(None)
         self._setup_all_feature_computers(simulation_options)
@@ -133,7 +135,8 @@ class FeatureComputerContainerService(Generic[T_FeatureParams], AutoReprMixin):
                         feature_name not in FeatureComputerContainerService._nan_warnings,
                         not is_finite(feature_value),
                     )):
-                        warnings.warn(f"Feature {feature_name} ({feature_computer.name}) has non-finite value {feature_value} at time-step {params.time_step}. Recurring warnings will be suppressed!")
+                        warnings.warn(
+                            f"Feature {feature_name} ({feature_computer.name}) has non-finite value {feature_value} at time-step {params.time_step}. Recurring warnings will be suppressed!")
                         FeatureComputerContainerService._nan_warnings.add(feature_name)
 
                 start_index, end_index = self.feature_column_indices[feature_name]

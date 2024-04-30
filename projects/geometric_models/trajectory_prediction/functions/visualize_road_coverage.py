@@ -1,14 +1,13 @@
-import random
 from typing import Tuple
-from commonroad.common.file_reader import CommonRoadFileReader
-from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset
-from commonroad_geometric.common.torch_utils.sampling import sample_indices
-from torch_geometric.loader import DataLoader
-from matplotlib import pyplot as plt
-import torch
-from projects.geometric_models.drivable_area.utils.visualization.plotting import plot_road_coverage, plot_distribution, plot_with_axes
 
-from commonroad_geometric.plotting.plot_scenario import plot_scenario
+import torch
+from matplotlib import pyplot as plt
+from torch_geometric.loader import DataLoader
+
+from commonroad_geometric.common.torch_utils.sampling import sample_indices
+from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset
+from projects.geometric_models.drivable_area.utils.visualization.plotting import plot_road_coverage, plot_with_axes
+
 
 def visualize_road_coverage(
     dataset: CommonRoadDataset,
@@ -17,7 +16,7 @@ def visualize_road_coverage(
     figsize: Tuple[int, int] = (16, 16),
     batch_size: int = 10,
     shuffle: bool = True
-) -> None:    
+) -> None:
     num_samples = grid[0] * grid[1]
 
     loader = DataLoader(

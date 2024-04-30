@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import dill
 import torch
-from optuna.trial import Trial
 from torch import Tensor, nn
 from torch.optim.optimizer import Optimizer
 
@@ -18,8 +17,7 @@ from commonroad_geometric.common.torch_utils.helpers import optimizer_to
 from commonroad_geometric.common.utils.filesystem import load_dill
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.learning.geometric.types import T_CommonRoadDataInput
-from commonroad_geometric.learning.training.optimizer.hyperparameter_optimizer_service import BaseOptimizerService
-from commonroad_geometric.rendering.base_renderer_plugin import BaseRendererPlugin
+from commonroad_geometric.rendering.plugins.base_renderer_plugin import BaseRenderPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +26,9 @@ TypeVar_BaseGeometric = TypeVar('TypeVar_BaseGeometric', bound='BaseGeometric')
 
 MODEL_FILENAME = 'model'
 MODEL_FILETYPE = 'pt'
-MODEL_FILE = MODEL_FILENAME + '.' + MODEL_FILETYPE
-STATE_DICT_FILE = 'state_dict.pt'
-OPTIMIZER_FILE = 'optimizer.pt'
+MODEL_FILE = Path(MODEL_FILENAME + '.' + MODEL_FILETYPE)
+STATE_DICT_FILE = Path('state_dict.pt')
+OPTIMIZER_FILE = Path('optimizer.pt')
 
 
 class BaseModel(nn.Module, ABC, StringResolverMixin):
@@ -102,7 +100,7 @@ class BaseGeometric(BaseModel):
 
     @abstractmethod
     def forward(
-        self, 
+        self,
         data: T_CommonRoadDataInput,
         **kwargs: Any
     ) -> Union[Tensor, Tuple[Tensor, ...]]:
@@ -122,8 +120,8 @@ class BaseGeometric(BaseModel):
 
     def configure_optimizer(
         self,
-        trial: Optional[Trial] = None,
-        optimizer_service: Optional[BaseOptimizerService] = None,
+        trial = None,
+        optimizer_service = None,
     ) -> Optimizer:
         """Returns optimizer for the module.
 
@@ -146,11 +144,11 @@ class BaseGeometric(BaseModel):
         )
 
     @classmethod
-    def configure_renderer_plugins(cls) -> Optional[List[BaseRendererPlugin]]:
+    def configure_renderer_plugins(cls) -> Optional[List[BaseRenderPlugin]]:
         """Returns list of renderer plugins for visualiasing the module's predictions.
 
         Returns:
-            Optional[List[BaseRendererPlugin]]: List of renderer plugins, or None if visualization not implemented.
+            Optional[List[BaseRenderPlugin]]: List of renderer plugins, or None if visualization not implemented.
         """
         return None
 
@@ -158,7 +156,7 @@ class BaseGeometric(BaseModel):
     def _build(
         self,
         batch: CommonRoadData,
-        trial: Optional[Trial] = None
+        trial = None
     ) -> None:
         """Constructs all the submodules of the model. As opposed to the __init__ method,
         _build has access to data dimensions etc. via the CommonRoadData sample.
@@ -167,7 +165,7 @@ class BaseGeometric(BaseModel):
             batch (CommonRoadData): Test batch for extracting data dimensions
             trial (Optional[Trial]): Optional parameter to include the trial from Optuna for adjusting model parameters
 
-        def _build(self, batch: CommonRoadData, trial: Optional[Trial] = None) -> None:
+        def _build(self, batch: CommonRoadData, trial = None) -> None:
             self.linear = nn.Linear(
                 batch.x.shape[1],
                 1
@@ -187,10 +185,10 @@ class BaseGeometric(BaseModel):
         return data
 
     def build(
-        self, 
+        self,
         data: CommonRoadData,
-        trial: Optional[Trial] = None,
-        optimizer_service: Optional[BaseOptimizerService] = None,
+        trial = None,
+        optimizer_service = None,
         optimizer_state: Optional[Dict[str, Any]] = None
     ) -> None:
         self._trial = trial
@@ -215,7 +213,7 @@ class BaseGeometric(BaseModel):
     def optimizer(self) -> Optimizer:
         if self._optimizer is None:
             raise AttributeError("self._optimizer is None")
-        return self._optimizer # type: ignore
+        return self._optimizer  # type: ignore
 
     @property
     def latest_state_path(self) -> Optional[Path]:
@@ -227,7 +225,7 @@ class BaseGeometric(BaseModel):
 
     def save_model(
         self,
-        output_path: Union[str, Path],
+        output_path: Path,
         use_torch: bool = False
     ) -> None:
         if use_torch:
@@ -239,15 +237,15 @@ class BaseGeometric(BaseModel):
 
     def save_state(
         self,
-        output_path: Union[str, Path]
+        output_path: Path
     ) -> None:
         torch.save(self.state_dict(), output_path)
-        self._latest_state_path = Path(output_path)
+        self._latest_state_path = output_path
 
     @classmethod
     def load(
         cls: Type[TypeVar_BaseGeometric],
-        model_path: Union[str, Path],
+        model_path: Path,
         device: Optional[str] = None,
         eval: bool = True,
         retries: int = 3,
@@ -277,7 +275,8 @@ class BaseGeometric(BaseModel):
                         model.eval()
                     break
                 if not silent:
-                    logger.exception(f"Failed to load BaseGeometric model from {model_path}. {retries - attempt - 1} attempts remaining.")
+                    logger.exception(
+                        f"Failed to load BaseGeometric model from {model_path}. {retries - attempt - 1} attempts remaining.")
                 wait_duration = backoff_factor * (2 ** (attempt - 1))
                 exception = e
                 if attempt < retries:

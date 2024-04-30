@@ -44,7 +44,8 @@ class VehicleLaneletPoseEdgeFeatureComputer(BaseFeatureComputer[VFeatureParams])
         include_heading_error: bool = True,
         update_exact_interval: int = 1,
         allow_outside_arclengths: bool = True,
-        nan_if_missing: bool = False
+        nan_if_missing: bool = False,
+        linear_lanelet_projection: bool = False
     ) -> None:
         if not any((
             include_longitudinal_abs,
@@ -63,6 +64,7 @@ class VehicleLaneletPoseEdgeFeatureComputer(BaseFeatureComputer[VFeatureParams])
         self._include_lateral_error = include_lateral_error
         self._include_heading_error = include_heading_error
         self._allow_outside_arclengths = allow_outside_arclengths
+        self._linear_lanelet_projection = linear_lanelet_projection
         self._update_exact_interval = update_exact_interval
         self._use_approximations = update_exact_interval > 1
         self._nan_if_missing = nan_if_missing
@@ -88,10 +90,15 @@ class VehicleLaneletPoseEdgeFeatureComputer(BaseFeatureComputer[VFeatureParams])
             self._vehicle_call_count[obstacle_id] = 0
 
         center_polyline = simulation.get_lanelet_center_polyline(lanelet.lanelet_id)
-        if not self._use_approximations or self._vehicle_call_count[obstacle_id] % self._update_exact_interval == 0 or simulation.has_changed_lanelet(params.obstacle):
+        if not self._use_approximations or \
+            self._vehicle_call_count[obstacle_id] % self._update_exact_interval == 0 or \
+            simulation.has_changed_lanelet(params.obstacle) or \
+            obstacle_id not in self._vehicle_arclength_approximations or \
+            params.time_step not in self._vehicle_arclength_approximations[obstacle_id]:
             lanelet_arclength_abs = center_polyline.get_projected_arclength(
                 params.state.position,
-                relative=False
+                relative=False,
+                linear_projection=self._linear_lanelet_projection
             )
             if self._allow_outside_arclengths and lanelet_arclength_abs <= 0:
                 lanelet_arclength_abs = center_polyline.get_projected_arclength(
@@ -99,7 +106,8 @@ class VehicleLaneletPoseEdgeFeatureComputer(BaseFeatureComputer[VFeatureParams])
                         np.cos(params.state.orientation) * params.obstacle.obstacle_shape.length / 2,
                         np.sin(params.state.orientation) * params.obstacle.obstacle_shape.length / 2
                     ),
-                    relative=False
+                    relative=False,
+                    linear_projection=self._linear_lanelet_projection
                 ) - params.obstacle.obstacle_shape.length / 2
             elif self._allow_outside_arclengths and lanelet_arclength_abs >= center_polyline.length:
                 lanelet_arclength_abs = center_polyline.get_projected_arclength(
@@ -107,22 +115,32 @@ class VehicleLaneletPoseEdgeFeatureComputer(BaseFeatureComputer[VFeatureParams])
                         np.cos(-params.state.orientation) * params.obstacle.obstacle_shape.length / 2,
                         np.sin(-params.state.orientation) * params.obstacle.obstacle_shape.length / 2
                     ),
-                    relative=False
+                    relative=False,
+                    linear_projection=self._linear_lanelet_projection
                 ) + params.obstacle.obstacle_shape.length / 2
         else:
             lanelet_arclength_abs = self._vehicle_arclength_approximations[obstacle_id][params.time_step]
         _features[V_Feature.LaneletArclengthAbs.value] = lanelet_arclength_abs
         if self._use_approximations:
+            if obstacle_id not in self._vehicle_call_count:
+                self._vehicle_call_count[obstacle_id] = 0 # not sure why it's necessary, avoids some KeyError
             self._vehicle_call_count[obstacle_id] += 1
         if self._include_longitudinal_rel:
-            _features[V_Feature.LaneletArclengthRel.value] = lanelet_arclength_abs / center_polyline.length
+            lanelet_arclength_rel = lanelet_arclength_abs / center_polyline.length
+            _features[V_Feature.LaneletArclengthRel.value] = lanelet_arclength_rel
         if self._include_lateral_left or self._include_lateral_error:
             left_polyline = simulation.get_lanelet_left_polyline(lanelet.lanelet_id)
-            dist_left_bound = left_polyline.get_projected_distance(params.state.position, arclength=lanelet_arclength_abs)
+            dist_left_bound = left_polyline.get_projected_distance(
+                params.state.position, 
+                arclength=lanelet_arclength_abs
+            )
             _features[V_Feature.DistLeftBound.value]=dist_left_bound
         if self._include_lateral_right or self._include_lateral_error:
             right_polyline = simulation.get_lanelet_right_polyline(lanelet.lanelet_id)
-            dist_right_bound = right_polyline.get_projected_distance(params.state.position, arclength=lanelet_arclength_abs)
+            dist_right_bound = right_polyline.get_projected_distance(
+                params.state.position,
+                arclength=lanelet_arclength_abs
+            )
             _features[V_Feature.DistRightBound.value]=dist_right_bound
 
         if self._include_lateral_error:
@@ -133,9 +151,8 @@ class VehicleLaneletPoseEdgeFeatureComputer(BaseFeatureComputer[VFeatureParams])
             heading_error = relative_orientation(
                 params.state.orientation,
                 center_polyline.get_direction(lanelet_arclength_abs)
-                )
+            )
             _features[V_Feature.HeadingError.value] = heading_error           
-
 
         if self._use_approximations and obstacle_id not in self._vehicle_arclength_approximations:
             self._vehicle_arclength_approximations[obstacle_id] = {}
@@ -185,6 +202,9 @@ class VehicleLaneletPoseEdgeFeatureComputer(BaseFeatureComputer[VFeatureParams])
 
         if self._include_heading_error:
             features[V2L_Feature.V2LHeadingError.value] = _features[V_Feature.HeadingError.value]
+
+        assert all (np.isfinite(f) for f in features.values())
+
         return features
 
     def _return_undefined_features(self) -> FeatureDict:

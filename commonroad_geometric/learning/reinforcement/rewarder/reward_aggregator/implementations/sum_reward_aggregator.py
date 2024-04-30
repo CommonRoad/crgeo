@@ -8,5 +8,6 @@ class SumRewardAggregator(BaseRewardAggregator):
     """
     Aggregator class for summing the reward components.
     """
+
     def _aggregate(self, reward_components: Dict[BaseRewardComputer, float]) -> float:
         return sum(reward_components.values())

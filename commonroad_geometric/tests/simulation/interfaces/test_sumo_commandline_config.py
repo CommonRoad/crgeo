@@ -13,7 +13,7 @@ def test_generate_command_float():
     )
     command = config.generate_command()
     idx = command.index('--step-length')
-    assert command[idx+1] == '0.04'
+    assert command[idx + 1] == '0.04'
 
 
 def test_generate_command_boolean():
@@ -22,7 +22,7 @@ def test_generate_command_boolean():
     )
     command = config.generate_command()
     idx = command.index('--tls.all-off')
-    assert command[idx+1] == 'true'
+    assert command[idx + 1] == 'true'
 
 
 def test_save_config():
@@ -30,7 +30,6 @@ def test_save_config():
         tls__all_off=True
     )
     config.save_config()
-    config_path = Path(__file__).parents[3].joinpath(
-        'simulation/interfaces/interactive/config_files/sumo_saved_config.xml'
-    )
+    config_path = os.path.join(Path(__file__).parents[3],
+        'simulation/interfaces/interactive/config_files/sumo_saved_config.xml')
     assert os.path.exists(config_path)

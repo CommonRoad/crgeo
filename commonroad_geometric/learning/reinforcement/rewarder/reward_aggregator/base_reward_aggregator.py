@@ -8,11 +8,9 @@ import numpy as np
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 from commonroad_geometric.common.class_extensions.string_resolver_mixing import StringResolverMixin
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
+from commonroad_geometric.learning.reinforcement.observer.base_observer import T_Observation
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.base_reward_computer import BaseRewardComputer
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
-
-WARN_THRESHOLD = 5.0
-
 
 class BaseRewardAggregator(ABC, AutoReprMixin, StringResolverMixin):
     """
@@ -20,12 +18,14 @@ class BaseRewardAggregator(ABC, AutoReprMixin, StringResolverMixin):
     """
 
     _nan_warnings: Set[str] = set()
-    _abs_warnings: Set[str] = set()
     
     def __init__(
         self,
         reward_computers: List[BaseRewardComputer]
     ) -> None:
+        if len(reward_computers) == 0:
+            raise ValueError("Please provide at least one reward computer")
+
         self._reward_computers = reward_computers
         self._reward_cache: Dict[BaseRewardComputer, float] = {}
         self._reward_component_info_step: Dict[str, float] = {}
@@ -75,7 +75,8 @@ class BaseRewardAggregator(ABC, AutoReprMixin, StringResolverMixin):
         self,
         action: np.ndarray,
         simulation: EgoVehicleSimulation,
-        data: CommonRoadData
+        data: CommonRoadData,
+        observation: T_Observation
     ) -> None:
         reward_components: Dict[BaseRewardComputer, float] = {}
         reward_component_info: Dict[str, float] = {}
@@ -90,7 +91,8 @@ class BaseRewardAggregator(ABC, AutoReprMixin, StringResolverMixin):
             reward_component = computer.compute(
                 action=action,
                 simulation=simulation,
-                data=data
+                data=data,
+                observation=observation
             ) if simulation.current_time_step > simulation.initial_time_step + 1 else 0.0
 
             if not math.isfinite(reward_component):
@@ -98,10 +100,6 @@ class BaseRewardAggregator(ABC, AutoReprMixin, StringResolverMixin):
                     warnings.warn(f"Reward component {type(computer).name} has non-finite value {reward_component} at time-step {simulation.current_time_step}. Recurring warnings will be suppressed!") # type: ignore # TODO
                     BaseRewardAggregator._nan_warnings.add(type(computer).name)
                 reward_component = self._reward_cache.get(computer, 0.0)
-
-            if abs(reward_component) >= WARN_THRESHOLD and type(computer).name not in BaseRewardAggregator._abs_warnings:
-                warnings.warn(f"Reward component {type(computer).name} has large absolute value {reward_component} at time-step {simulation.current_time_step}. Recurring warnings will be suppressed!")
-                BaseRewardAggregator._abs_warnings.add(type(computer).name)
 
             if reward_component < lowest_reward:
                 lowest_reward = reward_component

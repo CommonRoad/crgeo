@@ -2,7 +2,8 @@ from typing import List, Optional
 
 from commonroad.prediction.prediction import TrajectoryPrediction
 from commonroad.scenario.trajectory import Trajectory
-from commonroad.scenario.obstacle import DynamicObstacle, ObstacleType, State
+from commonroad.scenario.obstacle import DynamicObstacle, ObstacleType
+from commonroad.scenario.state import State, CustomState, InitialState
 from commonroad.geometry.shape import Rectangle
 from commonroad.scenario.lanelet import Lanelet
 from commonroad.scenario.lanelet import LaneletNetwork
@@ -19,10 +20,9 @@ def create_dummy_state(
     position: Optional[np.ndarray] = None
 ) -> State:
     if position is None:
-        position =  np.array([0., 0.])
-    return State(
+        position = np.array([0., 0.])
+    return InitialState(
         velocity=1.0,
-        velocity_y=0.0,
         acceleration=.0,
         orientation=.0,
         position=position,
@@ -73,19 +73,19 @@ def create_dummy_obstacle(
 
 def create_dummy_lanelet(lanelet_id: int, **kwargs) -> Lanelet:
     options = dict(
-        right_vertices = np.array([[0, 0], [1, 0], [2, 0], [3, .5], [4, 1], [5, 1], [6, 1], [7, 0], [8, 0]]),
-        left_vertices = np.array([[0, 1], [1, 1], [2, 1], [3, 1.5], [4, 2], [5, 2], [6, 2], [7, 1], [8, 1]]),
-        center_vertices = np.array([[0, .5], [1, .5], [2, .5], [3, 1], [4, 1.5], [5, 1.5], [6, 1.5], [7, .5], [8, .5]]),
-        lanelet_id = lanelet_id,
-        predecessor = [],
-        successor = [],
-        adjacent_left = None,
-        adjacent_right = None,
-        adjacent_right_same_direction = False,
-        adjacent_left_same_direction = False,
-        line_marking_right_vertices = LineMarking.SOLID,
-        line_marking_left_vertices = LineMarking.DASHED,
-        stop_line = StopLine(start=np.array([0, 0]), end=np.array([0, 1]), line_marking=LineMarking.SOLID)
+        right_vertices=np.array([[0, 0], [1, 0], [2, 0], [3, .5], [4, 1], [5, 1], [6, 1], [7, 0], [8, 0]]),
+        left_vertices=np.array([[0, 1], [1, 1], [2, 1], [3, 1.5], [4, 2], [5, 2], [6, 2], [7, 1], [8, 1]]),
+        center_vertices=np.array([[0, .5], [1, .5], [2, .5], [3, 1], [4, 1.5], [5, 1.5], [6, 1.5], [7, .5], [8, .5]]),
+        lanelet_id=lanelet_id,
+        predecessor=[],
+        successor=[],
+        adjacent_left=None,
+        adjacent_right=None,
+        adjacent_right_same_direction=False,
+        adjacent_left_same_direction=False,
+        line_marking_right_vertices=LineMarking.SOLID,
+        line_marking_left_vertices=LineMarking.DASHED,
+        stop_line=StopLine(start=np.array([0, 0]), end=np.array([0, 1]), line_marking=LineMarking.SOLID)
     )
     options.update(kwargs)
     return Lanelet(**options)

@@ -9,6 +9,7 @@ class TrafficLightGenerator:
     Traffic light cycles are based on the number of incoming lanes.
 
     """
+
     def __init__(self, number_of_incomings):
         self.number_incomings = number_of_incomings
 

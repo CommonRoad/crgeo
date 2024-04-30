@@ -1,8 +1,11 @@
+import os
+
+from omegaconf import OmegaConf
 from typing import Type
 from torch import Tensor, nn
 from torch_geometric.nn import GCN, GAT
 import torch
-import gym
+import gymnasium
 import warnings
 import numpy as np
 from torch_geometric.data import HeteroData
@@ -14,11 +17,14 @@ from torch_geometric.nn import MessagePassing, BatchNorm, LayerNorm, GraphNorm
 from torch_geometric.nn.inits import reset
 from torch_geometric.utils import remove_self_loops, add_self_loops, softmax
 
-from typing import Type, TypeVar
+from typing import Type, TypeVar, Union
 from torch import nn, Tensor
 import torch
 from torch_geometric.nn import MessagePassing, MessageNorm, BatchNorm
 
+# needed for switching between curriculum-specific settings
+local_cfg = OmegaConf.load(os.path.abspath(__file__).replace("feature_extractor.py", "config.yaml"))
+# TODO use local_cfg.general.use_traffic_rules
 
 class EdgeConv(MessagePassing):
     def __init__(
@@ -51,12 +57,37 @@ class EdgeConv(MessagePassing):
         return z
 
 
-def get_ego_features(data: CommonRoadData) -> Tensor:
-    ego_features = torch.cat([
-        (data.v[V_Feature.Velocity.value] - 15.0)/20.0,
-        data.v[V_Feature.Acceleration.value] / 10.0,
-        torch.clip(data.v[V_Feature.YawRate.value], -1.0, 1.0),
-    ], dim=-1)
+def get_ego_features(data: CommonRoadData, no_yaw_rate: bool = False) -> Tensor:
+    try:
+        if no_yaw_rate:
+            ego_features = torch.cat([
+                # With hacky normalizations to roughly [0..1]:
+                (data.v[V_Feature.Velocity.value] - 15.0) / 20.0,
+                data.v[V_Feature.Acceleration.value] / 10.0,
+                data.v[V_Feature.GoalDistanceLateral.value],
+                data.v[V_Feature.GoalDistanceLongitudinal.value],
+                torch.clip(data.v[V_Feature.HeadingError.value], -np.pi/4, np.pi/4),
+                (data.v[V_Feature.DistLeftRoadBound.value] + data.v[V_Feature.DistLeftBound.value]) / 12.,
+                (data.v[V_Feature.DistRightRoadBound.value] + data.v[V_Feature.DistRightBound.value]) / 12.,
+                data.v[V_Feature.DistLeftBound.value] / 2,
+                data.v[V_Feature.DistRightBound.value] / 2,
+            ], dim=-1)
+        else:
+            ego_features = torch.cat([
+                # With hacky normalizations to roughly [0..1]:
+                (data.v[V_Feature.Velocity.value] - 15.0) / 20.0,
+                data.v[V_Feature.Acceleration.value] / 10.0,
+                torch.clip(data.v[V_Feature.YawRate.value], -1.0, 1.0),
+                data.v[V_Feature.GoalDistanceLateral.value],
+                data.v[V_Feature.GoalDistanceLongitudinal.value],
+                torch.clip(data.v[V_Feature.HeadingError.value], -np.pi/4, np.pi/4),
+                (data.v[V_Feature.DistLeftRoadBound.value] + data.v[V_Feature.DistLeftBound.value]) / 12.,
+                (data.v[V_Feature.DistRightRoadBound.value] + data.v[V_Feature.DistRightBound.value]) / 12.,
+                data.v[V_Feature.DistLeftBound.value] / 2,
+                data.v[V_Feature.DistRightBound.value] / 2,
+            ], dim=-1)
+    except RuntimeError:
+        pass
     return ego_features
 
 
@@ -82,13 +113,9 @@ class VehicleGraphFeatureExtractor(BaseGeometricFeatureExtractor):
     GNN feature extractor with V2V interactions.
     """
 
-    NUM_NODE_FEATURES = 4
-    NUM_EDGE_FEATURES = 2
-    NUM_EGO_FEATURES = 5
-
     def __init__(
         self, 
-        observation_space: gym.Space,
+        observation_space: gymnasium.Space,
         gnn_hidden_dim: int,
         gnn_layers: int,
         gnn_out_dim: int,
@@ -107,16 +134,19 @@ class VehicleGraphFeatureExtractor(BaseGeometricFeatureExtractor):
         self._aggr = aggr
         self._activation_fn = activation_fn
         self._normalization = normalization
+        self._num_node_features = 4
+        self._num_edge_features = 2
+        self._num_ego_features = 12
         super().__init__(observation_space)
 
-    def _build(self, observation_space: gym.Space) -> None:
+    def _build(self, observation_space: gymnasium.Space) -> None:
         if self._gnn_layers > 0:
             self.convs = []
             for i in range(self._gnn_layers):
-                x_dim = VehicleGraphFeatureExtractor.NUM_NODE_FEATURES if i == 0 else self._gnn_hidden_dim
+                x_dim = self._num_node_features if i == 0 else self._gnn_hidden_dim
                 edge_conv = EdgeConv(
                     x_dim=x_dim,
-                    edge_dim=VehicleGraphFeatureExtractor.NUM_EDGE_FEATURES,
+                    edge_dim=self._num_edge_features,
                     hidden_dim=self._gnn_hidden_dim,
                     aggr=self._aggr,
                     activation_fn=self._activation_fn,
@@ -130,21 +160,18 @@ class VehicleGraphFeatureExtractor(BaseGeometricFeatureExtractor):
                 self.convs.append(layer)
                 # TODO use sequential
             self.embedder = nn.Linear(
-                self._gnn_hidden_dim + int(self._concat_ego_features) * VehicleGraphFeatureExtractor.NUM_EGO_FEATURES,
+                self._gnn_hidden_dim + int(self._concat_ego_features) * self._num_ego_features,
                 self._gnn_out_dim
             )
             self.embed_act = self._activation_fn()
             self.out_norm = nn.BatchNorm1d(self.output_dim) if self._normalization else nn.Identity()
-            #self.ego_features_norm = BatchNorm(VehicleGraphFeatureExtractor.NUM_EGO_FEATURES) if self._normalization else nn.Identity()
-            #self.x_norm = BatchNorm(VehicleGraphFeatureExtractor.NUM_NODE_FEATURES) if self._normalization else nn.Identity()
-            #self.edge_attr_norm = BatchNorm(VehicleGraphFeatureExtractor.NUM_EDGE_FEATURES) if self._normalization else nn.Identity()
 
     @property
     def output_dim(self) -> int:
         if self._gnn_layers == 0:
-            return VehicleGraphFeatureExtractor.NUM_EGO_FEATURES
+            return self._num_ego_features
         elif self._concat_ego_features:
-            return self._gnn_out_dim # + VehicleGraphFeatureExtractor.NUM_EGO_FEATURES
+            return self._gnn_out_dim # + self._num_ego_features
         else:
             return self._gnn_out_dim
 
@@ -185,7 +212,7 @@ class VehicleGraphFeatureExtractor(BaseGeometricFeatureExtractor):
                 edge_index, edge_attr_raw = add_self_loops(
                     edge_index, 
                     edge_attr_raw, 
-                    fill_value=torch.zeros((VehicleGraphFeatureExtractor.NUM_EDGE_FEATURES, ), device=ego_mask.device, dtype=torch.float32),
+                    fill_value=torch.zeros((self._num_edge_features, ), device=ego_mask.device, dtype=torch.float32),
                     num_nodes=x_raw.size(0)
                 )
 

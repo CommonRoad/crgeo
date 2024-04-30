@@ -3,6 +3,4 @@ from commonroad_geometric.learning.geometric.components.decoders.base_decoder im
 from commonroad_geometric.learning.geometric.components.decoders.base_recurrent_decoder import BaseRecurrentDecoder
 from commonroad_geometric.learning.geometric.components.decoders.bucket_decoder import BucketDecoder
 from commonroad_geometric.learning.geometric.components.decoders.lstm_decoder import LSTMDecoder
-from commonroad_geometric.learning.geometric.components.decoders.mlp_decoder import MLPDecoder
-from commonroad_geometric.learning.geometric.components.decoders.sequential_decoder import SequentialDecoder
 from commonroad_geometric.learning.geometric.components.decoders.set2set_decoder import Set2SetDecoder

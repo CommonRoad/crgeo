@@ -7,19 +7,21 @@ from torch import nn
 from torch.optim import Adam
 
 from commonroad_geometric.common.io_extensions.scenario import LaneletAssignmentStrategy
-from commonroad_geometric.dataset.extraction.traffic import TrafficExtractorOptions
 from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.lanelet import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.lanelet_to_lanelet import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_lanelet import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_vehicle import *
-from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficFeatureComputerOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import (TrafficExtractorOptions,
+                                                                               TrafficFeatureComputerOptions)
 from commonroad_geometric.dataset.postprocessing.implementations import *
-from commonroad_geometric.dataset.preprocessing.implementations import *
+from commonroad_geometric.dataset.scenario.preprocessing.filters.implementations import *
+from commonroad_geometric.dataset.scenario.preprocessing.identity_preprocessor import IdentityPreprocessor
+from commonroad_geometric.dataset.scenario.preprocessing.preprocessors.implementations import *
 from commonroad_geometric.learning.reinforcement import RLEnvironmentOptions
 from commonroad_geometric.learning.reinforcement.experiment import RLExperiment, RLExperimentConfig
-from commonroad_geometric.learning.reinforcement.observer.flattened_graph_observer import FlattenedGraphObserver
+from commonroad_geometric.learning.reinforcement.observer.implementations.flattened_graph_observer import FlattenedGraphObserver
 from commonroad_geometric.learning.reinforcement.project.base_rl_project import BaseRLProject
 from commonroad_geometric.learning.reinforcement.rewarder.reward_aggregator.implementations import SumRewardAggregator
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.implementations import *
@@ -29,8 +31,10 @@ from commonroad_geometric.learning.reinforcement.training.rl_trainer import RLMo
 from commonroad_geometric.simulation.ego_simulation.control_space.implementations.longitudinal_control_space import LongitudinalControlOptions, LongitudinalControlSpace
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle import VehicleModel
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulationOptions
-from commonroad_geometric.simulation.ego_simulation.respawning.implementations import RandomRespawner, RandomRespawnerOptions
-from commonroad_geometric.simulation.interfaces.static.scenario_simulation import ScenarioSimulation, ScenarioSimulationOptions
+from commonroad_geometric.simulation.ego_simulation.respawning.implementations import (RandomRespawner,
+                                                                                       RandomRespawnerOptions)
+from commonroad_geometric.simulation.interfaces.static.scenario_simulation import (ScenarioSimulation,
+                                                                                   ScenarioSimulationOptions)
 from projects.geometric_models.lane_occupancy.models.occupancy.occupancy_model import DEFAULT_PATH_LENGTH
 from projects.graph_rl_agents.lane_occupancy.render_config import RENDERER_OPTIONS
 from projects.graph_rl_agents.lane_occupancy.utils.encoding_observer import EncodingObserver
@@ -40,14 +44,14 @@ from projects.graph_rl_agents.lane_occupancy.utils.occupancy_encoding_post_proce
 from projects.graph_rl_agents.lane_occupancy.utils.occupancy_penalty_reward_computer import OccupancyPenaltyRewardComputer
 
 SCENARIO_PREPROCESSORS = [
-    #VehicleFilterPreprocessor(),
-    #RemoveIslandsPreprocessor()
+    # VehicleFilterPreprocessor(),
+    # RemoveIslandsPreprocessor()
     SegmentLaneletsPreprocessor(25.0)
-    #(DepopulateScenarioPreprocessor(1), 1),
+    # (DepopulateScenarioPreprocessor(1), 1),
 ]
 SCENARIO_PREFILTERS = [
-    TrafficFilterer(),
-    LaneletNetworkSizeFilterer(10)
+    TrafficFilter(),
+    MinLaneletCountFilter(10)
 ]
 
 # Control settings
@@ -66,19 +70,19 @@ REWARDER_COMPUTERS = [
         max_speed=15.0,
         speed_bias=3.0,
     ),
-    #FrictionViolationPenaltyRewardComputer(penalty=-0.01),
+    # FrictionViolationPenaltyRewardComputer(penalty=-0.01),
     TrajectoryProgressionRewardComputer(
         weight=0.06,
         delta_threshold=0.08
     ),
-    #ConstantRewardComputer(reward=-0.001),
+    # ConstantRewardComputer(reward=-0.001),
     #
     ReachedGoalRewardComputer(reward=2.0),
-    #SteeringAnglePenaltyRewardComputer(weight=0.0005, loss_type=RewardLossMetric.L1),
+    # SteeringAnglePenaltyRewardComputer(weight=0.0005, loss_type=RewardLossMetric.L1),
     StillStandingPenaltyRewardComputer(penalty=-0.001, velocity_threshold=2.0),
-    
-    #TimeToCollisionPenaltyRewardComputer(weight=0.1), # requires incoming edges
-    #YawratePenaltyRewardComputer(weight=0.01)
+
+    # TimeToCollisionPenaltyRewardComputer(weight=0.1), # requires incoming edges
+    # YawratePenaltyRewardComputer(weight=0.01)
     VelocityPenaltyRewardComputer(
         reference_velocity=17.0,
         weight=0.002,
@@ -142,6 +146,12 @@ class LaneOccupancyRLProject(BaseRLProject):
         occ_model_path = Path(cfg["occ_model_path"]).resolve()
         enable_representations: bool = cfg["enable_representations"]
 
+        scenario_preprocessor = IdentityPreprocessor()
+        for scenario_filter in SCENARIO_PREFILTERS:
+            scenario_preprocessor >>= scenario_filter
+        for preprocessor in SCENARIO_PREPROCESSORS:
+            scenario_preprocessor >>= preprocessor
+
         if enable_representations:
             observer = EncodingObserver(
                 only_longitudinal_features=True
@@ -153,7 +163,7 @@ class LaneOccupancyRLProject(BaseRLProject):
                     'walks', 'ego_trajectory_sequence', 'ego_trajectory_sequence_mask', 'walk_start_length'
                 ]
             )
-        
+
         occupancy_encoder_post_processor = OccupancyEncodingPostProcessor(
             occ_model_path,
             decoding_resolution_route=500 if cfg["hd_videos"] else 50,
@@ -171,9 +181,9 @@ class LaneOccupancyRLProject(BaseRLProject):
                 max_sequence_length=10, flatten=False
             ),
             occupancy_encoder_post_processor
-                
+
         ]
-        
+
         experiment_config = RLExperimentConfig(
             simulation_cls=ScenarioSimulation,
             simulation_options=ScenarioSimulationOptions(
@@ -212,7 +222,7 @@ class LaneOccupancyRLProject(BaseRLProject):
                     v2l=V2L_FEATURE_COMPUTERS,
                 ),
                 postprocessors=postprocessors,
-                only_ego_inc_edges=False, # set to True to speed up extraction for 1-layer GNNs
+                only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
                 assign_multiple_lanelets=True,
                 ego_map_radius=cfg["ego_map_radius"]
             ),
@@ -220,11 +230,10 @@ class LaneOccupancyRLProject(BaseRLProject):
             rewarder=SumRewardAggregator(REWARDER_COMPUTERS),
             termination_criteria=TERMINATION_CRITERIA,
             env_options=RLEnvironmentOptions(
-                async_resets=True,
+                async_resets=False,
                 num_respawns_per_scenario=0,
                 loop_scenarios=True,
-                scenario_preprocessors=SCENARIO_PREPROCESSORS,
-                scenario_prefilters=SCENARIO_PREFILTERS,
+                preprocessor=scenario_preprocessor,
                 render_on_step=cfg["render_on_step"],
                 render_debug_overlays=cfg["render_debug_overlays"],
                 renderer_options=RENDERER_OPTIONS,
@@ -261,7 +270,7 @@ class LaneOccupancyRLProject(BaseRLProject):
                 policy_kwargs=dict(
                     ortho_init=False,
                     log_std_init=-1,
-                    net_arch=[{'vf': [256, 128, 64], 'pi': [256, 128, 64]}],
+                    net_arch={'vf': [256, 128, 64], 'pi': [256, 128, 64]},
                     activation_fn=nn.Tanh,
                     features_extractor_class=feature_extractor_cls,
                     features_extractor_kwargs=feature_extractor_kwargs,
@@ -270,5 +279,5 @@ class LaneOccupancyRLProject(BaseRLProject):
                         eps=1e-5
                     )
                 ),
-            ),            
+            ),
         )

@@ -1,7 +1,9 @@
 import warnings
 from typing import List, Literal, Optional, overload
 
-from commonroad.scenario.obstacle import DynamicObstacle, ObstacleType, State
+from commonroad.scenario.obstacle import DynamicObstacle, ObstacleType
+
+from commonroad.scenario.state import State
 
 
 def map_obstacle_type(obstacle_type: ObstacleType) -> int:
@@ -37,6 +39,7 @@ def get_obstacle_lanelet_assignment(
 
     return []
 
+
 # DynamicObstacle.__hash__ = lambda o: hash(o.obstacle_id) # type: ignore
 
 
@@ -50,6 +53,7 @@ class ObstacleUndefinedStateException(ValueError):
 @overload
 def state_at_time(obstacle: DynamicObstacle, time_step: int, assume_valid: Literal[True]) -> State:
     ...
+
 
 @overload
 def state_at_time(obstacle: DynamicObstacle, time_step: int, assume_valid: bool = False) -> Optional[State]:
@@ -65,7 +69,7 @@ def state_at_time(obstacle: DynamicObstacle, time_step: int, assume_valid: bool 
     """
     if time_step == obstacle.initial_state.time_step:
         return obstacle.initial_state
-        
+
     trajectory = obstacle.prediction.trajectory
     if assume_valid:
         try:

@@ -21,7 +21,7 @@ class BaseDataTransformation(ABC, AutoReprMixin, StringResolverMixin):
 
     def transform_dataset(self, dataset: CommonRoadDataset) -> CommonRoadDataset:
         if self.is_touched(dataset[0]):
-            raise ValueError(f"Dataset has already been processed by {type(self).__name__}")
+            pass # TODO raise ValueError(f"Dataset has already been processed by {type(self).__name__}")
         dataset = self._transform_dataset(dataset)
         self.touch_dataset(dataset)
         return dataset
@@ -36,7 +36,7 @@ class BaseDataTransformation(ABC, AutoReprMixin, StringResolverMixin):
         data = self._transform_data(data)
         self.touch_data(data)
         return data
-    
+
     @abstractmethod
     def _transform_data(self, data: CommonRoadData) -> CommonRoadData:
         ...
@@ -64,8 +64,9 @@ class BaseDataTransformation(ABC, AutoReprMixin, StringResolverMixin):
     def touch_data(self, data: CommonRoadData) -> None:
         setattr(data, self.touch_signature, True)
 
-    def to_post_processor(self) -> T_DataPostprocessorCallable:  
+    def to_post_processor(self) -> T_DataPostprocessorCallable:
         parent = self
+
         def post_processor_callable(
             samples: List[CommonRoadData],
             simulation: Optional[BaseSimulation] = None,

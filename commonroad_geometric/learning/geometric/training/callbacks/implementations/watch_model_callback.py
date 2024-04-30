@@ -2,7 +2,7 @@ from commonroad_geometric.learning.geometric.training.callbacks.base_callback im
 from commonroad_geometric.learning.training.wandb_service.wandb_service import WandbService
 
 
-class WatchWandbCallback(BaseCallback[InitializeTrainingCallbacksParams]): 
+class WatchWandbCallback(BaseCallback[InitializeTrainingCallbacksParams]):
     def __init__(
         self,
         wandb_service: WandbService,
@@ -20,4 +20,7 @@ class WatchWandbCallback(BaseCallback[InitializeTrainingCallbacksParams]):
         if self._wandb_service.success:
             # Logging gradients can randomly fail with warmstart, not sure why
             # https://github.com/wandb/client/issues/800
-            self._wandb_service.watch_model(params.ctx, log="all" if self._log_gradients else "parameters", log_freq=self._log_freq)
+            self._wandb_service.watch_model(
+                params.ctx,
+                log="all" if self._log_gradients else "parameters",
+                log_freq=self._log_freq)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Callable, List, TYPE_CHECKING, Union
-
+from pathlib import Path
 import optuna
 import torch.optim as optim
 from optuna import Study, Trial, pruners
@@ -38,7 +38,7 @@ class BaseOptimizerService:
 
     def suggest_optimizer(parameters, *args, **kwargs):
         ...
-    
+
     def suggest_param(func_name: str, attr: str, *args, **kwargs):
         ...
 
@@ -53,7 +53,7 @@ class SweepsOptimizerService(BaseOptimizerService):
         wandb_service: WandbService = None,
         metrics: Union[str, List[str]] = None,
         metric_callback: Callable[..., Any] = None,
-        log_file: str = 'optimizer.log',
+        log_file: Path = Path('optimizer.log'),
     ) -> None:
         # Use directions for mult-parameter learning
         self._metric_callback = metric_callback
@@ -69,17 +69,17 @@ class SweepsOptimizerService(BaseOptimizerService):
         return self._metric_callback(*args, **kwargs)
 
     def optimize(self, objective: Callable, *args, **kwargs):
-        func = lambda trial: objective(trial, *args, **kwargs)
+        def func(trial): return objective(trial, *args, **kwargs)
         return func(self._wandb_service.config.as_dict())
 
     def prune_trial(self, *args, **kwargs):
         ...
 
     def suggest_optimizer(self,
-        parameters,
-        *args,
-        **kwargs,
-    ):
+                          parameters,
+                          *args,
+                          **kwargs,
+                          ):
         print(parameters)
         lr = self.wandb_service.config.learning_rate if 'learning_rate' in self.wandb_service.config else 1e-3
         optimizer = self.wandb_service.config.optimizer if 'optimizer' in self.wandb_service.config else 'Adam'
@@ -101,7 +101,7 @@ class OptunaOptimizerService(BaseOptimizerService):
         n_trials=100,
         metrics: Union[str, List[str]] = None,
         metric_callback: Callable[..., Any] = None,
-        log_file: str = 'optimizer.log',
+        log_file: Path = Path('optimizer.log'),
         optimizer_suggestions: List[str] = ["Adam", "RMSprop", "SGD"],
         pruner: pruners.BasePruner = None,
         early_stopping: bool = True
@@ -110,7 +110,11 @@ class OptunaOptimizerService(BaseOptimizerService):
         # Use directions for mult-parameter learning
         if pruner is None:
             pruner = HyperbandPruner(min_resource=1, max_resource=n_trials, reduction_factor=3)
-        self._study = optuna.create_study(sampler=sampler, pruner=pruner, direction=None if self._multi_parameter else directions, directions=directions if self._multi_parameter else None)
+        self._study = optuna.create_study(
+            sampler=sampler,
+            pruner=pruner,
+            direction=None if self._multi_parameter else directions,
+            directions=directions if self._multi_parameter else None)
         self._metric_callback = metric_callback
         self._metrics = metrics
         self._callbacks = []
@@ -143,7 +147,7 @@ class OptunaOptimizerService(BaseOptimizerService):
         return self._metric_callback(*args, **kwargs)
 
     def optimize(self, objective: Callable, *args, **kwargs):
-        func = lambda trial: objective(trial, *args, **kwargs)
+        def func(trial): return objective(trial, *args, **kwargs)
         self._study.optimize(func, n_trials=self._n_trials, callbacks=self._callbacks)
 
     def prune_trial(self, trial, epoch, *args, **kwargs):
@@ -156,17 +160,17 @@ class OptunaOptimizerService(BaseOptimizerService):
                 raise optuna.exceptions.TrialPruned()
 
     def suggest_optimizer(self,
-        parameters,
-        trial: Trial,
-        lr_high:float = 1e-1, 
-        lr_low:float = 1e-5
-    ):
+                          parameters,
+                          trial: Trial,
+                          lr_high: float = 1e-1,
+                          lr_low: float = 1e-5
+                          ):
         print(parameters)
         optimizer_name = trial.suggest_categorical("optimizer", self._optimizer_suggestions)
         lr = trial.suggest_float("lr", lr_low, lr_high)
         return getattr(optim, optimizer_name)(parameters, lr=lr)
 
-    def suggest_param(self, func_name: str, attr:str, trial: optuna.Trial, *args, **kwargs):
+    def suggest_param(self, func_name: str, attr: str, trial: optuna.Trial, *args, **kwargs):
         return getattr(trial, func_name)(attr, *args, **kwargs)
 
     def conclude_trial(self) -> None:

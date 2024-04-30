@@ -1,18 +1,6 @@
-[project]
-name = "crgeo"
-version = "0.0.1"
-authors = [
-  { name="Eivind Meyer", email="eivind.meyer@tum.de" },
+[build-system]
+requires = [
+    "setuptools",
 ]
-description = "Graph Neural Networks for Autonomous Driving"
-readme = "README.md"
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: BSD License",
-    "Operating System :: POSIX :: Linux",
-]
+build-backend = "setuptools.build_meta"
 
-[project.urls]
-"Homepage" = "https://github.com/CommonRoad/commonroad-geometric"
-"Bug Tracker" = "https://github.com/CommonRoad/commonroad-geometric/issues"

@@ -26,8 +26,8 @@ class TemporalTrafficExtractorFactory(BaseExtractorFactory[TemporalTrafficExtrac
         )
         self._traffic_extractor_factory = traffic_extractor_factory
 
-    def create(self, simulation: BaseSimulation) -> TemporalTrafficExtractor:
-        traffic_extractor = self._traffic_extractor_factory.create(simulation=simulation)
+    def __call__(self, simulation: BaseSimulation) -> TemporalTrafficExtractor:
+        traffic_extractor = self._traffic_extractor_factory(simulation=simulation)
         return self._extractor_cls(
             traffic_extractor=traffic_extractor,
             options=self._options,

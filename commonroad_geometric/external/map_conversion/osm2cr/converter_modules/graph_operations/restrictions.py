@@ -33,7 +33,7 @@ def parse_restriction(restriction: str) -> Optional[Set[str]]:
         elif restriction.startswith("connectivity"):
             return {str(restriction)}
         else:
-            #print("unknown restriction: " + restriction)
+            # print("unknown restriction: " + restriction)
             return None
 
 

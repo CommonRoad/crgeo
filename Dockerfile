@@ -1,5 +1,8 @@
-FROM ubuntu:22.04
-# opengl
+FROM python:3.10.13
+
+WORKDIR home/commonroad-geometric
+
+# OpenGL and commonroad-drivability checker
 RUN apt-get update \
   && apt-get install -y -qq --no-install-recommends \
     libglvnd0 \
@@ -8,35 +11,32 @@ RUN apt-get update \
     libegl1 \
     libxext6 \
     libx11-6 \
+    libxrender1 \
     wget\
+  && apt-get install -y \
+    build-essential \
+    cmake \
+    git git-lfs \
+    wget \
+    unzip \
+    libboost-dev \
+    libboost-thread-dev \
+    libboost-test-dev \
+    libboost-filesystem-dev \
+    libeigen3-dev \
+    libomp-dev \
+    freeglut3-dev \
+  && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# install python3.10
-RUN apt-get update \
-  && apt-get install -y software-properties-common \
-&& add-apt-repository ppa:deadsnakes/ppa && apt install -y python3.10
+# Files should be excluded through .dockerignore
+COPY . .
 
-# install pachkage for docker
-RUN apt-get install -y build-essential cmake git git-lfs wget unzip libboost-dev libboost-thread-dev libboost-test-dev libboost-filesystem-dev libeigen3-dev libomp-dev freeglut3-dev
+# Build commonroad-drivability with more than one thread
+ARG CMAKE_BUILD_PARALLEL_LEVEL=4
+RUN pip install --upgrade pip \
+    && pip install --extra-index-url https://download.pytorch.org/whl/cpu torch==2.0.1 torch_geometric==2.3.1 \
+    && pip install -e .[tests] \
+    && pip cache purge
 
-# install miniconda
-ENV PATH="/root/miniconda3/bin:${PATH}"
-ARG PATH="/root/miniconda3/bin:${PATH}"
-
-RUN wget \
-    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
-    && mkdir /root/.conda \
-    && bash Miniconda3-latest-Linux-x86_64.sh -b \
-    && rm -f Miniconda3-latest-Linux-x86_64.sh
-
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES graphics,utility,compute
-COPY docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json
-
-
-COPY ./environment_cpu.yml ./environment_cpu.yml
-COPY ./pyproject.toml ./pyproject.toml
-COPY ./setup.cfg ./setup.cfg
-
-RUN conda env create -f environment_cpu.yml
-
+ENV SUMO_HOME=/usr/local/lib/python3.10/site-packages/sumo/

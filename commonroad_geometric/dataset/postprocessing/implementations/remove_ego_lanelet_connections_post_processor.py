@@ -23,6 +23,9 @@ class RemoveEgoLaneletConnectionsPostProcessor(BaseDataPostprocessor):
     ) -> List[CommonRoadData]:        
         
         assert ego_vehicle is not None
+
+        # TODO: l2v??
+        # TODO: update ALL features
         
         for data in samples:
             ego_obstacle_mask = torch.where(data.v.id == ego_vehicle.obstacle_id)[0]

@@ -1,7 +1,8 @@
-from typing import List, Dict, Tuple, TypedDict
+from typing import Tuple, TypedDict
 
 import torch
-from torch import IntTensor, FloatTensor
+from torch import FloatTensor, IntTensor
+
 
 # https://en.m.wikipedia.org/wiki/Confusion_matrix#Table_of_confusion
 
@@ -33,7 +34,8 @@ def _to_float32(*ts: IntTensor) -> Tuple[FloatTensor, ...]:
 def complete_confusion_matrix(conf_matrix: BaseConfusionMatrix) -> ExtendedConfusionMatrix:
     P, N = _to_float32(conf_matrix["positive"], conf_matrix["negative"])
     # PP, PN = _to_float32(conf_matrix["predicted_positive"], conf_matrix["predicted_negative"])
-    TP, FN, FP, TN = _to_float32(conf_matrix["true_positive"], conf_matrix["false_negative"], conf_matrix["false_positive"], conf_matrix["true_negative"])
+    TP, FN, FP, TN = _to_float32(conf_matrix["true_positive"], conf_matrix["false_negative"],
+                                 conf_matrix["false_positive"], conf_matrix["true_negative"])
     sensitivity = TP / P
     precision = TP / (TP + FP)
     return ExtendedConfusionMatrix(

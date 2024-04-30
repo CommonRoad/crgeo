@@ -30,7 +30,8 @@ class InvalidFeatureNameException(TrafficExtractionException):
 
 class DuplicateFeatureNameException(TrafficExtractionException):
     def __init__(self, feature_name: str, old_computer_name: str, new_computer_name: str) -> None:
-        super().__init__(f"Encountered duplicate feature '{feature_name}' from feature computer {new_computer_name} (already returned by {old_computer_name})")
+        super().__init__(
+            f"Encountered duplicate feature '{feature_name}' from feature computer {new_computer_name} (already returned by {old_computer_name})")
 
 
 class FeatureComputerNotSetupException(TrafficExtractionException):
@@ -42,13 +43,13 @@ class BaseFeatureComputer(ABC, Generic[T_FeatureParams], SafePicklingMixin, Auto
     Base class for computing features to be included as attributes in
     the Data instances originating from 'TrafficExtractor'.
 
-    Feature computer is easily customizable by writing child class of BaseFeatureComputer and overwrite abstractmethod __call__  
+    Feature computer is easily customizable by writing child class of BaseFeatureComputer and overwrite abstractmethod __call__
     Note to add new features to commonroad_geometric/dataset/extraction/traffic/feature_computers/implementations/types.py
     """
 
     ComputedFeaturesCache: Dict[str, FeatureValue] = {}
     _MockSimulation: Optional[ScenarioSimulation] = None
-    _MockParams: Optional[ List[BaseFeatureParams]] = None
+    _MockParams: Optional[List[BaseFeatureParams]] = None
     _FeatureComputerMap: Dict[str, BaseFeatureComputer[Any]] = {}
     _FeatureDimensions: Dict[str, Dict[str, int]] = {}
     _FeatureTypes: Dict[str, Dict[str, type]] = {}
@@ -92,7 +93,7 @@ class BaseFeatureComputer(ABC, Generic[T_FeatureParams], SafePicklingMixin, Auto
     def features(self) -> List[str]:
         if not self.is_setup:
             raise FeatureComputerNotSetupException()
-        return  self._FeatureNames[self.name]
+        return self._FeatureNames[self.name]
 
     @property
     def is_setup(self) -> bool:
@@ -167,7 +168,10 @@ class BaseFeatureComputer(ABC, Generic[T_FeatureParams], SafePicklingMixin, Auto
         if not self._activated:
             self.reset(simulation)
         self._activated = True
-        feature_dict_raw = self(params, simulation)
+        try:
+            feature_dict_raw = self(params, simulation)
+        except Exception as e:
+            raise
         feature_dict: FeatureDict = {}
 
         for key, raw_value in feature_dict_raw.items():
@@ -216,9 +220,11 @@ class BaseFeatureComputer(ABC, Generic[T_FeatureParams], SafePicklingMixin, Auto
     @staticmethod
     def _validate_feature(feature_name: str, feature_value: Any) -> None:
         if not isinstance(feature_name, str):
-            raise InvalidFeatureNameException(f"Encountered feature_name {feature_name} ({type(feature_name)}). Only feature names of type str are allowed.")
+            raise InvalidFeatureNameException(
+                f"Encountered feature_name {feature_name} ({type(feature_name)}). Only feature names of type str are allowed.")
         if not isinstance(feature_value, (float, int, bool, torch.Tensor, np.ndarray)):
-            raise InvalidFeatureValueException(f"Feature extractor {feature_name} returned invalid type {type(feature_value)}.")
+            raise InvalidFeatureValueException(
+                f"Feature extractor {feature_name} returned invalid type {type(feature_value)}.")
         if isinstance(feature_value, (torch.Tensor, np.ndarray)) and feature_value.ndim > 1:
             raise InvalidFeatureValueException(f"Feature computer {feature_name} returns a tensor with {feature_value.ndim} dimensions. "
                                                f"Only one or zero-dimensional tensors are allowed.")
@@ -244,6 +250,6 @@ class FunctionalFeatureComputer(BaseFeatureComputer[T_FeatureParams], Generic[T_
         simulation: BaseSimulation,
     ) -> FeatureDict:
         if self._accepts_simulation:
-            return self._feature_computer(params, simulation) # TODO: fix type issues
+            return self._feature_computer(params, simulation)  # TODO: fix type issues
         else:
             return self._feature_computer(params)

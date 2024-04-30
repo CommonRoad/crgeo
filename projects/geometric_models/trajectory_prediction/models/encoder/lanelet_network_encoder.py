@@ -3,8 +3,8 @@ from typing import Tuple
 import torch
 from torch import Tensor, nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-from torch_geometric.nn import MLP
-from torch_geometric.nn import BatchNorm
+from torch_geometric.nn.models import MLP
+from torch_geometric.nn.norm import BatchNorm
 
 from commonroad_geometric.common.config import Config
 from commonroad_geometric.common.torch_utils.helpers import assert_size

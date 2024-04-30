@@ -444,7 +444,6 @@ class GraphEdge:
         return np.array([p.get_array() for p in self.waypoints])
 
     def add_traffic_sign(self, sign: "GraphTrafficSign"):
-
         """
         adds traffic signs to all lanes of the edge
 
@@ -464,7 +463,7 @@ class GraphEdge:
         if sign_direction is not None:
             # get compass degrees of edge
             edge_orientation = self.get_compass_degrees()
-            if abs(sign_direction-edge_orientation) < 180:
+            if abs(sign_direction - edge_orientation) < 180:
                 forward = False
         for lane in self.lanes:
             # add sign to forward lanes

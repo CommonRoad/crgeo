@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from optuna import Trial
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from torch_geometric.nn.models import MLP
 from typing import Any, Dict, Optional, Tuple, Union
@@ -35,12 +34,12 @@ class MLPOccupancyDecoder(BaseOccupancyDecoder):
         self.config = config
 
     def reset_config(self) -> None:
-        self.config = MLPOccupancyDecoderConfig() # TODO
-        
+        self.config = MLPOccupancyDecoderConfig()  # TODO
+
     def build(
         self,
         data: CommonRoadData,
-        trial: Optional[Trial] = None
+        trial = None
     ) -> None:
         self.decoder = MLP(
             in_channels=self.input_size + 2,
@@ -61,10 +60,10 @@ class MLPOccupancyDecoder(BaseOccupancyDecoder):
         domain: Union[int, Tensor],
         dt: float,
         time_horizon: int
-    ) -> Tuple[Tensor, Dict[str, Tensor]]: 
+    ) -> Tuple[Tensor, Dict[str, Tensor]]:
         batch_size = z.shape[0]
         device = z.device
-        
+
         if isinstance(domain, int):
             domain = torch.linspace(
                 0, 1, domain, device=device
@@ -78,8 +77,8 @@ class MLPOccupancyDecoder(BaseOccupancyDecoder):
 
         resolution = domain.shape[3]
 
-        t = dt*torch.arange(time_horizon, device=device
-        )[None, None, :, None, None].repeat(
+        t = dt * torch.arange(time_horizon, device=device
+                              )[None, None, :, None, None].repeat(
             domain.shape[0], batch_size, 1, resolution, 1
         )
 
@@ -94,7 +93,8 @@ class MLPOccupancyDecoder(BaseOccupancyDecoder):
         del z_view
 
         occ_probs = torch.sigmoid(
-            self.decoder(features.view(-1, self.input_size + 2)).view(domain.shape[0], batch_size, time_horizon, resolution)
+            self.decoder(features.view(-1, self.input_size + 2)
+                         ).view(domain.shape[0], batch_size, time_horizon, resolution)
         )
 
         del features
@@ -104,8 +104,5 @@ class MLPOccupancyDecoder(BaseOccupancyDecoder):
         )
 
         occ_probs = occ_probs.squeeze(0)
-        
+
         return occ_probs, info
-
-
-

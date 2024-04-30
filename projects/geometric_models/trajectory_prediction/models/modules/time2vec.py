@@ -29,7 +29,7 @@ class Time2Vec(nn.Module):
         self.phase_shift.data[1::2] = np.pi / 2
 
     def forward(self, time: Tensor) -> Tensor:
-        time = time[:, (0, )] # TODO: hack
+        time = time[:, (0, )]  # TODO: hack
         assert time.size(-1) == 1
         time_vec = torch.empty(time.size()[:-1] + (self.dim,), dtype=time.dtype, device=time.device)
         time_vec[..., 0:1] = self.frequency[0] * time + self.phase_shift[0]

@@ -2,6 +2,7 @@
 """
 from abc import ABC, abstractmethod
 from enum import Enum, unique
+import math
 from typing import List, Optional, Dict, Any
 
 import commonroad_dc.pycrcc as pycrcc
@@ -10,7 +11,8 @@ from commonroad.common.solution import VehicleType
 from commonroad.geometry.shape import Rectangle, Shape
 from commonroad.prediction.prediction import TrajectoryPrediction
 from commonroad.scenario.obstacle import DynamicObstacle, ObstacleType
-from commonroad.scenario.trajectory import State, Trajectory
+from commonroad.scenario.state import State, InitialState, CustomState, InputState
+from commonroad.scenario.trajectory import Trajectory
 from commonroad_dc.feasibility.vehicle_dynamics import VehicleDynamics, FrictionCircleException
 from vehiclemodels.parameters_vehicle1 import parameters_vehicle1
 from vehiclemodels.parameters_vehicle2 import parameters_vehicle2
@@ -21,6 +23,7 @@ from commonroad_geometric.common.geometry.helpers import make_valid_orientation
 from commonroad_geometric.common.online_stats import AggregatedRunningStats
 from commonroad_geometric.external.commonroad_rl.yaw_rate_dynamics import YawRateDynamics
 from commonroad_geometric.simulation.ego_simulation.planning_problem import EgoRoute
+from commonroad_geometric.common.io_extensions.obstacle import state_at_time
 
 N_INTEGRATION_STEPS = 100
 
@@ -57,6 +60,7 @@ class ActionBase(Enum):
     ACCELERATION = 'acceleration',
     JERK = 'jerk'
 
+
 class _BaseVehicle(ABC, AutoReprMixin):
     """
     Description:
@@ -91,7 +95,8 @@ class _BaseVehicle(ABC, AutoReprMixin):
         )
         # Contains State information
         self._dynamic_obstacle: Optional[DynamicObstacle] = None
-        self._aggregate_state_statistics: Dict[str, AggregatedRunningStats] = {attr: AggregatedRunningStats() for attr in EgoVehicle.STATE_STATISTICS_ATTRIBUTES}
+        self._aggregate_state_statistics: Dict[str, AggregatedRunningStats] = {
+            attr: AggregatedRunningStats() for attr in EgoVehicle.STATE_STATISTICS_ATTRIBUTES}
 
     @property
     def vertices(self) -> np.ndarray:
@@ -149,7 +154,7 @@ class _BaseVehicle(ABC, AutoReprMixin):
 
         :return: The current state of the vehicle
         """
-        return self.as_dynamic_obstacle.prediction.trajectory.state_list[-1] if self.as_dynamic_obstacle is not None else None 
+        return self.as_dynamic_obstacle.prediction.trajectory.state_list[-1] if self.as_dynamic_obstacle is not None else None
 
     @state.setter
     def state(self, state: State):
@@ -189,23 +194,20 @@ class _BaseVehicle(ABC, AutoReprMixin):
         """
         if self.vehicle_model == VehicleModel.PM:
             orientation = initial_state.orientation if hasattr(initial_state, "orientation") else 0.0
-            model_initial_state = State(**{"position": initial_state.position,
+            model_initial_state = InitialState(**{"position": initial_state.position,
                                            "orientation": orientation,
                                            "time_step": initial_state.time_step,
-                                           "velocity": initial_state.velocity * np.cos(orientation),
-                                           "velocity_y": initial_state.velocity * np.sin(orientation),
-                                           "acceleration": initial_state.acceleration * np.cos(orientation) if hasattr(initial_state, "acceleration") else 0.0,
-                                           "acceleration_y": initial_state.acceleration * np.sin(orientation) if hasattr(initial_state, "acceleration") else 0.0})
+                                           "velocity": initial_state.velocity,
+                                           "acceleration": initial_state.acceleration if hasattr(initial_state, "acceleration") else 0.0})
         else:
-            model_initial_state = State(**{"position": initial_state.position,
-                                           "steering_angle": initial_state.steering_angle if hasattr(initial_state, "steering_angle") else 0.0,
+            model_initial_state = InitialState(**{"position": initial_state.position,
                                            "orientation": initial_state.orientation if hasattr(initial_state, "orientation") else 0.0,
                                            "yaw_rate": initial_state.yaw_rate if hasattr(initial_state, "yaw_rate") else 0.0,
                                            "time_step": initial_state.time_step,
                                            "velocity": initial_state.velocity,
                                            "acceleration": initial_state.acceleration if hasattr(initial_state, "acceleration") else 0.0,
                                            "slip_angle": initial_state.slip_angle if hasattr(initial_state, "slip_angle") else 0.0})
-
+        model_initial_state.steering_angle = initial_state.steering_angle
         self._dynamic_obstacle = DynamicObstacle(
             obstacle_id=-1,
             obstacle_type=ObstacleType.CAR,
@@ -248,13 +250,13 @@ class EgoVehicle(_BaseVehicle):
         self.jerk_bounds = np.array([-10, 10])
 
         try:
-            self.vehicle_dynamic = VehicleDynamics.from_model(self.vehicle_model, self.vehicle_type)
+            self.vehicle_dynamics = VehicleDynamics.from_model(self.vehicle_model, self.vehicle_type)
         except Exception:
             if self.vehicle_model == VehicleModel.YawRate:
                 # customize YawRate VehicleModel
                 self.vehicle_model = VehicleModel.YawRate
-                self.vehicle_dynamic = YawRateDynamics(self.vehicle_type)
-                self.parameters = self.vehicle_dynamic.parameters
+                self.vehicle_dynamics = YawRateDynamics(self.vehicle_type)
+                self.parameters = self.vehicle_dynamics.parameters
             else:
                 raise ValueError(f"Unknown vehicle model: {self.vehicle_model}")
 
@@ -272,7 +274,7 @@ class EgoVehicle(_BaseVehicle):
     ) -> State:
         assert self._dynamic_obstacle is not None
         self._dynamic_obstacle.prediction.trajectory.state_list.append(next_state)
-        self._dynamic_obstacle.prediction.final_time_step = next_state.time_step
+        self._dynamic_obstacle.prediction.trajectory.final_state.time_step = next_state.time_step
         self.update_collision_object()
         for key, aggregator in self._aggregate_state_statistics.items():
             if hasattr(next_state, key):
@@ -396,7 +398,7 @@ class EgoVehicle(_BaseVehicle):
             )
 
         if self.vehicle_model == VehicleModel.ST:
-            x_current, _ = self.vehicle_dynamic._state_to_array(current_state)
+            x_current, _ = self.vehicle_dynamics._state_to_array(current_state)
             x_next = self._forward_simulation(x_current, u_input)
             # simulated_state.acceleration = u_input[1]
             return State(
@@ -411,26 +413,55 @@ class EgoVehicle(_BaseVehicle):
             )
 
         x_current = np.array([
-            current_state.position[0],
-            current_state.position[1],
+            current_state.position[0] - self.parameters.b * math.cos(current_state.orientation),
+            current_state.position[1] - self.parameters.b * math.sin(current_state.orientation),
             current_state.steering_angle,
             current_state.velocity,
             current_state.orientation,
         ])
-        x_next = self._forward_simulation(x_current, u_input)
 
+        input = InputState(
+            steering_angle_speed=u_input[0], 
+            acceleration=u_input[1],
+            time_step=current_state.time_step
+        )
+        try:
+            next_state = self.vehicle_dynamics.simulate_next_state(current_state, input, self.dt)
+        except FrictionCircleException:
+            self.violate_friction = True
+            x, x_ts = self.vehicle_dynamics.state_to_array(current_state)
+            u, u_ts = self.vehicle_dynamics.input_to_array(input)
+            for _ in range(N_INTEGRATION_STEPS):
+                # simulate state transition - t parameter is set to vehicle.dt but irrelevant for the current vehicle models
+                # TODO：x_dot of KS model considers the action constraints, which YR and PM model have not included yet
+                x_dot = np.array(self.vehicle_dynamics.dynamics(self.dt, x, u))
+                # update state
+                x = x + x_dot * (self.dt / N_INTEGRATION_STEPS)
+
+            next_state = self.vehicle_dynamics.array_to_state(x, x_ts + 1)
+
+        steering_angle = next_state.steering_angle
+        # x_next = self._forward_simulation(x_current, u_input)
+        
         if self.vehicle_model == VehicleModel.KS:
             # simulated_state.acceleration = u_input[1]
             # simulated_state.yaw_rate = (simulated_state.orientation - x_current_old[4]) / self.dt
-            return State(
-                position=np.array([x_next[0], x_next[1]]),
-                steering_angle=x_next[2],
-                velocity=x_next[3],
-                orientation=make_valid_orientation(x_next[4]),
+            position = np.array([
+                current_state.position[0] + math.cos(next_state.orientation) * next_state.velocity * self.dt,
+                current_state.position[1] + math.sin(next_state.orientation) * next_state.velocity * self.dt
+            ])
+            
+            next_state = InitialState(
+                position=position,
+                velocity=next_state.velocity,
+                orientation=next_state.orientation,
                 acceleration=u_input[1],
-                yaw_rate=(x_next[4] - x_current[4]) / self.dt,
+                yaw_rate=(next_state.orientation - current_state.orientation) / self.dt,
                 time_step=current_state.time_step + 1,
             )
+            next_state.steering_angle = steering_angle
+
+            return next_state
 
         if self.vehicle_model == VehicleModel.YawRate:
             # simulated_state.acceleration = u_input[0]
@@ -465,14 +496,15 @@ class EgoVehicle(_BaseVehicle):
         # Copy and mutate next state
         x_next = x_current.copy()
         try:
-            x_next = self.vehicle_dynamic.forward_simulation(x_next, u_input, self.dt, throw=True)
+            x_next = self.vehicle_dynamics.forward_simulation(x_next, u_input, self.dt, throw=True)
+            #print(f"{u_input=}, {x_next=}")
             self.violate_friction = False
         except FrictionCircleException:
             self.violate_friction = True
             for _ in range(N_INTEGRATION_STEPS):
                 # simulate state transition - t parameter is set to vehicle.dt but irrelevant for the current vehicle models
                 # TODO：x_dot of KS model considers the action constraints, which YR and PM model have not included yet
-                x_dot = np.array(self.vehicle_dynamic.dynamics(self.dt, x_next, u_input))
+                x_dot = np.array(self.vehicle_dynamics.dynamics(self.dt, x_next, u_input))
                 # update state
                 x_next = x_next + x_dot * (self.dt / N_INTEGRATION_STEPS)
         return x_next
