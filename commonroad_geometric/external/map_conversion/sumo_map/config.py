@@ -82,7 +82,7 @@ class SumoConfig(DefaultConfig):
     departure_time_ego = 3
 
     ##
-    ## ego vehicle sync parameters
+    # ego vehicle sync parameters
     ##
     # Time window to detect the lanelet change in seconds
     lanelet_check_time_window = int(2 / dt)
@@ -96,7 +96,7 @@ class SumoConfig(DefaultConfig):
     lane_change_tol = 0.00
 
     ##
-    ## TRAFFIC GENERATION
+    # TRAFFIC GENERATION
     ##
     # probability that vehicles will start at the fringe of the network (edges without
     # predecessor), and end at the fringe of the network (edges without successor).

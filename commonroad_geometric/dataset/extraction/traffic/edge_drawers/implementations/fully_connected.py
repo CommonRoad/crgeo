@@ -9,6 +9,7 @@ class FullyConnectedEdgeDrawer(BaseEdgeDrawer):
     Draws a fully connected graph (edges between all vehicles).
     For connecting only neighboring vehicles within a certain radius, use the dist_threshold parameter.
     """
+
     def _draw(self, options: BaseEdgeDrawingParams) -> Tensor:
         assert options.n_vehicles is not None
         indices = torch.arange(options.n_vehicles, dtype=torch.long)

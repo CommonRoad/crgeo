@@ -6,10 +6,9 @@ from typing import Dict, Generic, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, nn
-from torch_geometric.nn import MLP
+from torch_geometric.nn.models import MLP
 
 from commonroad_geometric.common.config import Config
-from commonroad_geometric.common.torch_utils.helpers import assert_size
 from commonroad_geometric.learning.geometric.base_geometric import BaseModel
 from projects.geometric_models.drivable_area.models.decoder.vehicle_model import T_VehicleStates, VehicleModel
 from projects.geometric_models.drivable_area.models.modules.cvae import ConditionalVariationalAutoencoder
@@ -37,7 +36,9 @@ class VehicleTrajectoryPredictionDecoder(BaseModel, Generic[T_VehicleStates]):
                 hidden_size=self.cfg.trajectory_prediction.rnn.hidden_size,
                 batch_first=False,
             )
-            self.rnn_project_lin = nn.Linear(self.cfg.trajectory_prediction.rnn.hidden_size, vehicle_model.num_input_dims)
+            self.rnn_project_lin = nn.Linear(
+                self.cfg.trajectory_prediction.rnn.hidden_size,
+                vehicle_model.num_input_dims)
 
         elif self.cfg.trajectory_prediction.decoder_type == "Transformer":
             cfg_transformer = self.cfg.trajectory_prediction.transformer
@@ -86,7 +87,7 @@ class VehicleTrajectoryPredictionDecoder(BaseModel, Generic[T_VehicleStates]):
             delta_times = dt * torch.arange(1, T_pred + 1, device=device)
             decoder_input = self.rnn_decoder_time2vec(delta_times.unsqueeze(-1))
             decoder_input = decoder_input.unsqueeze(1).repeat(1, N_veh, 1)
-            #assert_size(decoder_input, (T_obs, N_veh, self.cfg.trajectory_prediction.rnn.time2vec_dim))
+            # assert_size(decoder_input, (T_obs, N_veh, self.cfg.trajectory_prediction.rnn.time2vec_dim))
 
             _, hidden_state = self.rnn_encoder(vehicle_x)
             output, _ = self.rnn_decoder(decoder_input, hidden_state)
@@ -113,7 +114,8 @@ class VehicleTrajectoryPredictionDecoder(BaseModel, Generic[T_VehicleStates]):
             #   https://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html
             enable_teacher_forcing = random.random() < self.cfg.trajectory_prediction.teacher_forcing_rate  # TODO
 
-            # TODO visualize attention patterns like here: https://trajectory-transformer.github.io/ ("attention patterns")
+            # TODO visualize attention patterns like here:
+            # https://trajectory-transformer.github.io/ ("attention patterns")
 
             current_vehicle_states = vehicle_states_last_obs
             for t in range(T_pred):
@@ -151,10 +153,12 @@ class VehicleTrajectoryPredictionDecoder(BaseModel, Generic[T_VehicleStates]):
         assert isinstance(prediction, list) and len(prediction) == len(target_vehicle_states)
         loss_sum = torch.tensor(0, dtype=torch.float32, device=self.device)
         for i, vehicle_states in enumerate(prediction):
-            loss = self.vehicle_model.compute_single_step_loss(prediction=vehicle_states, target=target_vehicle_states[i])
+            loss = self.vehicle_model.compute_single_step_loss(
+                prediction=vehicle_states, target=target_vehicle_states[i])
             # TODO all other (non-primary) losses
             loss_sum = loss_sum + loss["primary"]
         return loss_sum / len(prediction), {}
+
 
 @dataclass(frozen=True)
 class CVAETrainingOutput(Generic[T_VehicleStates]):
@@ -210,7 +214,8 @@ class VehicleTrajectoryPredictionCVAEDecoder(BaseModel, Generic[T_VehicleStates]
         trajectory_prediction = []
         current_vehicle_states = initial_vehicle_states
         for t in range(self.num_predict_time_steps):
-            input = vehicle_model_input[:, t * self.vehicle_model.num_input_dims:(t + 1) * self.vehicle_model.num_input_dims]
+            input = vehicle_model_input[:, t *
+                                        self.vehicle_model.num_input_dims:(t + 1) * self.vehicle_model.num_input_dims]
             current_vehicle_states = self.vehicle_model.compute_next_state(
                 states=current_vehicle_states,
                 input=input,
@@ -233,7 +238,8 @@ class VehicleTrajectoryPredictionCVAEDecoder(BaseModel, Generic[T_VehicleStates]
         vehicle_x = vehicle_x[:, T_obs - 1]
         # TODO don't use just the last time step?
 
-        # TODO make it possible to get the expected inputs from the vehicle model by inverting the compute_next_state method?
+        # TODO make it possible to get the expected inputs from the vehicle model
+        # by inverting the compute_next_state method?
 
         prediction = self.cvae(
             input=vehicle_x,
@@ -288,7 +294,8 @@ class VehicleTrajectoryPredictionCVAEDecoder(BaseModel, Generic[T_VehicleStates]
             assert isinstance(prediction, list) and len(prediction) == len(target_vehicle_states)
             loss_sum = torch.tensor(0, dtype=torch.float32, device=self.device)
             for i, vehicle_states in enumerate(prediction):
-                loss = self.vehicle_model.compute_single_step_loss(prediction=vehicle_states, target=target_vehicle_states[i])
+                loss = self.vehicle_model.compute_single_step_loss(
+                    prediction=vehicle_states, target=target_vehicle_states[i])
                 # TODO all other (non-primary) losses
                 loss_sum = loss_sum + loss["primary"]
             return loss_sum / len(prediction), {}
@@ -328,7 +335,7 @@ class CVAEGeneratorNetwork(nn.Module):
         ])
 
     def forward(self, input: Tensor, latent: Tensor) -> Tensor:
-        if not self.training: 
+        if not self.training:
             # TODO: hack
             latent = latent.to(input.device)
         x = torch.cat([input, latent], dim=-1)

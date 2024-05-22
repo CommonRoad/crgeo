@@ -292,7 +292,7 @@ class IntermediateFormat:
                             # TODO implement unknown direction keys
                             try:
                                 incoming_element[direction].extend(
-                                        [s.id for s in incoming_lane.successors])
+                                    [s.id for s in incoming_lane.successors])
                             except KeyError:
                                 # print('unknown intersection direction key: ' + direction)
                                 # calculate the direction for each successor
@@ -426,7 +426,7 @@ class IntermediateFormat:
         goal_region = GoalRegion([State(time_step=Interval(0, 1), velocity=Interval(0.0, 1), position=rectangle),
                                   State(time_step=Interval(1, 2), velocity=Interval(0.0, 1), position=circ)])
         planning_problem = PlanningProblem(pp_id, State(velocity=0.1, position=np.array([[0], [0]]), orientation=0,
-                                                       yaw_rate=0, slip_angle=0, time_step=0), goal_region)
+                                                        yaw_rate=0, slip_angle=0, time_step=0), goal_region)
 
         return PlanningProblemSet(list([planning_problem]))
 
@@ -436,9 +436,9 @@ class IntermediateFormat:
         non existing elements.
         """
         traffic_light_ids = {tlight.traffic_light_id for tlight in
-                        self.traffic_lights}
+                             self.traffic_lights}
         traffic_sign_ids = {tsign.traffic_sign_id for tsign in
-                        self.traffic_signs}
+                            self.traffic_signs}
         for edge in self.edges:
             for t_light_ref in set(edge.traffic_lights):
                 if not t_light_ref in traffic_light_ids:

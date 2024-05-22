@@ -49,7 +49,7 @@ class InterruptCallbacksParams(BaseCallbackParams):
 
 @dataclass
 class CheckpointCallbackParams(BaseCallbackParams):
-    ...    
+    ...
 
 
 TypeVar_CallbackParams = TypeVar(
@@ -66,7 +66,7 @@ class BaseCallback(Generic[TypeVar_CallbackParams], ABC, AutoReprMixin):
 
     def __init__(self) -> None:
         pass
-    
+
     @abstractmethod
     def __call__(
         self,

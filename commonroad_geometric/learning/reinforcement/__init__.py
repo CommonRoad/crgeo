@@ -2,7 +2,7 @@ from commonroad_geometric.learning.reinforcement.constants import COMMONROAD_GYM
 from commonroad_geometric.learning.reinforcement.training.rl_trainer import RLTrainer
 from commonroad_geometric.learning.reinforcement.commonroad_gym_env import CommonRoadGymEnv, RLEnvironmentOptions, CommonRoadGymStepInfo
 
-from gym.envs.registration import register
+from gymnasium.envs.registration import register
 
 register(
     id=COMMONROAD_GYM_ENV_ID,

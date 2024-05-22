@@ -15,7 +15,7 @@ class RandomFeatureTransform(torch.nn.Module):
 
         batch_size, channels = x.shape
 
-        assert channels == self._num_input_channels,\
+        assert channels == self._num_input_channels, \
             "Expected input to have {} channels (got {} channels)".format(self._num_input_channels, channels)
 
         y = x @ self._B.to(x.device) + self._c.to(x.device)

@@ -45,7 +45,7 @@ class BaseRecurrentDecoder(BaseDecoder):
 
     @property
     def output_size(self) -> int:
-        return 2*self.hidden_size if self._include_h_output else self.hidden_size
+        return 2 * self.hidden_size if self._include_h_output else self.hidden_size
 
     @abstractmethod
     def _init_recurrent_state(self, x: Tensor) -> Tuple[Tensor, Tuple[Tensor, ...]]:
@@ -82,7 +82,7 @@ class BaseRecurrentDecoder(BaseDecoder):
 
         y_q = q_out + self.out_bias
         h = h_last[0].max(dim=0)[0]
-        #x_h = x*h
+        # x_h = x*h
         if self._include_h_output:
             y = torch.cat([y_q, h], dim=-1)
         else:

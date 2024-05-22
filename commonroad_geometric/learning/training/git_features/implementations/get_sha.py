@@ -7,7 +7,7 @@ from commonroad_geometric.learning.training.git_features.types import Git_Metada
 class GetSha(BaseGitFeatureComputer[BaseGitFeatureParams]):
     def __init__(self):
         pass
-    
+
     def __call__(
         self,
         params: BaseGitFeatureParams,

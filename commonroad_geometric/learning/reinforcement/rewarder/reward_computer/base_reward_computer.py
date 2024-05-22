@@ -10,6 +10,7 @@ from commonroad_geometric.common.class_extensions.safe_pickling_mixin import Saf
 from commonroad_geometric.common.class_extensions.string_resolver_mixing import StringResolverMixin
 from commonroad_geometric.common.utils.string import rchop
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
+from commonroad_geometric.learning.reinforcement.observer.base_observer import T_Observation
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
 
 
@@ -52,33 +53,35 @@ class BaseRewardComputer(ABC, SafePicklingMixin, AutoReprMixin, StringResolverMi
 
     @classproperty
     def name(cls) -> str:
-        return rchop(cls.__name__, 'RewardComputer') # type: ignore
-        
+        return rchop(cls.__name__, 'RewardComputer')  # type: ignore
+
     @classproperty
     def allow_nan_values(cls) -> bool:
         return False
-        
+
     def compute(
         self,
         action: np.ndarray,
         simulation: EgoVehicleSimulation,
-        data: CommonRoadData
+        data: CommonRoadData,
+        observation: T_Observation
     ) -> float:
         """
         The __call__ method returns the computed reward component.
 
         Args:
-            data (CommonRoadData): 
+            data (CommonRoadData):
                 Traffic graph data instanc for the current time-step.
 
         Returns:
-            float: 
+            float:
                 Reward signal
         """
         reward = self(
             action=action,
             simulation=simulation,
-            data=data
+            data=data,
+            observation=observation
         )
         self._cumulative += reward
         self._cumulative_abs += abs(reward)
@@ -88,23 +91,24 @@ class BaseRewardComputer(ABC, SafePicklingMixin, AutoReprMixin, StringResolverMi
             self._max = reward
         self._call_count += 1
         return reward
-    
+
     @abstractmethod
     def __call__(
         self,
         action: np.ndarray,
         simulation: EgoVehicleSimulation,
-        data: CommonRoadData
+        data: CommonRoadData,
+        observation: T_Observation
     ) -> float:
         """
         The __call__ method returns the computed reward component.
 
         Args:
-            data (CommonRoadData): 
+            data (CommonRoadData):
                 Traffic graph data instanc for the current time-step.
 
         Returns:
-            float: 
+            float:
                 Reward signal
         """
 

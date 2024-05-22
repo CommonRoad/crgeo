@@ -13,7 +13,7 @@ class EmptyCacheException(ValueError):
 
 class CachedProperty(Generic[T_CachedProperty], AutoReprMixin):
     def __init__(
-        self, 
+        self,
         value_type: Type[T_CachedProperty],
         init_time_step: Optional[int] = None,
         init_value: Optional[T_CachedProperty] = None,

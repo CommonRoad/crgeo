@@ -19,6 +19,7 @@ class Edge:
     """
     Class to represent the edges in the intermediate format
     """
+
     def __init__(self,
                  edge_id: int,
                  node1: Node,

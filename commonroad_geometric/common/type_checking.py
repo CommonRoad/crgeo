@@ -18,7 +18,7 @@ class GenericTypeChecker(Generic[T], AutoReprMixin):
         if accept_none and x is None:
             return
         if not self.is_right_type(x):
-            raise TypeError(f"Invalid type {type(x)} (expected {self._generic_arg.__name__})") # type: ignore
+            raise TypeError(f"Invalid type {type(x)} (expected {self._generic_arg.__name__})")  # type: ignore
 
 
 def is_mutable(obj: Any) -> bool:

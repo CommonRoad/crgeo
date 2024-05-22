@@ -4,7 +4,8 @@ import xml.etree.ElementTree as et
 import warnings
 
 from commonroad_geometric.external.sumocr.sumo_config import plot_params, ID_DICT
-from typing import List, Tuple, Set
+from typing import List, Tuple
+from pathlib import Path
 from commonroad_geometric.external.sumocr.sumo_config.default import SUMO_PEDESTRIAN_PREFIX, SUMO_VEHICLE_PREFIX
 from commonroad.scenario.obstacle import ObstacleType, SignalState
 import enum
@@ -53,17 +54,17 @@ VEHICLE_TYPE_SUMO2CR = {
 }
 
 
-def get_route_files(config_file) -> List[str]:
+def get_route_files(config_file:Path) -> List[Path]:
     """
     Returns net-file and route-files specified in the config file.
 
     :param config_file: SUMO config file (.sumocfg)
 
     """
-    if not os.path.isfile(config_file):
+    if not config_file.is_file():
         raise FileNotFoundError(config_file)
     tree = et.parse(config_file)
-    file_directory = os.path.dirname(config_file)
+    file_directory = config_file.parent
 
     # find route-files
     all_route_files = tree.findall('*/route-files')
@@ -73,7 +74,7 @@ def get_route_files(config_file) -> List[str]:
     for item in all_route_files:
         attributes = item.attrib['value'].split(',')
         for route in attributes:
-            route_files.append(os.path.join(file_directory, route))
+            route_files.append(Path(file_directory, route))
     return route_files
 
 
@@ -108,7 +109,7 @@ def generate_cr_id(type: str, sumo_id: str, sumo_prefix: str, ids_sumo2cr: dict,
     if type not in ID_DICT:
         raise ValueError(
             '{0} is not a valid type of id_convention. Only allowed: {1}'.
-                format(type, ID_DICT.keys()))
+            format(type, ID_DICT.keys()))
     if sumo_id in ids_sumo2cr[type]:
         # warnings.warn(
         #     'For this sumo_id there is already a commonroad id. No cr ID is generated'
@@ -117,7 +118,7 @@ def generate_cr_id(type: str, sumo_id: str, sumo_prefix: str, ids_sumo2cr: dict,
     elif sumo_id in ids_sumo2cr[sumo_prefix]:
         raise ValueError(
             'Two sumo objects of different types seem to have same sumo ID {0}. ID must be unique'
-                .format(sumo_id))
+            .format(sumo_id))
 
     cr_id = max_cr_id + 1
     if int(str(cr_id)[0]) != ID_DICT[type]:
@@ -174,6 +175,7 @@ def sumo2cr(sumo_id: int, ids_sumo2cr: dict) -> int:
 
 class DummyClass:
     """Dummy class used if SUMO is not installed and traci cannot be imported"""
+
     def __init__(self):
         pass
 
@@ -218,9 +220,9 @@ def get_signal_state(state: int, time_step: int) -> SignalState:
     args = {cr_name: bit_string[sumo_name.value]
             for sumo_name, cr_name in _defined_signals.items()}
     signal_state = SignalState(**{**args,
-        # the following are not modelled by sumo, so have to be inserted manually
-        **{"horn": False, "hazard_warning_lights": False},
-        **{"time_step": time_step}})
+                                  # the following are not modelled by sumo, so have to be inserted manually
+                                  **{"horn": False, "hazard_warning_lights": False},
+                                  **{"time_step": time_step}})
     return signal_state
 
 
@@ -255,6 +257,7 @@ class EgoCollisionError(Exception):
     Exception raised if the ego vehicle collides with another vehicle
 
     """
+
     def __init__(self, time_step=None):
         super().__init__()
         self.time_step = time_step

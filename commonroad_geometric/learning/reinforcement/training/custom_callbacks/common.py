@@ -5,6 +5,7 @@ import numpy as np
 
 _T_ArrayBufferMetric = TypeVar("_T_ArrayBufferMetric", float, np.ndarray)
 
+
 @dataclass
 class _ArrayBufferMetrics(Generic[_T_ArrayBufferMetric]):
     max: _T_ArrayBufferMetric

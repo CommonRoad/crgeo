@@ -14,6 +14,7 @@ class LaneletOccupancyPostProcessor(BaseDataPostprocessor):
     Obtains lanelet occupancies by peeking into future
     data instances. Returns flattened 2D occupancy grids (longitudinal & temporal dimensions).
     """
+
     def __init__(
         self,
         time_horizon: int,
@@ -39,7 +40,7 @@ class LaneletOccupancyPostProcessor(BaseDataPostprocessor):
         simulation: Optional[BaseSimulation] = None,
         ego_vehicle: Optional[EgoVehicle] = None
     ) -> List[CommonRoadData]:
-        
+
         # TODO: Should be set as vehicle_to_lanelet attribute, not lanelet.
         device = samples[0].v2v.edge_index.device
 
@@ -55,7 +56,11 @@ class LaneletOccupancyPostProcessor(BaseDataPostprocessor):
             ), dtype=torch.int32, device=device)
 
             # occupancy cells are represented by their center
-            occupancy_cell_pos = (torch.arange(end=self._discretization_resolution, dtype=torch.float32, device=device) + 0.5) / self._discretization_resolution
+            occupancy_cell_pos = (
+                torch.arange(
+                    end=self._discretization_resolution,
+                    dtype=torch.float32,
+                    device=device) + 0.5) / self._discretization_resolution
 
         scenario_occupancies_continuous = torch.zeros((
             n_lanelets,
@@ -82,7 +87,8 @@ class LaneletOccupancyPostProcessor(BaseDataPostprocessor):
                 # discrete
                 if self._discretization_resolution is not None:
                     distances_discrete = torch.abs(vehicle_pos.unsqueeze(-1) - occupancy_cell_pos)
-                    occupancies_discrete = (distances_discrete <= (vehicle_len + 1 / (2 * self._discretization_resolution)).unsqueeze(-1))
+                    occupancies_discrete = (distances_discrete <= (
+                        vehicle_len + 1 / (2 * self._discretization_resolution)).unsqueeze(-1))
                     occupancies_discrete, _ = occupancies_discrete.to(torch.int32).max(dim=0)
                     scenario_occupancies_discrete[i_lanelet, i_sample] = occupancies_discrete
 
@@ -91,7 +97,6 @@ class LaneletOccupancyPostProcessor(BaseDataPostprocessor):
                 scenario_occupancies_continuous[i_lanelet, i_sample, :n_vehicles, 0] = vehicle_pos - half_vehicle_len
                 scenario_occupancies_continuous[i_lanelet, i_sample, :n_vehicles, 1] = vehicle_pos + half_vehicle_len
                 scenario_occupancies_continuous[i_lanelet, i_sample, :n_vehicles, 2] = 1  # vehicle indicator
-                
 
                 # Non-overlapping check (BROKEN)
                 # vehicle_boundaries = scenario_occupancies_continuous[i_lanelet, i_sample, :n_vehicles, :2]
@@ -110,12 +115,14 @@ class LaneletOccupancyPostProcessor(BaseDataPostprocessor):
         for i_sample, data in enumerate(samples_with_occupancy):
             if self._discretization_resolution is not None:
                 # TODO
-                data.lanelet.occupancy_discrete = scenario_occupancies_discrete[:, i_sample:i_sample + self._time_horizon].view(n_lanelets, -1)
+                data.lanelet.occupancy_discrete = scenario_occupancies_discrete[:,
+                                                                                i_sample:i_sample + self._time_horizon].view(n_lanelets, -1)
                 data.lanelet.occupancy_discretization_resolution = self._discretization_resolution
-            data.lanelet.occupancy_continuous = scenario_occupancies_continuous[:, i_sample:i_sample + self._time_horizon].view(n_lanelets, -1)
+            data.lanelet.occupancy_continuous = scenario_occupancies_continuous[:,
+                                                                                i_sample:i_sample + self._time_horizon].view(n_lanelets, -1)
             data.lanelet.occupancy_time_horizon = self._time_horizon
             if self._min_occupancy_ratio is None or data.lanelet.occupancy_continuous.mean().item() > self._min_occupancy_ratio:
-                samples_to_keep.append(data) 
-            data.lanelet.occupancy_max_vehicle_count = self._max_vehicle_count        
+                samples_to_keep.append(data)
+            data.lanelet.occupancy_max_vehicle_count = self._max_vehicle_count
 
         return samples_to_keep

@@ -1,19 +1,19 @@
 from __future__ import annotations
-
-from dotenv import load_dotenv
-load_dotenv()
-import wandb
-from wandb import sdk as wandb_sdk
-import logging
-import os
-import socket
-from typing import Dict, Any, Optional, TYPE_CHECKING
-from commonroad_geometric.common.logging import set_terminal_title
+from commonroad_geometric.common.utils.datetime import get_timestamp
 from commonroad_geometric.learning.training.wandb_service.constants import (
     PROJECT_NAME,
     ENTITY_NAME
 )
-from commonroad_geometric.common.utils.datetime import get_timestamp
+from commonroad_geometric.common.logging import set_terminal_title
+from typing import Dict, Any, Optional, TYPE_CHECKING
+import socket
+import os
+import logging
+from wandb import sdk as wandb_sdk
+import wandb
+
+from dotenv import load_dotenv
+load_dotenv()
 if TYPE_CHECKING:
     from commonroad_geometric.learning.geometric.training.types import GeometricTrainingContext
 
@@ -44,10 +44,12 @@ class WandbService:
         else:
             if self._project_name is None:
                 self._success = False
-                logger.warn(f"wandb integration not configured yet (PROJECT_NAME={self._project_name}, ENTITY_NAME={self._entity_name}).")
+                logger.warn(
+                    f"wandb integration not configured yet (PROJECT_NAME={self._project_name}, ENTITY_NAME={self._entity_name}).")
             else:
                 self._success = True
-                logger.info(f"Successfully retrieved wandb environment configuration (PROJECT_NAME={self._project_name}, ENTITY_NAME={self._entity_name}).")
+                logger.info(
+                    f"Successfully retrieved wandb environment configuration (PROJECT_NAME={self._project_name}, ENTITY_NAME={self._entity_name}).")
         self._current_run = None
 
     def start_experiment(
@@ -81,7 +83,7 @@ class WandbService:
             self._success = True
             if update_terminal_title:
                 set_terminal_title(name)
-        except Exception: 
+        except Exception:
             self._success = False
 
         self._experiment_name = name
@@ -102,7 +104,7 @@ class WandbService:
     @property
     def config(self) -> wandb_sdk.wandb_config.Config:
         return wandb.config
-    
+
     def update_config(self, attributes: Dict[str, list]) -> bool:
         return wandb.config.update(attributes)
 

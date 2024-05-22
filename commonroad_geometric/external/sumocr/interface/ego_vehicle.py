@@ -26,8 +26,8 @@ class EgoVehicle:
     """
 
     def __init__(
-        self, id,initial_state: State, delta_steps: int, width: float = 2.0, length: float = 5.0,
-                 planning_problem: PlanningProblem = None):
+            self, id, initial_state: State, delta_steps: int, width: float = 2.0, length: float = 5.0,
+            planning_problem: PlanningProblem = None):
         self.id = id
         self._width = width
         self._length = length
@@ -58,10 +58,10 @@ class EgoVehicle:
 
         assert len(planned_state_list) >= self.delta_steps, \
             'planned_trajectory must contain at least {} states, but contains {}. (See delta_steps in sumo_config file)' \
-                .format(self.delta_steps, len(planned_state_list))
+            .format(self.delta_steps, len(planned_state_list))
         assert 1 == planned_state_list[0].time_step, \
             'planned_trajectory must always start at time_step ({}) but starts at time_step {}' \
-                .format(1, planned_state_list[0].time_step)
+            .format(1, planned_state_list[0].time_step)
         self._planned_trajectories[self.current_time_step] = planned_state_list
         self.add_state(planned_state_list[0])
 
@@ -103,7 +103,7 @@ class EgoVehicle:
         Returns the planned state.
 
         :param delta_step: get planned state after delta steps
-        
+
         """
         planned_state: State = copy.deepcopy(self._planned_trajectories[self.current_time_step][0])
         if self.delta_steps > 1:

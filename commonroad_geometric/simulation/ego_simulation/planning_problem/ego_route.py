@@ -51,36 +51,31 @@ class EgoRoute(AutoReprMixin):
         self._navigator: Optional[Navigator] = None
         self._planned_ego_polyline: Optional[ContinuousPolyline] = None
         self._extended_path_polyline: Optional[ContinuousPolyline] = None
-        self._look_ahead_point: Optional[np.ndarray] = None
-        self._look_ahead_distance: Optional[float] = None
+        self._look_ahead_points: dict[float, np.ndarray] = {}
         self.planning_problem_set = planning_problem_set
 
     @property
-    def look_ahead_distance(self) -> Optional[float]:
-        return self._look_ahead_distance
+    def look_ahead_points(self) -> dict[float, np.ndarray]:
+        return self._look_ahead_points
 
-    @look_ahead_distance.setter
-    def look_ahead_distance(self, value: float) -> None:
-        self._look_ahead_distance = value
-
-    @property
-    def look_ahead_point(self) -> Optional[np.ndarray]:
-        return self._look_ahead_point
-
-    def set_look_ahead_point(self, x: Union[float, np.ndarray]) -> Tuple[float, np.ndarray]:
-        assert self.look_ahead_distance is not None
+    def set_look_ahead_point(
+        self, 
+        look_ahead_distance,
+        x: Union[float, np.ndarray],
+        linear_projection: bool = False
+    ) -> Tuple[float, np.ndarray]:
         path = self.planning_problem_path_polyline
         assert path is not None
 
         if isinstance(x, float):
             arclength = x
         else:
-            arclength = path.get_projected_arclength(x)
+            arclength = path.get_projected_arclength(x, linear_projection=linear_projection)
 
-        look_ahead_arclength = min(path.length, arclength + self.look_ahead_distance)
+        look_ahead_arclength = min(path.length, arclength + look_ahead_distance)
         look_ahead_point = path(look_ahead_arclength)
 
-        self._look_ahead_point = look_ahead_point
+        self._look_ahead_points[look_ahead_distance] = look_ahead_point
 
         return look_ahead_arclength, look_ahead_point
 
@@ -186,7 +181,8 @@ class EgoRoute(AutoReprMixin):
             if self.goal_region.lanelets_of_goal_position is not None:
                 goal_lanelet_id = self.goal_region.lanelets_of_goal_position[0][0]
             else:
-                goal_lanelet_id = self._scenario.lanelet_network.find_lanelet_by_position([self.goal_region.state_list[0].position.center])[0][0]
+                goal_lanelet_id = self._scenario.lanelet_network.find_lanelet_by_position(
+                    [self.goal_region.state_list[0].position.center])[0][0]
             goal_lanelet = find_lanelet_by_id(self._scenario.lanelet_network, goal_lanelet_id)
             self._goal_lanelet = goal_lanelet
         return self._goal_lanelet

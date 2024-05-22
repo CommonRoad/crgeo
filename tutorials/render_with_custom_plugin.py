@@ -1,80 +1,90 @@
 import sys, os; sys.path.insert(0, os.getcwd())
 
-from typing import List
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional
 
 import numpy as np
 
-from commonroad_geometric.common.caching.cached_rng import CachedRNG
 from commonroad_geometric.common.io_extensions.obstacle import state_at_time
-from commonroad_geometric.common.logging import stdout
-from commonroad_geometric.dataset.iteration import TimeStepIterator
-from commonroad_geometric.rendering.base_renderer_plugin import BaseRendererPlugin
-from commonroad_geometric.rendering.plugins import *
-from commonroad_geometric.rendering.traffic_scene_renderer import T_Frame, TrafficSceneRenderer, TrafficSceneRendererOptions
+from commonroad_geometric.rendering.color.color import Color
+from commonroad_geometric.rendering.color.color_gradient import ColorGradient
+from commonroad_geometric.rendering.plugins.implementations.render_lanelet_network_plugin import RenderLaneletNetworkPlugin
+from commonroad_geometric.rendering.plugins.obstacles.base_obstacle_render_plugin import BaseRenderObstaclePlugin
+from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer, TrafficSceneRendererOptions
 from commonroad_geometric.rendering.types import RenderParams
 from commonroad_geometric.rendering.video_recording import save_video_from_frames
-from commonroad_geometric.rendering.viewer.viewer_2d import Viewer2D
+from commonroad_geometric.rendering.viewer.base_viewer import T_Viewer
+from commonroad_geometric.rendering.viewer.pyglet.gl_viewer_2d import GLViewerOptions
+from commonroad_geometric.simulation.interfaces.static.scenario_simulation import ScenarioSimulation
 
-INPUT_SCENARIO = 'data/osm_recordings/DEU_Munich-1_114_0_time_steps_1000_V1_0.xml'
+INPUT_SCENARIO = Path('data/other/ARG_Carcarana-1_7_T-1.xml')
 MAX_TIMESTEPS = 300
-VIDEO_OUTPUT_FILE = 'tutorials/output/custom_rendering/video.gif'
+VIDEO_OUTPUT_FILE = Path('tutorials/output/custom_rendering/video.gif')
 
 
-class MyCustomRenderObstaclesPlugin(BaseRendererPlugin):  # noqa: 405
-    def __init__(self) -> None:
-        self._rng_cache = CachedRNG(np.random.random) # type: ignore
+@dataclass
+class MyCustomRenderObstaclesPlugin(BaseRenderObstaclePlugin):
+    gradient: Optional[ColorGradient] = None
 
-    def __call__(self, viewer: Viewer2D, params: RenderParams) -> None:  # noqa: 405
+    def render(self, viewer: T_Viewer, params: RenderParams) -> None:
         assert params.time_step is not None
         assert params.scenario is not None
+
         for obstacle in params.simulation.current_obstacles:
             state = state_at_time(obstacle, params.time_step)
-            vertices = obstacle.obstacle_shape.vertices # type: ignore
-            obstacle_color = self._rng_cache(obstacle.obstacle_id, n=3) + (1.0,)
-            viewer.draw_shape(
-                vertices,
-                state.position,
-                state.orientation,
-                color=obstacle_color,
-                filled=True,
-                linewidth=2,
-                fill_color=(0, 0, 0),
-                border=obstacle_color
+            vertices = obstacle.obstacle_shape.vertices
+
+            obstacle_color = self.obstacle_color
+            if self.gradient is not None:
+                obstacle_color = self.gradient[params.time_step]
+
+            viewer.draw_2d_shape(
+                creator=self.__class__.__name__,
+                vertices=vertices,
+                fill_color=Color((0, 0, 0)),
+                border_color=obstacle_color,
+                translation=state.position,
+                rotation=-state.orientation,
+                line_width=2,
             )
 
 
 if __name__ == '__main__':
-    timestep_iterator = TimeStepIterator(INPUT_SCENARIO, loop=True)
     renderer_plugins = [
         RenderLaneletNetworkPlugin(  # noqa: 405
             lanelet_linewidth=3.0,
-            lanelet_color=(0.2, 0.2, 0.2)
-            #lanelet_color=(0.0, 0.0, 1.0)
         ),
-        #RenderObstaclesPlugin(),
-        MyCustomRenderObstaclesPlugin(),
+        MyCustomRenderObstaclesPlugin(
+            obstacle_color=Color('green'),  # Prioritizes gradient over obstacle_color
+            gradient=ColorGradient(['green', 'red'], max_val=MAX_TIMESTEPS, min_val=0)
+        ),
     ]
+
     renderer = TrafficSceneRenderer(
         options=TrafficSceneRendererOptions(
-            window_height=1000,
-            window_width=1000,
+            # viewer_options=Open3DViewerOptions(),
+            viewer_options=GLViewerOptions(  # change to Open3DViewerOptions to use Open3D backend
+                window_width=1000,
+                window_height=1000,
+            ),
             plugins=renderer_plugins,
             fps=30
         )
     )
     video_frames: List[np.ndarray] = []
-    for time_step in timestep_iterator:
-        if len(video_frames) >= MAX_TIMESTEPS:
-            break
-        frame = renderer.render(
-            return_rgb_array=True,
-            render_params=RenderParams(  # noqa: 405
-                scenario=timestep_iterator.scenario,
-                time_step=time_step
-            ),
-        )
-        video_frames.append(frame)
-        stdout(f"Collected video frames: {len(video_frames)}")
 
+    simulation = ScenarioSimulation(initial_scenario=INPUT_SCENARIO)
+    with simulation:
+        for timestep, scenario in simulation(num_time_steps=MAX_TIMESTEPS):
+            # Contains one frame for one renderer
+            frames = simulation.render(
+                renderers=[renderer],
+                return_frames=True
+            )
+
+            video_frames.append(*frames)
+    # print("Obstacle Color:{}".format(test_obstacle_color))
+    print(f"Collected video frames: {len(video_frames)}")
     print(f"Saving video to {VIDEO_OUTPUT_FILE}")
     save_video_from_frames(frames=video_frames, output_file=VIDEO_OUTPUT_FILE)

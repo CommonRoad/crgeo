@@ -1,5 +1,0 @@
-from commonroad_geometric.learning.geometric.components.encoders.base_encoder import BaseEncoder
-from commonroad_geometric.learning.geometric.components.encoders.encoder_model import VGAEExtensionModel
-from commonroad_geometric.learning.geometric.components.encoders.gcn_encoder import GCNEncoder
-from commonroad_geometric.learning.geometric.components.encoders.vgae_encoder import VGAEEncoder
-

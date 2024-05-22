@@ -19,6 +19,7 @@ class LaneletEgoSequencePostProcessor(BaseDataPostprocessor):
     Obtains lanelet occupancies by peeking into future
     data instances. Returns flattened 2D occupancy grids (longitudinal & temporal dimensions).
     """
+
     def __init__(
         self,
         max_distance: float = 100.0,
@@ -65,11 +66,12 @@ class LaneletEgoSequencePostProcessor(BaseDataPostprocessor):
                 chosen = max(successors, key=lambda x: simulation.lanelet_network.find_lanelet_by_id(x).distance[-1])
                 lanelet_id_route.append(chosen)
 
-        #try:
+        # try:
         assert len(lanelet_id_route) > 0
 
         try:
-            current_lanelet_candidates = [lid for lid in simulation.obstacle_id_to_lanelet_id[ego_vehicle.obstacle_id] if lid in lanelet_id_route]
+            current_lanelet_candidates = [
+                lid for lid in simulation.obstacle_id_to_lanelet_id[ego_vehicle.obstacle_id] if lid in lanelet_id_route]
             if not len(current_lanelet_candidates):
                 logger.warning(f"Found not lanelet canditates for the ego vehicle")
                 return samples
@@ -79,16 +81,15 @@ class LaneletEgoSequencePostProcessor(BaseDataPostprocessor):
                 candidate_lanelet = simulation.lanelet_network.find_lanelet_by_id(candidate_id)
                 if any((predecessor in current_lanelet_candidates_set for predecessor in candidate_lanelet.predecessor)):
                     continue
-                
+
                 yaw = ego_vehicle.state.orientation
                 l = ego_vehicle.parameters.l
-                p_rear = ego_vehicle.state.position -l/2*np.array([cos(yaw), sin(yaw)])
-
+                p_rear = ego_vehicle.state.position - l / 2 * np.array([cos(yaw), sin(yaw)])
 
                 initial_arclength = max(0.0, current_lanelet_path.get_projected_arclength(p_rear))
                 if initial_arclength >= 0.0:
                     break
-            current_lanelet_id = candidate_id    
+            current_lanelet_id = candidate_id
 
         except KeyError as e:
             print("WARNING", repr(e))
@@ -134,7 +135,8 @@ class LaneletEgoSequencePostProcessor(BaseDataPostprocessor):
                 current_arclength = 0.0
 
         if self.raise_on_too_short and cumulative_arclength < self.max_distance:
-            raise ValueError(f"Extracted path was too short (cumulative_arclength < {cumulative_arclength:.2f} < self.max_distance {self.max_distance:.2f})")
+            raise ValueError(
+                f"Extracted path was too short (cumulative_arclength < {cumulative_arclength:.2f} < self.max_distance {self.max_distance:.2f})")
 
         walk_length = min(len(route_buffer), self.max_sequence_length)
         tensor_size = walk_length if not self.padding else self.max_sequence_length
@@ -145,7 +147,8 @@ class LaneletEgoSequencePostProcessor(BaseDataPostprocessor):
 
         data.walk_start_length = walk_start_length
 
-        for i, (lanelet_idx, lanelet_id, cumulative_arclength, current_arclength, next_arclength, current_length) in enumerate(route_buffer):
+        for i, (lanelet_idx, lanelet_id, cumulative_arclength, current_arclength,
+                next_arclength, current_length) in enumerate(route_buffer):
             if i >= self.max_sequence_length:
                 break
             trajectory_sequence[i, :] = torch.tensor([

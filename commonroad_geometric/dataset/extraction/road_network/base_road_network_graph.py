@@ -15,8 +15,9 @@ from torch_geometric.data import Data
 from torch_geometric.utils.convert import to_networkx
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
-from commonroad_geometric.common.torch_utils.helpers import to_float32, to_padded_sequence
+from commonroad_geometric.common.torch_utils.helpers import to_float32, to_padded_sequence, keys
 from commonroad_geometric.common.torch_utils.pygeo import nx_graph_to_pyg_data
+from commonroad_geometric.common.utils.filesystem import load_dill, save_dill
 from commonroad_geometric.dataset.extraction.road_network.types import LaneletEdgeType, TrafficFlowEdgeConnections
 from commonroad_geometric.plotting.plot_road_network_graph import plot_road_network_graph
 from commonroad_geometric.plotting.plot_scenario import plot_scenario
@@ -28,7 +29,9 @@ class CanonicalRepresentationError(ValueError):
 
 class CanonicalTransform(Enum):
     Translate = 'Translate'
-    TranslateRescale = 'TranslateRescale' # Newly added transformation option. TranslateRotateRescale provides some weird results?? TODO: try to solve that issue
+    # Newly added transformation option. TranslateRotateRescale provides some
+    # weird results?? TODO: try to solve that issue
+    TranslateRescale = 'TranslateRescale'
     TranslateRotate = 'TranslateRotate'
     TranslateRotateRescale = 'TranslateRotateRescale'
 
@@ -108,7 +111,8 @@ class BaseRoadNetworkGraph(ABC, nx.DiGraph, AutoReprMixin):
         self._scenario = value
 
     def get_traffic_flow_graph(self) -> nx.DiGraph:
-        return nx.DiGraph(((u, v, e) for u, v, e in self.edges(data=True) if e['lanelet_edge_type'] in TrafficFlowEdgeConnections))
+        return nx.DiGraph(((u, v, e) for u, v, e in self.edges(data=True)
+                          if e['lanelet_edge_type'] in TrafficFlowEdgeConnections))
 
     def get_canonical_graph_from_lanelet_id(
             self,
@@ -254,7 +258,6 @@ class BaseRoadNetworkGraph(ABC, nx.DiGraph, AutoReprMixin):
     ) -> Tuple[Type[BaseRoadNetworkGraph], LaneletNetwork]:
         ...
 
-
     def get_torch_data(
         self,
         source: Optional[Union[int, Tuple[int, int]]] = None,
@@ -298,20 +301,21 @@ class BaseRoadNetworkGraph(ABC, nx.DiGraph, AutoReprMixin):
             },
             edge_attr_prefix="edge_attr_"
         )
-        if 'relative_left_vertices' in graph_pyg.keys:
-            graph_pyg.vertices_lengths = torch.tensor([a.shape[0] for a in graph_pyg.relative_left_vertices], dtype=torch.int32).unsqueeze(-1)
+        if 'relative_left_vertices' in keys(graph_pyg):
+            graph_pyg.vertices_lengths = torch.tensor(
+                [a.shape[0] for a in graph_pyg.relative_left_vertices], dtype=torch.int32).unsqueeze(-1)
             graph_pyg.relative_vertices = to_padded_sequence([
                 np.concatenate([rlv, rrv], axis=-1)
                 for rlv, rrv in zip(graph_pyg.relative_left_vertices, graph_pyg.relative_right_vertices)
             ])
             del graph_pyg.relative_left_vertices
             del graph_pyg.relative_right_vertices
-        if 'left_vertices' in graph_pyg.keys:
+        if 'left_vertices' in keys(graph_pyg):
             graph_pyg.left_vertices = to_padded_sequence(graph_pyg.left_vertices)
             graph_pyg.center_vertices = to_padded_sequence(graph_pyg.center_vertices)
             graph_pyg.right_vertices = to_padded_sequence(graph_pyg.right_vertices)
 
-        for attr in graph_pyg.keys:
+        for attr in keys(graph_pyg):
             if isinstance(graph_pyg[attr], list) and isinstance(graph_pyg[attr][0], np.ndarray):
                 graph_pyg[attr] = torch.vstack([torch.from_numpy(row) for row in graph_pyg[attr]])
             else:
@@ -324,22 +328,20 @@ class BaseRoadNetworkGraph(ABC, nx.DiGraph, AutoReprMixin):
 
     @classmethod
     def from_data(cls,
-        data: Data,
-        node_attrs: Optional[Iterable[str]] = ['node_position', 'source'],
-        edge_attrs: Optional[Iterable[str]] = ['weight']
-    ) -> Type[BaseRoadNetworkGraph]:
+                  data: Data,
+                  node_attrs: Optional[Iterable[str]] = ['node_position', 'source'],
+                  edge_attrs: Optional[Iterable[str]] = ['weight']
+                  ) -> Type[BaseRoadNetworkGraph]:
         assert not hasattr(data, 'batch') or data.batch.max() == 0
         graph = to_networkx(data=data, node_attrs=node_attrs, edge_attrs=edge_attrs)
         return cls(graph=graph)
 
     def save(self, file_path: str) -> None:
-        from commonroad_geometric.common.utils.filesystem import save_pickle
-        save_pickle(self, file_path=file_path)
+        save_dill(self, file_path=file_path)
 
     @classmethod
     def load(cls, file_path: str) -> Type[BaseRoadNetworkGraph]:
-        from commonroad_geometric.common.utils.filesystem import load_pickle
-        return load_pickle(file_path=file_path)
+        return load_dill(file_path=file_path)
 
     @classmethod
     def from_scenario_file(
@@ -395,7 +397,7 @@ class BaseRoadNetworkGraph(ABC, nx.DiGraph, AutoReprMixin):
         figsize: Tuple[int, int] = (16, 12)
     ) -> Figure:
         # TODO: Add documentation
-        
+
         import os
         import matplotlib.pyplot as plt
 
@@ -419,7 +421,7 @@ class BaseRoadNetworkGraph(ABC, nx.DiGraph, AutoReprMixin):
                 self,
                 ax=axes[1],
                 **plot_kwargs_graph,
-                node_size=figsize[0]*5
+                node_size=figsize[0] * 5
             )
             if title:
                 axes[1].set_title(f"{self.__class__.__name__}")
@@ -429,7 +431,8 @@ class BaseRoadNetworkGraph(ABC, nx.DiGraph, AutoReprMixin):
             if show:
                 plt.show()
             if output_dir is not None:
-                output_path = os.path.join(output_dir, f"{self.scenario.scenario_id}-{self.__class__.__name__}-subplots.{output_filetype}")
+                output_path = os.path.join(
+                    output_dir, f"{self.scenario.scenario_id}-{self.__class__.__name__}-subplots.{output_filetype}")
                 fig.savefig(output_path)
             return fig
 
@@ -442,14 +445,15 @@ class BaseRoadNetworkGraph(ABC, nx.DiGraph, AutoReprMixin):
             if output_dir is not None:
                 output_path = os.path.join(output_dir, f"{self.scenario.scenario_id}.{output_filetype}")
                 scenario_fig.savefig(output_path)
-            
+
             graph_fig = plot_road_network_graph(
                 self,
                 **plot_kwargs_graph,
-                node_size=figsize[0]*5
+                node_size=figsize[0] * 5
             )
             if output_dir is not None:
-                output_path = os.path.join(output_dir, f"{self.scenario.scenario_id}-{self.__class__.__name__}.{output_filetype}")
+                output_path = os.path.join(output_dir,
+                                           f"{self.scenario.scenario_id}-{self.__class__.__name__}.{output_filetype}")
                 graph_fig.savefig(output_path)
 
             if show:

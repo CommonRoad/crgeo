@@ -7,8 +7,8 @@ from typing import Generic, Optional, TYPE_CHECKING
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 from commonroad_geometric.common.threading.delayed_executor import DelayedExecutor
-from commonroad_geometric.dataset.iteration.scenario_iterator import ScenarioBundle
-from commonroad_geometric.simulation.base_simulation import T_BaseSimulationOptions
+from commonroad_geometric.dataset.scenario.iteration.scenario_bundle import ScenarioBundle
+from commonroad_geometric.simulation.base_simulation import T_SimulationOptions
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
 
 if TYPE_CHECKING:
@@ -16,18 +16,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ASYNC_DELAY_MULTIPLIER_INCREASE = 1.03 # TODO: Provide these as arguments
+ASYNC_DELAY_MULTIPLIER_INCREASE = 1.03  # TODO: Provide these as arguments
 ASYNC_DELAY_MULTIPLIER_DECREASE = 0.9
 
 
-class _EpisodeResetter(Generic[T_BaseSimulationOptions], AutoReprMixin):
+class _EpisodeResetter(Generic[T_SimulationOptions], AutoReprMixin):
     """
     Asynchronous gym environment episode resetter for spreading compute time of .reset() calls across preceding step() calls,
     alleviating delays when training agent in parallel environments.
     """
+
     def __init__(
         self,
-        env: CommonRoadGymEnv[T_BaseSimulationOptions],
+        env: CommonRoadGymEnv[T_SimulationOptions],
         async_resets: bool = True,
         injected_async_delay: float = 0.2,
         auto_update_delay: bool = True
@@ -42,7 +43,8 @@ class _EpisodeResetter(Generic[T_BaseSimulationOptions], AutoReprMixin):
             disabled=not async_resets,
             delay=self._injected_async_delay
         )
-        logger.debug(f"Initialized _EpisodeResetter with async_resets={async_resets}, injected_async_delay={injected_async_delay}")
+        logger.debug(
+            f"Initialized _EpisodeResetter with async_resets={async_resets}, injected_async_delay={injected_async_delay}")
 
     def on_init(self) -> None:
         """
@@ -58,7 +60,7 @@ class _EpisodeResetter(Generic[T_BaseSimulationOptions], AutoReprMixin):
         """
         if self._async_resets and not self._env.has_started:
             self._setup_next_async()
-        
+
     def on_reset(self) -> None:
         """
         Should be called from the gym environment's reset method.
@@ -104,7 +106,7 @@ class _EpisodeResetter(Generic[T_BaseSimulationOptions], AutoReprMixin):
         success = False
         while not success:
             next_scenario_bundle: ScenarioBundle = self._delayed_executor(
-                self._env.scenario_iterator.__next__
+                self._env.scenario_iterable.__next__
             )
             logger.debug(f"Completed subtask 1/3: Retrieved next scenario bundle")
             next_ego_vehicle_simulation: EgoVehicleSimulation = self._delayed_executor(

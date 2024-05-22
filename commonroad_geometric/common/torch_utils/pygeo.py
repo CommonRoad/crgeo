@@ -9,6 +9,7 @@ from torch_geometric.data import Data
 from torch_geometric.utils.num_nodes import maybe_num_nodes
 import torch
 from torch import Tensor, LongTensor, scatter
+from torch_scatter import scatter_max, scatter_add
 
 def softmax(
     src: Tensor,
@@ -22,16 +23,16 @@ def softmax(
     key = softmax(x, batch)
         RuntimeError: nvrtc: error: failed to open libnvrtc-builtins.so.11.1.
         Make sure that libnvrtc-builtins.so.11.1 is installed correctly.
-        nvrtc compilation failed: 
+        nvrtc compilation failed:
     """
-    N = maybe_num_nodes(index, num_nodes)
-    src_max = scatter(src, index, dim, dim_size=N, reduce='max')
-    src_max = src_max.index_select(dim, index)
-    out = (src - src_max).exp()
-    out_sum = scatter(out, index, dim, dim_size=N, reduce='sum')
-    out_sum = out_sum.index_select(dim, index)
+    num_nodes = maybe_num_nodes(index, num_nodes)
 
-    return out / (out_sum + 1e-16)
+    out = src - scatter_max(src, index, dim=0, dim_size=num_nodes)[0][index]
+    out = out.exp()
+    out = out / (
+        scatter_add(out, index, dim=0, dim_size=num_nodes)[index] + 1e-16)
+
+    return out
 
 
 def get_batch_masks(batch: Tensor, max_num_nodes: Optional[int] = None) -> Tensor:
@@ -51,7 +52,7 @@ def get_batch_sizes(batch: Tensor) -> Tensor:
     return torch.diff(
         torch.where(torch.cat(
             [torch.diff(batch, prepend=torch.as_tensor([0], device=batch.device)),
-            torch.as_tensor([1], device=batch.device)]
+             torch.as_tensor([1], device=batch.device)]
         ))[0], prepend=torch.as_tensor([0], device=batch.device)
     )
 
@@ -65,7 +66,7 @@ def get_batch_internal_indices(batch: Tensor) -> Tensor:
     # TODO: Documentation
     a = torch.arange(len(batch), device=batch.device)
     d = torch.diff(batch, prepend=batch.new_zeros([1]))
-    return a - torch.cummax(a*d, 0)[0]
+    return a - torch.cummax(a * d, 0)[0]
 
 
 def nx_graph_to_pyg_data(
@@ -100,7 +101,8 @@ def nx_graph_to_pyg_data(
 
     # relabel nodes with integer labels from 0 to len(graph.nodes) - 1
     # TODO: why are we sorting the nodes?
-    sorted_node_ids = sorted(graph.nodes, key=lambda node_id: int(node_id.split('-')[0]) if isinstance(node_id, str) else node_id)
+    sorted_node_ids = sorted(graph.nodes, key=lambda node_id: int(
+        node_id.split('-')[0]) if isinstance(node_id, str) else node_id)
     lanelet_id_to_index_mapping = {
         node_id: idx
         for idx, node_id in enumerate(sorted_node_ids)

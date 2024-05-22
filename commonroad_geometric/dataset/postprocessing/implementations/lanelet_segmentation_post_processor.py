@@ -1,6 +1,7 @@
 from typing import List, Optional, Union
+
 import torch
-from torch_geometric.utils import subgraph, add_remaining_self_loops
+from torch_geometric.utils import add_remaining_self_loops, subgraph
 
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.dataset.postprocessing.base_data_postprocessor import BaseDataPostprocessor
@@ -12,6 +13,7 @@ class LaneletSegmentationPostProcessor(BaseDataPostprocessor):
     """
     Segments data from road network into individual lanelet instances.
     """
+
     def __init__(
         self,
         add_self_loops: bool = True,
@@ -32,11 +34,11 @@ class LaneletSegmentationPostProcessor(BaseDataPostprocessor):
         ego_vehicle: Optional[EgoVehicle] = None
     ) -> List[CommonRoadData]:
 
-        if type(samples) == CommonRoadData:
+        if isinstance(samples, CommonRoadData):
             samples = [samples]
         # require all data to be from the same scenario
         assert all(sample.scenario_id == samples[0].scenario_id for sample in samples[1:])
-        
+
         for data in samples:
             assert data.vehicle, f"Sample {data.scenario_id} does not have vehicle nodes"
             assert data.lanelet, f"Sample {data.scenario_id} does not have lanelet nodes"
@@ -48,19 +50,20 @@ class LaneletSegmentationPostProcessor(BaseDataPostprocessor):
         for i_sample, sample in enumerate(samples):
             data = {i: [] for i in range(len(sample.l.id.numpy()))}
             for j in sample.v.indices:
-                data[int(sample.v2l.edge_index[:,j][1])].append(int((sample.v.indices == sample.v2l.edge_index[:,j][0]).nonzero(as_tuple=True)[0]))
+                data[int(sample.v2l.edge_index[:, j][1])].append(
+                    int((sample.v.indices == sample.v2l.edge_index[:, j][0]).nonzero(as_tuple=True)[0]))
             for k in data.keys():
-                #sample.__dict__['_node_store_dict']['vehicle'].clone()
+                # sample.__dict__['_node_store_dict']['vehicle'].clone()
                 segmented_sample = sample.clone()
                 # Reorganize vehicle parameters
-                segmented_sample.v.x = segmented_sample.v.x[data[k]]
-                segmented_sample.v.is_ego_mask = segmented_sample.v.is_ego_mask[data[k]]
-                segmented_sample.v.pos = segmented_sample.v.pos[data[k]]
-                segmented_sample.v.id = segmented_sample.v.id[data[k]]
+                segmented_sample.vertices.x = segmented_sample.vertices.x[data[k]]
+                segmented_sample.vertices.is_ego_mask = segmented_sample.vertices.is_ego_mask[data[k]]
+                segmented_sample.vertices.pos = segmented_sample.vertices.pos[data[k]]
+                segmented_sample.vertices.id = segmented_sample.vertices.id[data[k]]
                 # Remove lanelets without vehicles
-                if segmented_sample.v.id.nelement() != 0: 
-                    segmented_sample.v.indices = segmented_sample.v.indices[data[k]]
-                    segmented_sample.v.num_nodes = len(data[k])
+                if segmented_sample.vertices.id.nelement() != 0:
+                    segmented_sample.vertices.indices = segmented_sample.vertices.indices[data[k]]
+                    segmented_sample.vertices.num_nodes = len(data[k])
                     # Reorganize vehicle to lanelet connections
                     segmented_sample.v2l.edge_index = segmented_sample.v2l.edge_index[:, data[k]]
                     segmented_sample.v2l.edge_attr = segmented_sample.v2l.edge_attr[data[k]]
@@ -78,20 +81,21 @@ class LaneletSegmentationPostProcessor(BaseDataPostprocessor):
                     edge_attr = sample.v2v.edge_attr
                     if len(edge_nodes) > 0 or self._add_self_loops:
                         if len(edge_nodes) == 0 and self._add_self_loops:
-                            edge_index, edge_attr = add_remaining_self_loops(edge_index, edge_attr, num_nodes=sample.v.id.shape[0])
+                            edge_index, edge_attr = add_remaining_self_loops(
+                                edge_index, edge_attr, num_nodes=sample.v.id.shape[0])
                             edge_nodes = data[k]
-                        segmented_sample.v2v.edge_index, segmented_sample.v2v.edge_attr = subgraph(subset = edge_nodes, edge_index=edge_index, edge_attr=edge_attr, relabel_nodes = True)
-                    else:                     
-                        segmented_sample.v2v.edge_index = torch.empty(2,0)
-                        segmented_sample.v2v.edge_attr = torch.empty(2,0)
-                    
+                        segmented_sample.v2v.edge_index, segmented_sample.v2v.edge_attr = subgraph(
+                            subset=edge_nodes, edge_index=edge_index, edge_attr=edge_attr, relabel_nodes=True)
+                    else:
+                        segmented_sample.v2v.edge_index = torch.empty(2, 0)
+                        segmented_sample.v2v.edge_attr = torch.empty(2, 0)
                     # Reorganize lanelet to lanelet connections
                     l2l_indices = [j for j in range(sample.l2l.edge_index.shape[1]) if k in sample.l2l.edge_index[:, j]]
                     segmented_sample.l2l.edge_index = segmented_sample.l2l.edge_index[:, l2l_indices]
                     segmented_sample.l2l.edge_attr = segmented_sample.l2l.edge_attr[l2l_indices]
 
                     if self._ensure_multiple_nodes_per_sample:
-                        if segmented_sample.v.num_nodes > 1:
+                        if segmented_sample.vertices.num_nodes > 1:
                             segmented_samples.append(segmented_sample)
                     else:
                         segmented_samples.append(segmented_sample)

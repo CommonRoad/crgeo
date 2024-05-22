@@ -5,6 +5,7 @@ import numpy as np
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.base_reward_computer import BaseRewardComputer
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
+from commonroad_geometric.learning.reinforcement.observer.base_observer import T_Observation
 
 
 class CollisionPenaltyRewardComputer(BaseRewardComputer):
@@ -27,7 +28,8 @@ class CollisionPenaltyRewardComputer(BaseRewardComputer):
         self,
         action: np.ndarray,
         simulation: EgoVehicleSimulation,
-        data: CommonRoadData
+        data: CommonRoadData,
+        observation: T_Observation
     ) -> float:
         collision_struct = simulation.check_if_has_collision()
         if collision_struct.collision:

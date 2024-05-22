@@ -1,16 +1,10 @@
-from dataclasses import dataclass
-from email.message import Message
-from torch import nn
-from torch.nn import ReLU, Tanh, PReLU, LeakyReLU, Hardtanh
-from typing import Literal, Type
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from optuna import Trial
+from typing import Optional
+
+from torch import nn
+
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
-from typing import Any, Dict, Optional, Tuple, Union
-from torch import nn
-from abc import ABC, abstractmethod
-from torch_geometric.nn import MessagePassing
 
 
 @dataclass
@@ -20,8 +14,8 @@ class BaseOccupancyEncoderConfig(ABC):
 
 class BaseOccupancyEncoder(nn.Module, ABC):
     def __init__(
-        self, 
-        output_size: int, 
+        self,
+        output_size: int,
         offset_conditioning: bool,
         velocity_conditioning: bool
     ):
@@ -45,7 +39,6 @@ class BaseOccupancyEncoder(nn.Module, ABC):
     def build(
         self,
         data: CommonRoadData,
-        trial: Optional[Trial] = None
+        trial = None
     ) -> None:
         ...
-    

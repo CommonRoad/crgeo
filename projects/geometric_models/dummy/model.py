@@ -1,18 +1,17 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
-from optuna import Trial
 from torch import Tensor, nn
 from torch.optim.optimizer import Optimizer
-from torch_geometric.nn import GCNConv, global_add_pool
+from torch_geometric.nn import global_add_pool
+from torch_geometric.nn.conv import GCNConv
 
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.learning.geometric.base_geometric import BaseGeometric
-from commonroad_geometric.learning.training.optimizer.hyperparameter_optimizer_service import BaseOptimizerService
-from commonroad_geometric.rendering.base_renderer_plugin import BaseRendererPlugin
-from commonroad_geometric.rendering.plugins.render_lanelet_network_plugin import RenderLaneletNetworkPlugin
-from commonroad_geometric.rendering.plugins.render_obstacles_plugin import RenderObstaclesPlugin
-from commonroad_geometric.rendering.plugins.render_traffic_graph_plugin import RenderTrafficGraphPlugin
+from commonroad_geometric.rendering.plugins.base_renderer_plugin import BaseRenderPlugin
+from commonroad_geometric.rendering.plugins.implementations.render_lanelet_network_plugin import RenderLaneletNetworkPlugin
+from commonroad_geometric.rendering.plugins.implementations.render_traffic_graph_plugin import RenderTrafficGraphPlugin
+from commonroad_geometric.rendering.plugins.obstacles.render_obstacle_plugin import RenderObstaclePlugin
 
 
 class DummyModel(BaseGeometric):
@@ -27,7 +26,6 @@ class DummyModel(BaseGeometric):
         batch: CommonRoadData,
         **kwargs
     ) -> Tuple[Tensor, Dict[str, Any], Dict[str, Tensor]]:
-    
         """Learning to simply minimize the mean squared output"""
         loss = (out**2).mean()
 
@@ -69,27 +67,27 @@ class DummyModel(BaseGeometric):
         #     print(f"ERROR: TODO: fix error when batch includes empty graphs\n{e}")
         #     raise
 
-
         # Scaling up vehicle node features with a linear transformation
         z = self.upscaler(x)
 
         # Applying non-linear activation function
         z = torch.relu(z)
 
-        # Feeding upscaled features through GCNConv layer 
+        # Feeding upscaled features through GCNConv layer
         #  Reference: https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#torch_geometric.nn.conv.GCNConv
         phi = self.conv.forward(x=z, edge_index=edge_index)
 
         # Graph-level pooling
-        #  Reference: https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html?highlight=global_max_pool#global-pooling-layers
+        # Reference:
+        # https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html?highlight=global_max_pool#global-pooling-layers
         y = global_add_pool(phi, batch_indices)
-        
+
         return y
 
     def configure_optimizer(
-        self, 
-        trial: Any = None, 
-        optimizer_service: Optional[BaseOptimizerService] = None
+        self,
+        trial: Any = None,
+        optimizer_service = None
     ) -> Optimizer:
         # Just creating an optimizer for our model
         # For reference, see https://pytorch.org/docs/stable/optim.html
@@ -99,43 +97,45 @@ class DummyModel(BaseGeometric):
             self.parameters()
         )
 
-    def _build(self, batch: CommonRoadData, trial: Optional[Trial] = None) -> None:
-        # Building the network architecture, 
+    def _build(self, batch: CommonRoadData, trial = None) -> None:
+        # Building the network architecture,
         # with the help of a dummy batch for extracting appropriate dimensions.
         x = batch.vehicle.x
 
         # Demonstrating parameter fetching via optimize service
-        in_features=x.shape[1]
+        in_features = x.shape[1]
         out_features = 20
         n_layers = 0
         if self._optimizer_service is not None:
-            out_features =  self._optimizer_service.suggest_param("suggest_int", "out_features", trial, **{'low': 1, 'high': 10})
-            n_layers =  self._optimizer_service.suggest_param("suggest_int", "n_layers", trial, **{'low': 1, 'high': 3})
+            out_features = self._optimizer_service.suggest_param(
+                "suggest_int", "out_features", trial, **{'low': 1, 'high': 10})
+            n_layers = self._optimizer_service.suggest_param("suggest_int", "n_layers", trial, **{'low': 1, 'high': 3})
 
         layers = []
         for i in range(n_layers):
-            hidden_channels = self._optimizer_service.suggest_param("suggest_int", "hidden_channels_{}".format(i), trial, **{'low': 10, 'high': 20})
+            hidden_channels = self._optimizer_service.suggest_param(
+                "suggest_int", "hidden_channels_{}".format(i), trial, **{'low': 10, 'high': 20})
             layers.append(nn.Linear(in_features, hidden_channels))
             layers.append(nn.ReLU())
             p = 0.3
             if self._optimizer_service is not None:
-                p = self._optimizer_service.suggest_param("suggest_float", "dropout_{}".format(i), trial, **{'low': 0.2, 'high': 0.5})
+                p = self._optimizer_service.suggest_param(
+                    "suggest_float", "dropout_{}".format(i), trial, **{'low': 0.2, 'high': 0.5})
             layers.append(nn.Dropout(p))
             in_features = hidden_channels
-        
+
         layers.append(nn.Linear(in_features, out_features))
         self.upscaler = nn.Sequential(*layers)
 
-        
         self.conv = GCNConv(
             in_channels=out_features,
             out_channels=10
         )
 
     @classmethod
-    def configure_renderer_plugins(cls) -> Optional[List[BaseRendererPlugin]]:
+    def configure_renderer_plugins(cls) -> Optional[List[BaseRenderPlugin]]:
         return [
             RenderLaneletNetworkPlugin(),
             RenderTrafficGraphPlugin(),
-            RenderObstaclesPlugin(),
+            RenderObstaclePlugin(),
         ]

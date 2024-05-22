@@ -65,11 +65,11 @@ class Area:
         self.y_max = y_max
 
     def __contains__(self, item):
-        if type(item) == Point:
+        if isinstance(item, Point):
             return (self.x_min <= item.x <= self.x_max) and (
                 self.y_min <= item.y <= self.y_max
             )
-        elif type(item) == np.ndarray:
+        elif isinstance(item, np.ndarray):
             return (self.x_min <= item[0] <= self.x_max) and (
                 self.y_min <= item[1] <= self.y_max
             )
@@ -463,7 +463,7 @@ def angle_to(v1: np.ndarray, v2: np.ndarray) -> float:
     return angle
 
 
-def get_angle(v1: np.ndarray, v2:np.ndarray) -> float:
+def get_angle(v1: np.ndarray, v2: np.ndarray) -> float:
     """
     Get clockwise angle between vectors
     :param v1: one vector
@@ -479,6 +479,7 @@ def get_angle(v1: np.ndarray, v2:np.ndarray) -> float:
     diff1 = angles[0] - angles[1]
     angle = diff1 / np.pi * 180
     return angle
+
 
 def curvature(polyline: List[np.ndarray]) -> float:
     """
@@ -672,7 +673,7 @@ def split_line(
     :rtype: Tuple[List[np.ndarray], List[np.ndarray]]
     """
     line1 = line[: index + 1]
-    line2 = line[index + 1 :]
+    line2 = line[index + 1:]
     if split_point is not None:
         line1 = line1 + [split_point]
         line2 = [split_point] + line2

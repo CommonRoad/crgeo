@@ -7,6 +7,7 @@ from typing import List, Tuple
 import logging
 import numpy as np
 import utm
+from pathlib import Path
 
 from commonroad_geometric.external.map_conversion.osm2cr import config
 from commonroad_geometric.external.map_conversion.osm2cr.converter_modules.graph_operations import road_graph as rg
@@ -151,7 +152,7 @@ def create_scenario_intermediate(graph) -> Tuple[Scenario, IntermediateFormat]:
         interm_sublayer.traffic_lights = list()
         interm_sublayer.traffic_lights = list()
         interm_sublayer.remove_invalid_references()
-        #print("removed intersections, traffic lights, traffic signs from sublayer")
+        # print("removed intersections, traffic lights, traffic signs from sublayer")
         interm.merge(interm_sublayer)
         interm.add_crossing_information(crossings)
     scenario = interm.to_commonroad_scenario()
@@ -160,7 +161,7 @@ def create_scenario_intermediate(graph) -> Tuple[Scenario, IntermediateFormat]:
 
 def export(
         graph: rg.Graph,
-        file_path=config.SAVE_PATH + config.BENCHMARK_ID + ".xml"
+        file_path=Path(config.SAVE_PATH, config.BENCHMARK_ID+".xml")
 ) -> None:
     """
     converts a graph to a CR scenario and saves it to disk
@@ -258,7 +259,7 @@ def find_bounds(scenario: Scenario) -> List[float]:
     return [x_min, x_max, y_min, y_max]
 
 
-def view_xml(filename: str, ax=None) -> None:
+def view_xml(filename: Path, ax=None) -> None:
     """
     shows the plot of a CR scenario on a axes object
     if no axes are provided, a new window is opened with pyplot
@@ -267,11 +268,11 @@ def view_xml(filename: str, ax=None) -> None:
     :param ax: axes to plot on
     :return: None
     """
-    #print("loading scenario from XML")
+    # print("loading scenario from XML")
     scenario, problem = CommonRoadFileReader(filename).open()
-    #print("drawing scenario")
+    # print("drawing scenario")
     if len(scenario.lanelet_network.lanelets) == 0:
-        #print("empty scenario")
+        # print("empty scenario")
         return
     limits = find_bounds(scenario)
 

@@ -12,7 +12,9 @@ class NoEdgeDrawer(BaseEdgeDrawer):
     Edge drawer that connects no vehicles and
     returns an empty vehicle graph.
     """
-    def __init__(self, dist_threshold: Optional[float] = None) -> None: # TODO: Fix interface, make __init__ abstract in base class
+
+    # TODO: Fix interface, make __init__ abstract in base class
+    def __init__(self, dist_threshold: Optional[float] = None) -> None:
         super().__init__(dist_threshold=None)
 
     def __call__(self, options: BaseEdgeDrawingParams) -> Tuple[Tensor, Tensor]:

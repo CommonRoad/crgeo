@@ -2,7 +2,7 @@ import subprocess
 import sys
 import os
 import logging
-
+from pathlib import Path
 from stable_baselines3.common.callbacks import BaseCallback
 
 from commonroad_geometric.learning.reinforcement.training.utils.render_agent import PYTHON_PATH_RECORD_AGENT
@@ -10,27 +10,28 @@ from commonroad_geometric.learning.reinforcement.training.utils.render_agent imp
 
 logger = logging.getLogger(__name__)
 
+
 class RecordVideoSubprocCallback(BaseCallback):
     """
-    Records a video every ``record_freq`` timestep.
+    Records a video every ``video_frequency`` timestep.
 
-    :param record_freq: Number of timesteps between two recordings.
+    :param video_frequency: Number of timesteps between two recordings.
     """
 
     def __init__(
-        self, 
-        scenario_dir: str,
-        experiment_file: str,
-        record_freq: int,
+        self,
+        scenario_dir: Path,
+        experiment_file: Path,
+        video_frequency: int,
         record_backoff: float,
-        video_folder: str,
+        video_folder: Path,
         video_length: int,
         device: str
     ):
         super(RecordVideoSubprocCallback, self).__init__()
         self._scenario_dir = os.path.abspath(scenario_dir)
         self._experiment_file = os.path.abspath(experiment_file)
-        self._record_freq = record_freq
+        self._video_frequency = video_frequency
         self._record_backoff = record_backoff
         self._video_folder = video_folder
         self._video_length = video_length
@@ -38,16 +39,16 @@ class RecordVideoSubprocCallback(BaseCallback):
         self._device = device
 
     def _on_step(self) -> bool:
-        if self._last_time_trigger == 0 or (self.num_timesteps - self._last_time_trigger) >= self._record_freq:
+        if self._last_time_trigger == 0 or (self.num_timesteps - self._last_time_trigger) >= self._video_frequency:
             self._last_time_trigger = self.num_timesteps
-            self._record_freq = int(self._record_freq * self._record_backoff)
+            self._video_frequency = int(self._video_frequency * self._record_backoff)
             return self._on_event()
         return True
 
     def _on_event(self) -> bool:
-        video_folder = os.path.abspath(os.path.join(self._video_folder, f"{self.num_timesteps}-steps"))
-        os.makedirs(video_folder, exist_ok=True)
-        model_path = os.path.join(self._video_folder, "model")
+        video_folder = Path(self._video_folder).resolve().joinpath(f"{self.num_timesteps}-steps").absolute()
+        video_folder.mkdir(parents=True, exist_ok=True)
+        model_path = self._video_folder.joinpath("model")
 
         self.model.save(model_path)
         cmd = f'{sys.executable} "{PYTHON_PATH_RECORD_AGENT}" ' + \

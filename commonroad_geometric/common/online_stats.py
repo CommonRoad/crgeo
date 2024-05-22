@@ -30,6 +30,8 @@ class AggregatedRunningStats(AutoReprMixin):
         self._n = 0
 
     def update(self, value: float) -> None:
+        if value is None:
+            return
         import math
 
         abs_value = abs(value)
@@ -39,7 +41,7 @@ class AggregatedRunningStats(AutoReprMixin):
             self._min = value
         if value > self._max:
             self._max = value
-        
+
         if self._n == 1:
             self._old_mean = self._mean = value
             self._old_s = 0.0

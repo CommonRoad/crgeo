@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 def trajectory_prediction_init_fast(self: TrajectoryPrediction, trajectory: Trajectory, shape: Shape,
-                 center_lanelet_assignment: Union[None, Dict[int, Set[int]]] = None,
-                 shape_lanelet_assignment: Union[None, Dict[int, Set[int]]] = None):
+                                    center_lanelet_assignment: Union[None, Dict[int, Set[int]]] = None,
+                                    shape_lanelet_assignment: Union[None, Dict[int, Set[int]]] = None):
     """
     :param trajectory: predicted trajectory of the obstacle
     :param shape: shape of the obstacle
@@ -23,7 +23,7 @@ def trajectory_prediction_init_fast(self: TrajectoryPrediction, trajectory: Traj
     self.final_time_step = max([state.time_step for state in self._trajectory.state_list])
 
 
-def prediction_init_fast (self: Prediction, initial_time_step: int, occupancy_set: List[Occupancy]):
+def prediction_init_fast(self: Prediction, initial_time_step: int, occupancy_set: List[Occupancy]):
     self.initial_time_step = initial_time_step
 
 

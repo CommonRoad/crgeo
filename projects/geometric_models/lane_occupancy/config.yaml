@@ -2,46 +2,57 @@ defaults:
   - base_geometric_config
   - _self_
 
-project_dir: ./projects/output/geometric/lane_occupancy
+project_dir: ./projects/output/geometric/lane_occupancy_munich
 seed: 0
-no_wandb: False
+wandb_logging: True
 warmstart: False
 device: auto
-profile: True
+profile: False
 
-dataset: 
-  train_scenario_dir: &scenario_dir ./data/osm_recordings/
+dataset:
+  # train_scenario_dir: &scenario_dir ./data/osm_recordings/
+  # train_scenario_dir: &scenario_dir ./data/highd-sample/
+  train_scenario_dir: &scenario_dir ../../data/munich3_valid2
   test_scenario_dir: *scenario_dir
   val_scenario_dir: *scenario_dir
   overwrite: False
   pre_transform_workers: 1
   cache_data: False
   max_samples_per_scenario: 100
-  max_scenarios: 1
+  max_scenarios: 200
 
-experiment: 
+experiment:
   time_horizon: 60
   min_occupancy_ratio: 0.0
 
-training: 
+training:
   backward_freq: 1
-  batch_size: 16
-  checkpoint_frequency: 100
-  early_stopping: 
+  batch_size: 4
+  checkpoint_frequency: 1000
+  early_stopping:
   enable_multi_gpu: False
   enable_rendering: True
-  gradient_clipping_threshold: 
+  gradient_clipping_threshold: 1.0
   log_freq: 100
-  max_epochs: 10000
+  max_epochs: 1_000_000
   max_optimize_samples: 1
   overfit: False
+  shuffle: False
   swallow_errors: False
+  render_subprocess: True
   test_freq: 1
-  test_split: 0.1
-  validate_inner: True
+  test_split: 1
+  validate_inner: False
   validation_freq:  1
   validation_split:  1
   verbose: 1
   video_freq: 1000
   video_length: 400
-  video_record_backoff: 1.5
+  video_record_backoff: 1.25
+  lr_scheduler_cls: CosineAnnealingWarmRestarts
+  lr_scheduler_kwargs:
+    T_0: 80
+    T_mult: 1
+    eta_min: 0.0001
+
+

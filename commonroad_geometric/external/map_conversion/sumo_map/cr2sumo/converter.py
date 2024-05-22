@@ -2,10 +2,8 @@
 """
 import itertools
 import logging
-import os
+import os, sys
 import subprocess
-import sys
-import time
 import warnings
 from collections import defaultdict
 from copy import deepcopy
@@ -15,16 +13,16 @@ from typing import Dict, List, Set, Tuple, Iterable, Optional
 # TODO: Move to a single XML lib
 from xml.dom import minidom
 from xml.etree import cElementTree as ET
-
 import lxml.etree as etree
 import matplotlib.colors as mcolors
+from matplotlib import pyplot as plt
+from pathlib import Path
 import networkx as nx
 import numpy as np
 from commonroad.scenario.intersection import Intersection
 from commonroad.visualization.mp_renderer import MPRenderer
 from shapely.geometry import LineString, Point
 import sumolib
-from matplotlib import pyplot as plt
 
 try:
     import commonroad_dc.pycrccosy
@@ -50,13 +48,13 @@ from commonroad.scenario.traffic_sign_interpreter import TrafficSigInterpreter
 from commonroad_geometric.external.sumocr.maps.scenario_wrapper import AbstractScenarioWrapper
 
 from commonroad_geometric.external.map_conversion.sumo_map.sumolib_net import (TLS, Connection, Crossing, Edge, Junction, Lane,
-                                                            Node, NodeType, RightOfWay,
-                                                            VehicleType, SpreadType, sumo_net_from_xml, Net, Roundabout)
+                                                                               Node, NodeType, RightOfWay,
+                                                                               VehicleType, SpreadType, sumo_net_from_xml, Net, Roundabout)
 
 from commonroad_geometric.external.map_conversion.sumo_map.errors import ScenarioException
 from commonroad_geometric.external.map_conversion.sumo_map.util import (_find_intersecting_edges,
-                                                     get_total_lane_length_from_netfile, max_lanelet_network_id,
-                                                     merge_lanelets, min_cluster, update_edge_lengths)
+                                                                        get_total_lane_length_from_netfile, max_lanelet_network_id,
+                                                                        merge_lanelets, min_cluster, update_edge_lengths)
 
 from commonroad_geometric.external.map_conversion.sumo_map.config import SumoConfig
 from .mapping import (get_sumo_edge_type, traffic_light_states_SUMO2CR, VEHICLE_TYPE_CR2SUMO, VEHICLE_NODE_TYPE_CR2SUMO,
@@ -510,8 +508,8 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         if max_curvature > 0.001:  # not straight lanelet
             radius = 1 / max_curvature
             max_vehicle_length_sq = 4 * (
-                    (radius + lanelet_width / 2) ** 2 -
-                    (radius + self._max_vehicle_width / 2) ** 2)
+                (radius + lanelet_width / 2) ** 2 -
+                (radius + self._max_vehicle_width / 2) ** 2)
 
             for veh_class, veh_length in self.conf.veh_params['length'].items(
             ):
@@ -627,7 +625,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
                             for inc2 in intersection.incomings:
                                 if inc2.left_of == incoming.incoming_id:
                                     inc2.left_of = incoming.left_of
-                            del intersection._incomings[intersection._incomings.index(incoming)]
+                            del intersection._incomings[intersection._incomings.time_step(incoming)]
 
                     if intersect_any is False:
                         continue
@@ -1287,7 +1285,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
 
         return True
 
-    def write_intermediate_files(self, output_path: str) -> Tuple[str, ...]:
+    def write_intermediate_files(self, output_path: Path) -> Tuple[str, ...]:
         """
         Function for writing the edges and nodes files in xml format
         :param output_path: the relative path of the output
@@ -1342,13 +1340,13 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         self._edges_file = file_path
         return file_path
 
-    def _write_connections_file(self, output_path: str) -> str:
+    def _write_connections_file(self, output_path: Path) -> Path:
         """
         Function for writing the connections file
         :param output_path: path for the file
         :return: nothing
         """
-        file_path = os.path.join(os.path.dirname(output_path), f"{self.conf.scenario_name}.con.xml")
+        file_path = os.path.join(output_path.parent, f"{self.conf.scenario_name}.con.xml")
         with open(file_path, 'w+') as output_file:
             sumolib.writeXMLHeader(output_file, 'CommonRoad Scenario Designer')
             connections = etree.Element('connections')
@@ -1367,12 +1365,12 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         self._connections_file = file_path
         return file_path
 
-    def _write_traffic_file(self, output_path: str) -> str:
+    def _write_traffic_file(self, output_path: Path) -> Path:
         """
         Writes the tll.net.xml file to disk
         :param output_path: path for the file
         """
-        file_path = os.path.join(os.path.dirname(output_path), f"{self.conf.scenario_name}.tll.xml")
+        file_path = os.path.join(output_path.parent, f"{self.conf.scenario_name}.tll.xml")
         with open(file_path, "w+") as f:
             sumolib.writeXMLHeader(f, 'CommonRoad Scenario Designer')
             xml = etree.fromstring(self.traffic_light_signals.to_xml())
@@ -1380,12 +1378,12 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         self._traffic_file = file_path
         return file_path
 
-    def _write_edge_type_file(self, output_path: str) -> str:
+    def _write_edge_type_file(self, output_path: Path) -> Path:
         """
         Writes the tll.net.xml file to disk
         :param output_path: path for the file
         """
-        file_path = os.path.join(os.path.dirname(output_path), f"{self.conf.scenario_name}.typ.xml")
+        file_path = os.path.join(output_path.parent, f"{self.conf.scenario_name}.typ.xml")
         with open(file_path, "w+") as f:
             sumolib.writeXMLHeader(f, 'CommonRoad Scenario Designer')
             types = etree.fromstring(self.edge_types.to_xml())
@@ -1393,9 +1391,9 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         self._type_file = file_path
         return file_path
 
-    def merge_intermediate_files(self, output_path: str, cleanup: bool,
-                                 nodes_path: str, edges_path: str, connections_path: str,
-                                 traffic_path: str, type_path: str) -> bool:
+    def merge_intermediate_files(self, output_path: Path, cleanup: bool,
+                                 nodes_path: Path, edges_path: Path, connections_path: Path,
+                                 traffic_path: Path, type_path: Path) -> bool:
         """
         Function that merges the edges and nodes files into one using netconvert
         :param output_path
@@ -1472,7 +1470,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
 
         return success
 
-    def _update_internal_IDs_from_net_file(self, net_file_path: str):
+    def _update_internal_IDs_from_net_file(self, net_file_path: Path):
         with open(net_file_path, 'r') as f:
             root = ET.parse(f)
 
@@ -1578,7 +1576,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
                     continue
                 self.lanelet_id2junction[self.lane_id2lanelet_id[lane.id]] = junction
 
-    def create_sumo_files(self, output_folder: str, traffic_from_trajectories=False, cleanup_tmp_files=True) -> bool:
+    def create_sumo_files(self, output_folder: Path, traffic_from_trajectories=False, cleanup_tmp_files=True) -> bool:
         """
         Convert the CommonRoad scenario to a net.xml file, specified by the absolute path output_file and create
         all SUMO files required for the traffic simulation.
@@ -1588,7 +1586,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         :param cleanup_tmp_files: clean up temporary files created during the .net conversion, useful for debugging
         :return returns whether conversion was successful
         """
-        output_path = os.path.join(output_folder, self.conf.scenario_name + '.net.xml')
+        output_path = Path(output_folder, self.conf.scenario_name + '.net.xml')
         self.logger.info("Converting to SUMO Map")
         self.logger.info(output_folder)
         self.logger.info(self.conf.scenario_name)
@@ -1607,7 +1605,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         else:
             return self._create_random_routes(output_path)
 
-    def _create_routes_from_trajectories(self, scenario: Scenario, output_folder: str) -> bool:
+    def _create_routes_from_trajectories(self, scenario: Scenario, output_folder: Path) -> bool:
         """
         Convert the Commonroad trajectories to SUMO routes. Next to the route files add file will be created as well
         :param scenario: the scenario to be converted
@@ -1615,7 +1613,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         :return returns whether conversion was successful
         """
         scenario_name = self.conf.scenario_name
-        net_file = os.path.join(output_folder, scenario_name + '.net.xml')
+        net_file = Path(output_folder, scenario_name + '.net.xml')
 
         rou_files = self._create_rou_file_from_trajectories(scenario, output_folder)
 
@@ -1623,7 +1621,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
                                                     output_folder)
         return True
 
-    def _create_random_routes(self, net_file: str, scenario_name: str = None, return_files=True) -> bool:
+    def _create_random_routes(self, net_file: Path, scenario_name: str = None, return_files=True) -> bool:
         """
         Automatically generates traffic routes from the given .net.xml file
 
@@ -1643,7 +1641,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
 
         if scenario_name is None:
             scenario_name = self.conf.scenario_name
-        out_folder = os.path.dirname(net_file)
+        out_folder = net_file.parent
 
         self._additional_file = self._generate_add_file(scenario_name, out_folder)
         rou_files = self._generate_rou_file(net_file, scenario_name,
@@ -1655,7 +1653,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         else:
             return rou_files, self._additional_file, self.sumo_cfg_file
 
-    def _convert_to_add_file(self, scenario: Scenario, xml_root, domTree) -> str:
+    def _convert_to_add_file(self, scenario: Scenario, xml_root, domTree) -> Path:
         """
         During converting the Commonroad trajectories to SUMO routes add file is required for SUMO.
         :param scenario: the scenario to be converted
@@ -1671,9 +1669,9 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
             return {obstacle_id: list(obstacles)
                     for obstacle_id, obstacles in groupby(sorted(obstacle_list,
                                                                  key=lambda
-                                                                     obstacle: obstacle.obstacle_type.value),
+                                                                 obstacle: obstacle.obstacle_type.value),
                                                           key=lambda
-                                                              obstacle: obstacle.obstacle_type)}
+                                                          obstacle: obstacle.obstacle_type)}
 
         num_all_obstacles = len(scenario.obstacles)
         grouped_obstacles = {ObstacleRole.STATIC: get_grouped_obstacles(scenario.static_obstacles),
@@ -1700,20 +1698,20 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
 
                 for att_name, setting in vehicle_params.items():
                     att_value = setting[veh_type]
-                    if type(att_value) is Interval:
+                    if isinstance(att_value, Interval):
                         att_value = str(0.5 * (att_value.start + att_value.end))
                     else:
                         att_value = str(att_value)
                     vType_node.setAttribute(att_name, att_value)
                 for att_name, att_value in driving_params.items():
-                    if type(att_value) is Interval:
+                    if isinstance(att_value, Interval):
                         att_value = 0.5 * (att_value.start + att_value.end)
                     vType_node.setAttribute(att_name, str("{0:.2f}".format(att_value)))
                 if veh_role == ObstacleRole.STATIC:
                     vType_node.setAttribute("maxSpeed", str(f"{sys.float_info.min}"))
 
-    def _generate_add_file(self, scenario_name: str,
-                           output_folder: str) -> str:
+    def _generate_add_file(self, scenario_name: Path,
+                           output_folder: Path) -> Path:
         """
         Generate additional file for sumo scenario to define attributes of different vehicle types.
 
@@ -1734,7 +1732,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
                 vType_node.setAttribute(att_name,
                                         str("{0:.2f}".format(att_value)))
 
-        add_file = os.path.join(output_folder, scenario_name + '.add.xml')
+        add_file = Path(output_folder, scenario_name + '.add.xml')
 
         # create file
         domTree = minidom.Document()
@@ -1758,7 +1756,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
                 vType_node.setAttribute("probability", str(probability))
                 for att_name, setting in veh_params.items():
                     att_value = setting[veh_type]
-                    if type(att_value) is Interval:
+                    if isinstance(att_value, Interval):
                         att_value = np.random.uniform(att_value.start,
                                                       att_value.end, 1)[0]
                         att_value = str("{0:.2f}".format(att_value))
@@ -1778,7 +1776,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
     def _create_rou_file_from_trajectories(
             self,
             scenario: Scenario,
-            out_folder: str,
+            out_folder: Path,
     ) -> Dict[str, str]:
         """
         Creates route files from CommonRoad scenario.
@@ -1965,7 +1963,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         }
 
         for route_type, route_file in route_files.items():
-            flatten = lambda l: [item for sublist in l for item in sublist]
+            def flatten(l): return [item for sublist in l for item in sublist]
             route_obstacles = flatten([obstacles
                                        for obstacle_type, obstacles in grouped_obstacles.items()
                                        if VEHICLE_NODE_TYPE_CR2SUMO[obstacle_type] == route_type])
@@ -2197,10 +2195,10 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
 
     def _generate_rou_file(
             self,
-            net_file: str,
-            scenario_name: str,
-            out_folder: str = None,
-    ) -> Dict[str, str]:
+            net_file: Path,
+            scenario_name: Path,
+            out_folder: Path = None,
+    ) -> Dict[str, Path]:
         """
         Creates route & trips files using randomTrips generator.
 
@@ -2236,16 +2234,16 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         # conf.departure_interval_vehicles.start) / n_vehicles_max)
 
         # filenames
-        route_files: Dict[str, str] = {
-            'vehicle': os.path.join(out_folder, scenario_name + ".vehicles.rou.xml"),
+        route_files: Dict[str, Path] = {
+            'vehicle': Path(out_folder, scenario_name + ".vehicles.rou.xml"),
         }
-        trip_files: Dict[str, str] = {
-            'vehicle': os.path.join(out_folder, scenario_name + '.vehicles.trips.xml'),
+        trip_files: Dict[str, Path] = {
+            'vehicle': Path(out_folder, scenario_name + '.vehicles.trips.xml'),
         }
 
         if self.conf.veh_distribution[ObstacleType.PEDESTRIAN] > 0:
-            route_files["pedestrian"] = os.path.join(out_folder, scenario_name + ".pedestrians.rou.xml")
-            trip_files["pedestrian"] = os.path.join(out_folder, scenario_name + '.pedestrian.trips.xml')
+            route_files["pedestrian"] = Path(out_folder, scenario_name + ".pedestrians.rou.xml")
+            trip_files["pedestrian"] = Path(out_folder, scenario_name + '.pedestrian.trips.xml')
 
         def run(cmd) -> bool:
             try:
@@ -2291,9 +2289,9 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         return route_files
 
     @staticmethod
-    def generate_cfg_file(scenario_name: str, net_file: str,
+    def generate_cfg_file(scenario_name: Path, net_file: Path,
                           route_files: Dict[str, str],
-                          output_folder: str) -> str:
+                          output_folder: Path) -> Path:
         """
         Generates the configuration file according to the scenario name to the specified output folder.
 
@@ -2305,10 +2303,10 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
         :return: the path of the generated cfg file.
         """
 
-        sumo_cfg_file = os.path.join(output_folder,
+        sumo_cfg_file = Path(output_folder,
                                      scenario_name + '.sumo.cfg')
         tree = ET.parse(
-            os.path.join(os.path.dirname(__file__), DEFAULT_CFG_FILE))
+            Path(os.path.dirname(__file__), DEFAULT_CFG_FILE))
 
         updated_fields = {
             '*/net-file': os.path.basename(net_file),
@@ -2378,7 +2376,7 @@ class CR2SumoMapConverter(AbstractScenarioWrapper):
             """
             pos = \
                 self.lanelet_network.find_lanelet_by_id(
-                        list(inter.incomings[0].incoming_lanelets)[0]).center_vertices[-1].flatten()
+                    list(inter.incomings[0].incoming_lanelets)[0]).center_vertices[-1].flatten()
             plt.text(x=pos[0], y=pos[1], s=s, zorder=1e4)
         labels = nx.get_edge_attributes(G, "label")
         n = nx.draw_networkx_edge_labels(G, pos=graph_nodes_pos, edge_labels=labels)

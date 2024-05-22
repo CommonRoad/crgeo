@@ -15,3 +15,16 @@ class ReachedGoalCriterion(BaseTerminationCriterion):
     @property
     def reasons(self) -> Set[str]:
         return {'ReachedGoal'}
+
+
+class OvershotGoalCriterion(BaseTerminationCriterion):
+    def __call__(
+        self,
+        simulation: EgoVehicleSimulation
+    ) -> Tuple[bool, Optional[str]]:
+        overshot_goal = simulation.check_if_overshot_goal()
+        return overshot_goal, 'OvershotGoal' if overshot_goal else None
+
+    @property
+    def reasons(self) -> Set[str]:
+        return {'OvershotGoal'}

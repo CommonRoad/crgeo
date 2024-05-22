@@ -12,6 +12,7 @@ if sumocr.sumo_installed:
 
 import numpy as np
 import warnings
+from pathlib import Path
 
 from commonroad_geometric.external.sumocr.sumo_config import EGO_ID_START
 from commonroad_geometric.external.sumocr.sumo_config import DefaultConfig
@@ -25,11 +26,11 @@ __email__ = "commonroad-i06@in.tum.de"
 __status__ = "Released"
 
 ##
-## DEPRECATED USE CONVERSION IN commonroad-map-tool
+# DEPRECATED USE CONVERSION IN commonroad-map-tool
 ##
 
 
-def find_ego_ids_by_departure_time(rou_file: str, n_ego_vehicles: int, departure_time_ego: int, ego_ids: list) -> list:
+def find_ego_ids_by_departure_time(rou_file: Path, n_ego_vehicles: int, departure_time_ego: int, ego_ids: list) -> list:
     """
     Returns ids of vehicles from route file which match desired departure time as close as possible.
 
@@ -47,7 +48,7 @@ def find_ego_ids_by_departure_time(rou_file: str, n_ego_vehicles: int, departure
         dep_times.append(int(float(veh[1])))
 
     if n_ego_vehicles > len(veh_ids):
-        warnings.warn('only {} vehicles in route file instead of {}'.format(len(veh_ids), n_ego_vehicles),stacklevel=1)
+        warnings.warn('only {} vehicles in route file instead of {}'.format(len(veh_ids), n_ego_vehicles), stacklevel=1)
         n_ego_vehicles = len(veh_ids)
 
     # check if specified ids exist
@@ -73,29 +74,27 @@ def find_ego_ids_by_departure_time(rou_file: str, n_ego_vehicles: int, departure
     return ego_ids
 
 
-def get_scenario_name_from_crfile(filepath:str) -> str:
+def get_scenario_name_from_crfile(filepath: Path) -> str:
     """
     Returns the scenario name specified in the cr file.
 
     :param filepath: the path of the cr file
 
     """
-    scenario_name:str = (os.path.splitext(os.path.basename(filepath))[0]).split('.')[0]
-    return scenario_name
+    return filepath.stem
 
 
-def get_scenario_name_from_netfile(filepath:str) -> str:
+def get_scenario_name_from_netfile(filepath: Path) -> str:
     """
     Returns the scenario name specified in the net file.
 
     :param filepath: the path of the net file
 
     """
-    scenario_name:str = (os.path.splitext(os.path.basename(filepath))[0]).split('.')[0]
-    return scenario_name
+    return filepath.stem
 
 
-def get_boundary_from_netfile(filepath:str) -> list:
+def get_boundary_from_netfile(filepath: Path) -> list:
     """
     Get the boundary of the netfile.
     :param filepath:
@@ -110,7 +109,7 @@ def get_boundary_from_netfile(filepath:str) -> list:
     return boundary
 
 
-def get_total_lane_length_from_netfile(filepath:str) -> float:
+def get_total_lane_length_from_netfile(filepath: Path) -> float:
     """
     Compute the total length of all lanes in the net file.
     :param filepath:
@@ -124,7 +123,7 @@ def get_total_lane_length_from_netfile(filepath:str) -> float:
     return total_lane_length
 
 
-def generate_rou_file(net_file:str, out_folder:str=None, conf:DefaultConfig=DefaultConfig()) -> str:
+def generate_rou_file(net_file: Path, out_folder: Path = None, conf: DefaultConfig = DefaultConfig()) -> str:
     """
     Creates route & trips files using randomTrips generator.
 
@@ -135,7 +134,7 @@ def generate_rou_file(net_file:str, out_folder:str=None, conf:DefaultConfig=Defa
     :return: path of route file
     """
     if out_folder is None:
-        out_folder = os.path.dirname(net_file)
+        out_folder = net_file.parent
 
     total_lane_length = get_total_lane_length_from_netfile(net_file)
     if total_lane_length is not None:
@@ -151,13 +150,13 @@ def generate_rou_file(net_file:str, out_folder:str=None, conf:DefaultConfig=Defa
         period = 0.5
         # print('SUMO traffic generation: neither total_lane_length nor veh_per_second is defined. '
         #       'For each second there are two vehicles generated.')
-    #step_per_departure = ((conf.departure_interval_vehicles.end - conf.departure_interval_vehicles.start) / n_vehicles_max)
+    # step_per_departure = ((conf.departure_interval_vehicles.end - conf.departure_interval_vehicles.start) / n_vehicles_max)
 
     # filenames
     scenario_name = get_scenario_name_from_netfile(net_file)
-    rou_file = os.path.join(out_folder, scenario_name + '.rou.xml')
-    trip_file = os.path.join(out_folder, scenario_name + '.trips.xml')
-    add_file = os.path.join(out_folder, scenario_name + '.add.xml')
+    rou_file = out_folder.joinpath(scenario_name + '.rou.xml')
+    trip_file = out_folder.joinpath(scenario_name + '.trips.xml')
+    add_file = out_folder.joinpath(scenario_name + '.add.xml')
 
     # create route file
     cmd = ['python', os.path.join(os.path.expanduser(os.environ['SUMO_HOME']), 'tools/randomTrips.py'),
@@ -180,14 +179,14 @@ def generate_rou_file(net_file:str, out_folder:str=None, conf:DefaultConfig=Defa
         raise RuntimeError("Command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
 
     if conf.n_ego_vehicles != 0:
-        #get ego ids and add EGO_ID_START prefix
+        # get ego ids and add EGO_ID_START prefix
         ego_ids = find_ego_ids_by_departure_time(rou_file, conf.n_ego_vehicles, conf.departure_time_ego, conf.ego_ids)
         write_ego_ids_to_rou_file(rou_file, ego_ids)
 
     return rou_file
 
 
-def add_params_in_rou_file(rou_file:str, driving_params:dict=DefaultConfig.driving_params) -> None:
+def add_params_in_rou_file(rou_file: Path, driving_params: dict = DefaultConfig.driving_params) -> None:
     """
     Add parameters for the vType setting in the route file generated by SUMO. Parameters are sampled from uniform distribution.
     :param rou_file: the route file to be modified
@@ -204,7 +203,7 @@ def add_params_in_rou_file(rou_file:str, driving_params:dict=DefaultConfig.drivi
     tree.write(rou_file)
 
 
-def write_ego_ids_to_rou_file(rou_file:str, ego_ids:List[int]) -> None:
+def write_ego_ids_to_rou_file(rou_file: Path, ego_ids: List[int]) -> None:
     """
     Writes ids of ego vehicles to the route file.
 

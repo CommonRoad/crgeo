@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
-
 import numpy as np
 
-if TYPE_CHECKING:
-    from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer
+from commonroad_geometric.rendering.viewer.pyglet.gl_viewer_2d import GLViewer2D
 
 
 class UserQuitInterrupt(KeyboardInterrupt):
@@ -20,12 +17,12 @@ class UserAdvanceScenarioInterrupt(KeyboardInterrupt):
     pass
 
 
-def get_keyboard_action(renderer: Optional[TrafficSceneRenderer]) -> np.ndarray:
+def get_keyboard_action(gl_viewer: GLViewer2D) -> np.ndarray:
     from pyglet.window import key
 
-    if renderer is None:
+    if gl_viewer is None:
         return np.array([0.0, 0.0], dtype=np.float64)
-    keys = renderer.keys
+    keys = gl_viewer.keys
 
     if keys[key.R]:
         raise UserResetInterrupt()
@@ -47,5 +44,5 @@ def get_keyboard_action(renderer: Optional[TrafficSceneRenderer]) -> np.ndarray:
     else:
         lateral_action = 0.0
 
-    action = 1000*np.array([lateral_action, longitudinal_action], dtype=np.float64)
+    action = np.array([lateral_action, longitudinal_action], dtype=np.float64)
     return action

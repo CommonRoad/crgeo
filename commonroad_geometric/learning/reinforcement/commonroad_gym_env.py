@@ -2,37 +2,48 @@ import logging
 import os
 import timeit
 from dataclasses import dataclass
-from typing import Dict, Generic, List, Literal, Optional, Sequence, Set, Tuple, TypedDict, Union
+from pathlib import Path
+from typing import Any, Dict, Generic, List, Literal, Optional, Sequence, Set, Tuple, TypedDict, Union, Iterator
 
-import gym
-import gym.spaces
+import gymnasium
 import numpy as np
-
+from pathlib import Path
 from commonroad_geometric.common.logging import DeferredLogMessage
 from commonroad_geometric.common.utils.seeding import get_random_seed, set_global_seed
 from commonroad_geometric.common.utils.string import numpy_prettify
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
-from commonroad_geometric.dataset.iteration.scenario_iterator import ScenarioIterator
-from commonroad_geometric.dataset.preprocessing.base_scenario_filterer import BaseScenarioFilterer
-from commonroad_geometric.dataset.preprocessing.base_scenario_preprocessor import T_ScenarioPreprocessorsInput
+from commonroad_geometric.dataset.scenario.iteration.scenario_iterator import ScenarioIterator
+from commonroad_geometric.dataset.scenario.preprocessing.base_scenario_preprocessor import BaseScenarioPreprocessor
 from commonroad_geometric.learning.reinforcement._episode_resetter import _EpisodeResetter
-from commonroad_geometric.learning.reinforcement.observer.base_observer import BaseObserver
-from commonroad_geometric.learning.reinforcement.observer.flattened_graph_observer import FlattenedGraphObserver
+from commonroad_geometric.learning.reinforcement.observer.base_observer import BaseObserver, T_Observation
+from commonroad_geometric.learning.reinforcement.observer.implementations.flattened_graph_observer import FlattenedGraphObserver
 from commonroad_geometric.learning.reinforcement.rewarder.reward_aggregator.base_reward_aggregator import BaseRewardAggregator
 from commonroad_geometric.learning.reinforcement.termination_criteria import TERMINATION_CRITERIA_SCENARIO_FINISHED
 from commonroad_geometric.learning.reinforcement.termination_criteria.base_termination_criterion import BaseTerminationCriterion
-from commonroad_geometric.rendering.defaults import DEFAULT_FPS
-from commonroad_geometric.rendering.traffic_scene_renderer import T_Frame, TrafficSceneRenderer, TrafficSceneRendererOptions
+from commonroad_geometric.rendering.traffic_scene_renderer import DEFAULT_FPS, T_Frame, TrafficSceneRenderer, TrafficSceneRendererOptions
 from commonroad_geometric.rendering.types import RenderParams, SkipRenderInterrupt
-from commonroad_geometric.simulation.base_simulation import T_BaseSimulationOptions
+from commonroad_geometric.dataset.scenario.iteration.scenario_bundle import ScenarioBundle
+from commonroad_geometric.simulation.base_simulation import T_SimulationOptions
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation_factory import EgoVehicleSimulationFactory
 from commonroad_geometric.simulation.exceptions import SimulationRuntimeError
 
+import warnings
+
+# Filter out the specific warning by message
+warnings.filterwarnings(
+    action='ignore',
+    category=UserWarning,
+    module=r'gymnasium',
+)
+
+# Set global NumPy printing options
+np.set_printoptions(precision=3, suppress=True)
+
 logger = logging.getLogger(__name__)
 
-
 DEFAULT_OBSERVER_CLS = FlattenedGraphObserver
+T_InfoDict = dict[str, Any]
 
 
 @dataclass
@@ -45,24 +56,23 @@ class RLEnvironmentOptions:
         data_padding_size (int): Padding used when converting Pytorch Geometric data instances to fixed-size tensors. Defaults to 1000.
     """
     always_advance: bool = False
-    async_reset_delay: float = 0.05 # TODO: This should be automatically tuned based on mean ep. durations for better performance
-    async_resets: bool = True
+    async_reset_delay: float = 0.05  # TODO: This should be automatically tuned based on mean ep. durations for better performance
+    async_resets: bool = False
     auto_update_async_reset_delay: bool = True
     log_step_info: bool = False
     loop_scenarios: bool = True
     num_respawns_per_scenario: int = 0
     observer: Optional[BaseObserver] = None
     raise_exceptions: bool = False
-    render_debug_overlays: bool = False # TODO: move render stuff to somewhere else
-    render_on_step: bool = False # TODO: Add "render_condition", lambda method for enabling & disabling
+    render_debug_overlays: bool = False  # TODO: move render stuff to somewhere else
+    render_on_step: bool = False  # TODO: Add "render_condition", lambda method for enabling & disabling
     renderer_options: Union[None, TrafficSceneRendererOptions, Sequence[TrafficSceneRendererOptions]] = None
-    scenario_prefilters: Optional[Sequence[BaseScenarioFilterer]] = None
-    scenario_preprocessors: Optional[T_ScenarioPreprocessorsInput] = None
+    preprocessor: Optional[BaseScenarioPreprocessor] = None
 
 
 @dataclass
 class RLEnvironmentParams:
-    scenario_dir: str
+    scenario_dir: Path
     ego_vehicle_simulation_factory: EgoVehicleSimulationFactory
     rewarder: BaseRewardAggregator
     termination_criteria: List[BaseTerminationCriterion]
@@ -93,32 +103,34 @@ class CommonRoadGymStepInfo(TypedDict):
     lowest_reward: float
 
 
-class CommonRoadGymEnv(gym.Env, Generic[T_BaseSimulationOptions]):
+class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
     """
     Gym environment for training RL agents.
     See https://github.com/openai/gym for reference.
     """
 
     metadata = {
-        'render.modes': ['human', 'rgb_array'],
-        'video.frames_per_second': DEFAULT_FPS
+        # 'render_modes': ['human', 'rgb_array'],
+        # 'video.frames_per_second': DEFAULT_FPS
     }
 
-    def __init__(self, params: RLEnvironmentParams):
+    def __init__(self, params: RLEnvironmentParams, render_mode: str = 'rgb_array'):
         """Initializes gym environment"""
+        self.render_mode = render_mode
         self._scenario_iterator = ScenarioIterator(
-            directory=params.scenario_dir,
-            loop=params.options.loop_scenarios,
-            preprocessors=params.options.scenario_preprocessors,
-            prefilters=params.options.scenario_prefilters
+            directory=Path(params.scenario_dir),
+            is_looping=params.options.loop_scenarios,
+            preprocessor=params.options.preprocessor,
         )
+        self._scenario_iterable = iter(self._scenario_iterator)
         self._ego_vehicle_simulation_factory = params.ego_vehicle_simulation_factory
         self._rewarder = params.rewarder
         self._termination_criteria = params.termination_criteria
         self._options = params.options
 
-        self._termination_reasons: Set[str] = set.union(*(criterion.reasons for criterion in self._termination_criteria))
-        self._observation_space: Optional[gym.spaces.Dict] = None
+        self._termination_reasons: Set[str] = set.union(
+            *(criterion.reasons for criterion in self._termination_criteria))
+        self._observation_space: Optional[gymnasium.spaces.Dict] = None
         self._ego_vehicle_simulation: Optional[EgoVehicleSimulation] = None
 
         self._current_action: Optional[np.ndarray] = None
@@ -137,8 +149,9 @@ class CommonRoadGymEnv(gym.Env, Generic[T_BaseSimulationOptions]):
             auto_update_delay=self._options.auto_update_async_reset_delay
         )
         self._observer = self._options.observer if self._options.observer is not None else DEFAULT_OBSERVER_CLS()
-
-        self.seed()
+        # With removal of seed method from Env API, the seed is now passed to reset
+        # Need to keep track of last seed to prevent reshuffling the ScenarioIterator on every reset
+        self._last_seed = None
 
         while True:
             try:
@@ -151,13 +164,13 @@ class CommonRoadGymEnv(gym.Env, Generic[T_BaseSimulationOptions]):
                 logger.error(e, exc_info=True)
 
     @property
-    def action_space(self) -> gym.Space:
+    def action_space(self) -> gymnasium.Space:
         if self._ego_vehicle_simulation is None:
             raise AttributeError("self._ego_vehicle_simulation is None")
         return self._ego_vehicle_simulation.control_space.gym_action_space
 
     @property
-    def observation_space(self) -> gym.spaces.Dict:
+    def observation_space(self) -> gymnasium.Space:
         if self._observation_space is None:
             raise AttributeError("self._observation_space is None")
         return self._observation_space
@@ -195,6 +208,10 @@ class CommonRoadGymEnv(gym.Env, Generic[T_BaseSimulationOptions]):
         return self._termination_reasons
 
     @property
+    def scenario_iterable(self) -> Iterator[ScenarioBundle]:
+        return self._scenario_iterable
+
+    @property
     def scenario_iterator(self) -> ScenarioIterator:
         return self._scenario_iterator
 
@@ -205,9 +222,9 @@ class CommonRoadGymEnv(gym.Env, Generic[T_BaseSimulationOptions]):
     def step(
         self,
         action: np.ndarray,
-    ) -> Tuple[Union[Dict[str, np.ndarray], np.ndarray], float, bool, CommonRoadGymStepInfo]:
+    ) -> Tuple[T_Observation, float, bool, bool, CommonRoadGymStepInfo]:
         start_time = timeit.default_timer()
-
+        truncated: bool = False
         done: bool = False
         termination_reason = None
 
@@ -227,7 +244,8 @@ class CommonRoadGymEnv(gym.Env, Generic[T_BaseSimulationOptions]):
                 self._rewarder.on_substep(
                     action=action,
                     simulation=self.ego_vehicle_simulation,
-                    data=data
+                    data=data,
+                    observation=obs
                 )
 
                 # Evaluating termination criteria
@@ -298,10 +316,10 @@ class CommonRoadGymEnv(gym.Env, Generic[T_BaseSimulationOptions]):
 
         if done:
             logger.info(
-f"""Episode {self._episode_counter} done(
-    reason={termination_reason}, 
-    tot_reward={self._rewarder.cumulative_reward:.3f}, 
-    ep_length={self.step_counter}, 
+                f"""Episode {self._episode_counter} done(
+    reason={termination_reason},
+    tot_reward={self._rewarder.cumulative_reward:.3f},
+    ep_length={self.step_counter},
     scenario={self.ego_vehicle_simulation.current_scenario.scenario_id},
     tot_steps={self.total_step_counter},
     process={os.getpid()}
@@ -309,32 +327,52 @@ f"""Episode {self._episode_counter} done(
             )
         elif self._options.log_step_info:
             logger.debug(DeferredLogMessage(
-                lambda _: f"{self.current_scenario_id} step: t={self._step_counter}, a={numpy_prettify(action, 2)}, r={self._rewarder.avg_reward_step:+.3f}, dt={elapsed:.3f}, nxtrdy={self._resetter.ready}")
+                lambda
+                    _: f"{self.current_scenario_id} step: t={self._step_counter}, a={numpy_prettify(action, 2)}, r={self._rewarder.avg_reward_step:+.3f}, dt={elapsed:.3f}, nxtrdy={self._resetter.ready}")
             )
 
         self._step_counter += 1
         self._total_step_counter += 1
 
         if obs is None:
-            logger.warn("obs is None, this should never happen. using last obs as fallback") 
+            logger.warn("obs is None, this should never happen. using last obs as fallback")
             obs = self._last_obs
         else:
             self._last_obs = obs
-        
+
         assert obs is not None
+
+        if isinstance(obs, dict):
+            for key, value in obs.items():
+                if np.isnan(value).any():
+                    # logger.warn(f"NaN values found in array under key '{key}'. These will be replaced with zero.")
+                    value[np.isnan(value)] = 0.0
+        else:
+            obs[np.isnan(obs)] = 0.0
 
         if error:
             self._force_advance_next = True
+        terminated = done
+        # TODO: Which reward to return for multi-substep actions?
+        return obs, self._rewarder.avg_reward_step, terminated, truncated, info
 
-        return obs, self._rewarder.avg_reward_step, done, info # TODO: Which reward to return for multi-substep actions?
-
-    def reset(self) -> Union[Dict[str, np.ndarray], np.ndarray]:
+    def reset(
+        self,
+        seed: Optional[int] = None,
+        options: Optional[dict[str, Any]] = None  # Unused, mainly here to adhere to the Env interface
+    ) -> tuple[T_Observation, T_InfoDict]:
+        if self._last_seed is None:
+            self._last_seed = seed or get_random_seed()
+            set_global_seed(self._last_seed)
+            # self._scenario_iterator.shuffle(seed=self._last_seed)
+            # self._scenario_iterable = iter(self._scenario_iterator)
+            logger.debug(f"Set environment seed: {self._last_seed}")
         self._last_obs = None
         if self._episode_counter > 0:
             advance_scenario = all((
                 self._options.num_respawns_per_scenario >= 0,
                 self.ego_vehicle_simulation.reset_count >= self._options.num_respawns_per_scenario,
-                len(self._scenario_iterator) > 1
+                self._scenario_iterator.max_result_scenarios > 1
             )) or self._force_advance_next or self._options.always_advance
             self._force_advance_next = False
             logger.debug(f"Resetting gym environment with advance_scenario={advance_scenario}")
@@ -351,11 +389,12 @@ f"""Episode {self._episode_counter} done(
                 raise e
             logger.error(e, exc_info=True)
             self._force_advance_next = True
-            return self.reset() # TODO
+            return self.reset()  # TODO
         self._episode_counter += 1
-        return obs
+        info = {}
+        return obs, info
 
-    def respawn(self) -> Union[Dict[str, np.ndarray], np.ndarray]:
+    def respawn(self) -> T_Observation:
         self._last_obs = None
         self.ego_vehicle_simulation.reset()
         self._rewarder.reset()
@@ -365,7 +404,8 @@ f"""Episode {self._episode_counter} done(
 
     def render(
         self,
-        mode: Literal['human', 'rgb_array'] = 'human',
+        mode: Literal['human', 'rgb_array'] = 'rgb_array',
+        **render_kwargs: Any
     ) -> T_Frame:
         extra_overlays = self._queued_overlays
         self._queued_overlays = None
@@ -389,7 +429,7 @@ f"""Episode {self._episode_counter} done(
                 'Ego Lanelet': self.ego_vehicle_simulation.current_lanelet_ids
             }
             for reward_name, reward_component in self._rewarder.reward_component_info_step.items():
-                reward_fraction = reward_component/self._rewarder.highest_abs if self._rewarder.highest_abs > 0 else np.nan
+                reward_fraction = reward_component / self._rewarder.highest_abs if self._rewarder.highest_abs > 0 else np.nan
                 overlays[reward_name] = f"{reward_component:.3f} ({reward_fraction:.1%})"
             # cached_data = self.ego_vehicle_simulation.extract_data(use_cached=True)
             # for key in cached_data.ego.feature_columns:
@@ -403,20 +443,22 @@ f"""Episode {self._episode_counter} done(
 
         return_frame: T_Frame = None
         try:
-            for renderer in self.renderers:
+            for renderer in self.unwrapped.renderers:
                 frame = self.ego_vehicle_simulation.render(
-                    renderers=renderer,
+                    renderers=[renderer],
                     render_params=RenderParams(
                         render_kwargs=dict(
-                            overlays=overlays
+                            overlays=overlays,
+                            **render_kwargs
                         )
                     ),
-                    return_rgb_array=mode == 'rgb_array'
+                    return_frames=mode == 'rgb_array',
                 )
                 if return_frame is None:
-                    return_frame = frame
+                    return_frame = frame[0]
         except SkipRenderInterrupt:
             logger.info(f".render received SkipRenderInterrupt, skipping rendering.")
+
         return return_frame
 
     @property
@@ -441,26 +483,51 @@ f"""Episode {self._episode_counter} done(
         if self._ego_vehicle_simulation is not None:
             self._ego_vehicle_simulation.close()
 
-    def observe(self) -> Tuple[Union[Dict[str, np.ndarray], np.ndarray], CommonRoadData]:
+    def observe(self) -> Tuple[T_Observation, CommonRoadData]:
         data = self.ego_vehicle_simulation.extract_data()
 
         if data.v.is_ego_mask.sum().item() != 1:
             if self._last_obs is not None:
-                logger.warn(f"Observe call encountered data instance with {data.v.is_ego_mask.sum().item()} ego vehicles. Using last observation as fallback (TODO)") # TODO
+                logger.warning(
+                    f"Observe call encountered data instance with {data.v.is_ego_mask.sum().item()} ego vehicles. Using last observation as fallback (TODO)")  # TODO
                 return self._last_obs, data
             else:
-                raise SimulationRuntimeError(f"Observe call encountered data instance with {data.v.is_ego_mask.sum().item()} ego vehicles")
+                raise SimulationRuntimeError(
+                    f"Observe call encountered data instance with {data.v.is_ego_mask.sum().item()} ego vehicles")
 
         obs = self._observer.observe(
             data=data,
             ego_vehicle_simulation=self.ego_vehicle_simulation
         )
+        self._verify_observation_dimensions(obs)
         return obs, data
+    
+    def _verify_observation_dimensions(self, obs):
+        if isinstance(self.observation_space, gymnasium.spaces.Box):
+            # Get the expected shape from observation_space
+            expected_shape = self.observation_space.shape
+            # Check if the shape of the observation matches the expected shape
+            if obs.shape != expected_shape:
+                raise ValueError(f"Dimension mismatch for {key}: expected {expected_shape}, got {value.shape}")
+        elif isinstance(self.observation_space, gymnasium.spaces.Dict):
+            observation_space = dict(self.observation_space)
+            # Iterate through the keys and values in the obs dictionary
+            for key, value in obs.items():
+                # Check if the key from obs is in the observation_space
+                if key in observation_space:
+                    # Get the expected shape from observation_space
+                    expected_shape = self.observation_space[key].shape
+                    # Check if the shape of the observation matches the expected shape
+                    if value.shape != expected_shape:
+                        raise ValueError(f"Dimension mismatch for {key}: expected {expected_shape}, got {value.shape}")
+                else:
+                    # If the key is not found in observation_space, raise an error
+                    raise KeyError(f"{key} is not a valid observation type.")
+
 
     def seed(self, seed: Optional[int] = None) -> List[int]:
         seed = seed or get_random_seed()
         set_global_seed(seed)
-        self._scenario_iterator.shuffle(seed=seed)
         logger.debug(f"Set environment seed: {seed}")
         return [seed]
 

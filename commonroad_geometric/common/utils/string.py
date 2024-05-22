@@ -33,8 +33,8 @@ def lstrip_n(s: str, n: int, sub: str = ' ') -> str:
         else:
             return tmp
     return tmp
-    
-    
+
+
 def numpy_prettify(x: Any, precision: int = 3) -> str:
     # TODO: Make less hacky
     precision_fmt = '{:.' + str(precision) + 'f}'
@@ -71,7 +71,7 @@ def get_indent(astr: str) -> int:
 
     try:
         iter(astr)
-    except:
+    except BaseException:
         raise
 
     # OR for not raising exceptions at all

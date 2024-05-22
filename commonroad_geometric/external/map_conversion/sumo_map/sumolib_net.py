@@ -10,7 +10,7 @@ from enum import Enum, unique
 from typing import List, Dict, Tuple, Optional, Callable, TypeVar, Iterable, Union, Set
 from xml.etree import cElementTree as ET
 import os
-
+from pathlib import Path
 import numpy as np
 import sumolib
 import sumolib.files
@@ -81,16 +81,16 @@ def _get_default(d: Dict[_K, _V], key: _K, default: Optional[_VV] = None, map: C
         return None
 
 
-def sumo_net_from_xml(file: str) -> Net:
+def sumo_net_from_xml(file: Path) -> Net:
     """
     Given a SUMO .net.xml file this function returns the parsed
     representation of it.
     :param file: Path to .net.xml file
     :return: parsed Net
     """
-    if not os.path.isfile(file):
+    if not file.is_file():
         raise RuntimeError(f"Invalid file path: {file}")
-    if not file.endswith(".net.xml"):
+    if not file.name.endswith(".net.xml"):
         raise RuntimeError(f"Invalid file type {file}, required *.net.xml")
 
     root = ET.parse(file).getroot()
@@ -381,9 +381,9 @@ class Node:
 
     def __eq__(self, other):
         return self.id == other.id \
-               and self.type == other.type \
-               and self.tl == other.tl \
-               and self.right_of_way == other.right_of_way
+            and self.type == other.type \
+            and self.tl == other.tl \
+            and self.right_of_way == other.right_of_way
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -665,13 +665,13 @@ class Edge:
         return hash((self.id, self.from_node.id, self.to_node.id, self.type_id, *self._lanes))
 
     def __eq__(self, other: 'Edge'):
-        return type(self) == type(other) \
-               and self.id == other.id \
-               and self.from_node == other.from_node \
-               and self.to_node == other.to_node \
-               and self.type_id == other.type_id \
-               and len(self._lanes) == len(other._lanes) \
-               and all(x == y for x, y in zip(self._lanes, other._lanes))
+        return isinstance(self, type(other)) \
+            and self.id == other.id \
+            and self.from_node == other.from_node \
+            and self.to_node == other.to_node \
+            and self.type_id == other.type_id \
+            and len(self._lanes) == len(other._lanes) \
+            and all(x == y for x, y in zip(self._lanes, other._lanes))
 
     def __ne__(self, other: 'Edge'):
         return not self.__eq__(other)
@@ -870,19 +870,19 @@ class Lane:
         return hash((self.edge.id, self.index))
 
     def __eq__(self, other: 'Lane'):
-        return type(self) == type(other) \
-               and self.edge.id == other.edge.id \
-               and self.speed == other.speed \
-               and self.length == other.length \
-               and self.width == other.width \
-               and self._shapeWithJunctions == other._shapeWithJunctions \
-               and self._shapeWithJunctions3D == other._shapeWithJunctions3D \
-               and len(self.outgoing) == len(other.outgoing) \
-               and all(x == y for x, y in zip(self.outgoing, other.outgoing)) \
-               and len(self.allow) == len(other.allow) \
-               and all(x == y for x, y in zip(self.allow, other.allow)) \
-               and len(self.disallow) == len(other.disallow) \
-               and all(x == y for x, y in zip(self.disallow, other.disallow))
+        return isinstance(self, type(other)) \
+            and self.edge.id == other.edge.id \
+            and self.speed == other.speed \
+            and self.length == other.length \
+            and self.width == other.width \
+            and self._shapeWithJunctions == other._shapeWithJunctions \
+            and self._shapeWithJunctions3D == other._shapeWithJunctions3D \
+            and len(self.outgoing) == len(other.outgoing) \
+            and all(x == y for x, y in zip(self.outgoing, other.outgoing)) \
+            and len(self.allow) == len(other.allow) \
+            and all(x == y for x, y in zip(self.allow, other.allow)) \
+            and len(self.disallow) == len(other.disallow) \
+            and all(x == y for x, y in zip(self.disallow, other.disallow))
 
     def __ne__(self, other: 'Lane'):
         return not self.__eq__(other)
@@ -1148,11 +1148,11 @@ class Connection:
                      self._tl_link, self._state, len(self._via) if self._via else 0, self._keep_clear, self._cont_pos))
 
     def __eq__(self, other: 'Connection'):
-        return type(self) == type(other) and self._from == other._from and self._to == other._to \
-               and self._direction == other._direction and self._tls == other._tls and self._tl_link == other._tl_link \
-               and self._state == other._state and len(self._via) == len(other._via) \
-               and all(x == y for x, y in zip(self._via, other._via)) \
-               and self._keep_clear == other._keep_clear and self._cont_pos == other._cont_pos
+        return isinstance(self, type(other)) and self._from == other._from and self._to == other._to \
+            and self._direction == other._direction and self._tls == other._tls and self._tl_link == other._tl_link \
+            and self._state == other._state and len(self._via) == len(other._via) \
+            and all(x == y for x, y in zip(self._via, other._via)) \
+            and self._keep_clear == other._keep_clear and self._cont_pos == other._cont_pos
 
     def __ne__(self, other: 'Connection'):
         return not self.__eq__(other)

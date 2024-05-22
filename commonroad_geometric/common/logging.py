@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Optional, Sequence, Union
 
 
@@ -28,8 +29,25 @@ class DeferredLogMessage(object):
         return str(self.lambda_msg(None))
 
 
+class BraceMessage:
+    r"""
+    Used to enable logging with f-string syntax. e.g. with {var}.
+
+    References:
+        https://docs.python.org/3/howto/logging-cookbook.html#formatting-styles
+    """
+
+    def __init__(self, fmt, /, *args, **kwargs):
+        self.fmt = fmt
+        self.args = args
+        self.kwargs = kwargs
+
+    def __str__(self):
+        return self.fmt.format(*self.args, **self.kwargs)
+
+
 def setup_logging(
-    filename: Optional[str] = None,
+    filename: Optional[Path] = None,
     level: Union[int, str] = logging.INFO,
     fmt: Union[LoggingFormat, str] = LoggingFormat.NO_FILENAME,
     mute_annoying_dependencies: bool = True
@@ -70,7 +88,7 @@ def stdout(s: Optional[Union[str, Sequence[str]]] = None) -> None:
     sys.stdout.flush()
 
 
-def set_terminal_title(title: str, prefix_path: bool = True) -> None:
+def set_terminal_title(title: Path, prefix_path: bool = True) -> None:
     if prefix_path:
         title = f"{sys.argv[0]} ({title})"
     title = f"{os.getlogin()}: {title}"

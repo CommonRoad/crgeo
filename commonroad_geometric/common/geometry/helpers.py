@@ -28,8 +28,10 @@ def make_valid_orientation(angle: float) -> float:
     assert -np.pi <= angle <= np.pi
     return angle
 
+
 def princip(angle: float) -> float:
-    return ((angle + np.pi) % (2*np.pi)) - np.pi
+    return ((angle + np.pi) % (2 * np.pi)) - np.pi
+
 
 def chaikins_corner_cutting(coords: np.ndarray, refinements=1):
     coords = np.array(coords)
@@ -49,8 +51,8 @@ def chaikins_corner_cutting(coords: np.ndarray, refinements=1):
 def rotate_2d_matrix(rotation: float, dtype=float) -> np.ndarray:
     cos, sin = math.cos(rotation), math.sin(rotation)
     return np.array([
-        [ cos, -sin ],
-        [ sin, cos ],
+        [cos, -sin],
+        [sin, cos],
     ], dtype=dtype)
 
 
@@ -72,22 +74,22 @@ def translate_rotate_2d(x: np.ndarray, t: np.ndarray, r: float) -> np.ndarray:
 
 def scale_2d(scale: float, dtype=float) -> np.ndarray:
     return np.array([
-        [ scale, 0 ],
-        [ 0, scale ],
+        [scale, 0],
+        [0, scale],
     ], dtype=dtype)
 
 
 def affine_2d_homogeneous(rotation: float = 0.0, scale: float = 1.0, translation: Optional[np.ndarray] = None,
                           dtype=float) -> np.ndarray:
     if translation is None:
-        translation = np.array([ 0, 0 ], dtype=dtype)
+        translation = np.array([0, 0], dtype=dtype)
     cos, sin = np.cos(rotation), np.sin(rotation)
     return np.array([
-        [ scale * cos, scale * -sin, translation[0] ],
-        [ scale * sin, scale * cos, translation[1] ],
-        [ 0, 0, 1 ],
+        [scale * cos, scale * -sin, translation[0]],
+        [scale * sin, scale * cos, translation[1]],
+        [0, 0, 1],
     ], dtype=dtype)
-    
+
 
 def polyline_length(line: np.ndarray) -> np.ndarray:
     """Compute the Euclidean length of one or more polylines."""
@@ -120,7 +122,7 @@ def _cut_polyline(line: np.ndarray, distance: Union[List[float], np.ndarray]) \
 
         if cumulative_dist[i] == distance[0]:
             # Next cutting point is exactly at the next point on the line
-            segments.append(coords[:i+2].copy())
+            segments.append(coords[:i + 2].copy())
             cutting_points.append((i + 1, 0.0))
             dist_along_line = cumulative_dist[i]
             i += 1
@@ -130,7 +132,7 @@ def _cut_polyline(line: np.ndarray, distance: Union[List[float], np.ndarray]) \
             alpha = (distance[0] - dist_along_line) / (cumulative_dist[i] - dist_along_line)
             cut_point = (1 - alpha) * coords[i] + alpha * coords[i + 1]
             segment = np.vstack([
-                coords[:i+1],
+                coords[:i + 1],
                 cut_point,
             ])
             segments.append(segment)
@@ -142,12 +144,12 @@ def _cut_polyline(line: np.ndarray, distance: Union[List[float], np.ndarray]) \
         coords = coords[i:]
         cumulative_dist = cumulative_dist[i:]
         i = 0
-    
+
     if coords.shape[0] >= 2:
         # Add the remaining line segment
         segments.append(coords)
 
-    return (segments or [ coords ]), cutting_points
+    return (segments or [coords]), cutting_points
 
 
 def cut_polyline(line: Union[np.ndarray, LineString],
@@ -159,7 +161,7 @@ def cut_polyline(line: Union[np.ndarray, LineString],
         assert line.ndim == 2 and line.shape[0] > 1
         coords = line.astype(dtype=float, copy=True)
     if isinstance(distance, float):
-        distance = [ distance ]
+        distance = [distance]
     polyline_segments, _ = _cut_polyline(line=coords, distance=distance)
     return polyline_segments
 
@@ -173,19 +175,19 @@ def cut_polylines_at_identical_segments(
         for line in lines
     ]
     if isinstance(distance, float):
-        distance = [ distance ]
+        distance = [distance]
     assert lines[0].shape[0] > 1
     assert all(line.ndim == 2 and line.shape[0] == lines[0].shape[0] for line in lines)
     segments_first_line, cutting_points = _cut_polyline(line=lines[0], distance=distance)
 
-    cut_lines = [ segments_first_line ] + [ [] for _ in range(len(lines) - 1) ]
+    cut_lines = [segments_first_line] + [[] for _ in range(len(lines) - 1)]
     for i_segment, alpha in cutting_points:
         for i_lines in range(1, len(lines)):
             if alpha == 0.0:
                 segment = lines[i_lines][:i_segment + 1]
             else:
                 p = (1 - alpha) * lines[i_lines][i_segment] + alpha * lines[i_lines][i_segment + 1]
-                segment = np.vstack([ lines[i_lines][:i_segment + 1], p ])
+                segment = np.vstack([lines[i_lines][:i_segment + 1], p])
                 lines[i_lines][i_segment] = p
             lines[i_lines] = lines[i_lines][i_segment:]
             cut_lines[i_lines].append(segment)
@@ -195,7 +197,7 @@ def cut_polylines_at_identical_segments(
     return cut_lines
 
 
-def resample_polyline(line: Union[np.ndarray, LineString], interval: Union[float, int]) -> LineString:
+def resample_polyline(line: Union[np.ndarray, LineString], interval: Union[float, int]) -> np.ndarray:
     if isinstance(line, np.ndarray):
         line = LineString(line)
     if isinstance(interval, int):
@@ -204,10 +206,10 @@ def resample_polyline(line: Union[np.ndarray, LineString], interval: Union[float
         n_points = max(3, int(line.length // interval))
 
     waypoints = np.linspace(0, line.length, n_points)
-    points = [line.interpolate(x) for x in waypoints]
+    points = np.vstack([np.array(line.interpolate(x).coords) for x in waypoints])
 
     # assert np.allclose(np.array(line)[-1], np.array(points[-1]))
     # assert np.allclose(np.array(line)[0], np.array(points[0]))
     # assert len(points) == n_points
 
-    return LineString(points)
+    return points

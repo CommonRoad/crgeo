@@ -171,7 +171,7 @@ def link_interval(
     if length > min(len(incoming) - start_incoming, len(outgoing) - start_outgoing):
         raise ValueError("interval is larger than set of lanes")
     if start_incoming < 0 or start_outgoing < 0:
-        #print("Info: length of outgoing lanes: {}".format(len(outgoing)))
+        # print("Info: length of outgoing lanes: {}".format(len(outgoing)))
         raise ValueError("index is lower than zero")
     for index in range(length):
         link_two_lanes(
@@ -516,7 +516,7 @@ def set_turnlane_borders(
             # turnlane info is erroneous, turnlanes are not used
             last_left, first_through, last_through, first_right = None, None, None, None
             turnlane_useful = False
-            #print("Warning: turnlanes are inconsistent and are therefore ignored")
+            # print("Warning: turnlanes are inconsistent and are therefore ignored")
 
     if not turnlane_useful:
         # Fallback if turnlanes of successor are the same, set all to through

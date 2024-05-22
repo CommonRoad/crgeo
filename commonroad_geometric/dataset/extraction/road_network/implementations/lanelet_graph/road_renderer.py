@@ -17,6 +17,7 @@ DEBUG = False
 
 # TODO delete?
 
+
 class RoadRenderer:
 
     def __init__(self, size: int, multisampling_samples: int = 0):
@@ -67,7 +68,8 @@ class RoadRenderer:
             lanelet_orientation: float,
             lanelet_position: np.ndarray,
     ) -> np.ndarray:
-        self._set_up_projection_matrix(scale=scale, rotation_deg=-np.rad2deg(lanelet_orientation), translation=lanelet_position)
+        self._set_up_projection_matrix(scale=scale, rotation_deg=-
+                                       np.rad2deg(lanelet_orientation), translation=lanelet_position)
         self._clear_window()
 
         # draw lanelets
@@ -106,7 +108,8 @@ class RoadRenderer:
         lanelet_orientation_buckets: int = 8,
         node_segments_orientations: Dict[int, np.ndarray],
     ) -> np.ndarray:
-        self._set_up_projection_matrix(scale=scale, rotation_deg=-np.rad2deg(lanelet_orientation), translation=lanelet_position)
+        self._set_up_projection_matrix(scale=scale, rotation_deg=-
+                                       np.rad2deg(lanelet_orientation), translation=lanelet_position)
 
         road_orientation = np.empty((lanelet_orientation_buckets, self.size, self.size), dtype=float)
         # dimensions: [orientation, y, x]
@@ -139,7 +142,8 @@ class RoadRenderer:
 
                 if DEBUG:
                     a = (orientation + 0.5) * bucket_size
-                    gl.glColor3f(1.0, 0.5 + 0.5 * np.cos(a), 0.5 + 0.5 * np.sin(a))  # only the first color channel will be extracted
+                    # only the first color channel will be extracted
+                    gl.glColor3f(1.0, 0.5 + 0.5 * np.cos(a), 0.5 + 0.5 * np.sin(a))
                 else:
                     gl.glColor3f(1.0, 1.0, 1.0)
                 pyglet.graphics.draw(vertices.shape[0], gl.GL_QUADS, ("v2f", vertices.ravel(order="C")))

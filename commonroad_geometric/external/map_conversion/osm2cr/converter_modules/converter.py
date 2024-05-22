@@ -5,6 +5,8 @@ You can use this module instead of using **main.py**.
 import pickle
 import sys
 import logging
+from typing import Union
+from pathlib import Path
 import matplotlib.pyplot as plt
 
 from commonroad_geometric.external.map_conversion.osm2cr import config
@@ -21,7 +23,7 @@ from commonroad_geometric.external.map_conversion.osm2cr.converter_modules.graph
 )
 
 
-def step_collection_1(file: str) -> road_graph.Graph:
+def step_collection_1(file: Path) -> road_graph.Graph:
     graph = osm_parser.create_graph(file)
     if config.MAKE_CONTIGUOUS:
         logging.info("making graph contiguously")
@@ -92,7 +94,7 @@ class GraphScenario:
 
     """
 
-    def __init__(self, file: str):
+    def __init__(self, file: Path):
         """
         loads an OSM file and converts it to a graph
 
@@ -132,7 +134,7 @@ class GraphScenario:
         else:
             export.export(self.graph)
 
-    def save_to_file(self, filename: str):
+    def save_to_file(self, filename: Union[str,Path]):
         """
         Saves the road network to a file and stores it on disk
 
@@ -146,7 +148,7 @@ class GraphScenario:
         sys.setrecursionlimit(1000)
 
 
-def load_from_file(filename: str) -> GraphScenario:
+def load_from_file( filename: Union[str, Path]) -> GraphScenario:
     """
     loads a road network from a file
     Warning! Do only load files you trust!

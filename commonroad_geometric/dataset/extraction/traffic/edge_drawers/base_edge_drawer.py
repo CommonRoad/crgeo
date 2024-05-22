@@ -8,12 +8,14 @@ from torch import Tensor
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 from commonroad_geometric.common.class_extensions.string_resolver_mixing import StringResolverMixin
+from commonroad_geometric.simulation.base_simulation import BaseSimulation
 
 
 @dataclass
 class BaseEdgeDrawingParams:
+    simulation: BaseSimulation
     v_data: Dict[str, Any]
-    l_data: Dict[str, Any] 
+    l_data: Dict[str, Any]
     v2l_data: Dict[str, Any]
     pos: Tensor
     dist_matrix: Optional[Tensor] = None
@@ -41,7 +43,7 @@ class BaseEdgeDrawer(ABC, AutoReprMixin, StringResolverMixin):
         """
 
         options.n_vehicles = options.pos.shape[0]
-        
+
         if options.n_vehicles <= 1:
             # No edges exist
             edge_index = torch.zeros((2, 0), dtype=torch.long)
@@ -56,7 +58,7 @@ class BaseEdgeDrawer(ABC, AutoReprMixin, StringResolverMixin):
 
             # Filtering out valid edges
             if self._dist_threshold is not None:
-                keep_edge_matrix = options.dist_matrix  <= self._dist_threshold
+                keep_edge_matrix = options.dist_matrix <= self._dist_threshold
                 keep_edge_mask = keep_edge_matrix[edge_index[0, :], edge_index[1, :]]
                 edge_index = edge_index[:, keep_edge_mask]
 

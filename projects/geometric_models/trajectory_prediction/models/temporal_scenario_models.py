@@ -7,16 +7,14 @@ from torch import BoolTensor, Tensor
 from commonroad_geometric.common.config import Config
 from commonroad_geometric.common.torch_utils.helpers import assert_size
 from commonroad_geometric.common.types import Unlimited
-from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_temporal_vehicle.callables import ft_rel_state_vtv
-from commonroad_geometric.rendering.base_renderer_plugin import BaseRendererPlugin
-from commonroad_geometric.rendering.plugins.render_lanelet_network_plugin import RenderLaneletNetworkPlugin
-from commonroad_geometric.rendering.plugins.render_obstacles_plugin import RenderObstaclesPlugin, RenderObstaclesStyle
-from commonroad_geometric.rendering.plugins.render_traffic_graph_plugin import RenderTrafficGraphPlugin
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.dataset.commonroad_data_temporal import CommonRoadDataTemporal
 from commonroad_geometric.learning.geometric.base_geometric import BaseGeometric
+from commonroad_geometric.rendering.color.color import Color
+from commonroad_geometric.rendering.plugins.base_renderer_plugin import BaseRenderPlugin
+from commonroad_geometric.rendering.plugins.implementations import RenderLaneletNetworkPlugin
 from projects.geometric_models.trajectory_prediction.models.decoder.vehicle_model import KinematicSingleTrackVehicleStates, RelativePositionAndOrientationVehicleModel, \
-    RelativePositionAndOrientationVehicleStates, RelativePositionVehicleModel, RelativePositionVehicleStates
+    RelativePositionAndOrientationVehicleStates
 from projects.geometric_models.trajectory_prediction.models.decoder.vehicle_trajectory_prediction import VehicleTrajectoryPredictionCVAEDecoder, VehicleTrajectoryPredictionDecoder
 from projects.geometric_models.trajectory_prediction.models.encoder.scenario_encoder import ScenarioEncoderModel
 from projects.geometric_models.trajectory_prediction.utils.visualization.render_plugins import RenderTrajectoryPredictionPlugin
@@ -29,11 +27,11 @@ class MultiplePredictionWrapper(BaseGeometric, Generic[T_Prediction]):
     def __init__(self, cfg: Config, module: BaseGeometric):
         super().__init__(cfg)
         self.wrapped_module = module
-        
+
     def _build(
         self,
         batch: CommonRoadData,
-        trial = None
+        trial=None
     ) -> None:
         self.wrapped_module.build(data=batch)
         self.max_time_steps_temporal_edge = self.cfg.traffic.temporal.max_time_steps_temporal_edge
@@ -54,8 +52,8 @@ class MultiplePredictionWrapper(BaseGeometric, Generic[T_Prediction]):
         self,
         data: CommonRoadDataTemporal
     ) -> List[T_Prediction]:
-        if not type(data) is CommonRoadDataTemporal:
-            data = data[0] # TODO avoid batching
+        if not isinstance(data, CommonRoadDataTemporal):
+            data = data[0]  # TODO avoid batching
         T_obs = self.cfg.traffic.temporal.steps_observe
         predictions = []
         for t, data_window_list in self._time_slices(data):
@@ -66,19 +64,18 @@ class MultiplePredictionWrapper(BaseGeometric, Generic[T_Prediction]):
             CommonRoadDataTemporal.add_temporal_vehicle_edges_(
                 data=data_window_obs,
                 max_time_steps_temporal_edge=self.max_time_steps_temporal_edge,
-                #feature_computers=[ft_rel_state_vtv]
+                # feature_computers=[ft_rel_state_vtv]
             )
             predictions.append(self.wrapped_module(data_window_list, data_window_obs))
 
         assert len(predictions) > 0
         return predictions
 
-    
     @classmethod
-    def configure_renderer_plugins(cls) -> Optional[List[BaseRendererPlugin]]:
+    def configure_renderer_plugins(cls) -> Optional[List[BaseRenderPlugin]]:
         return [
             RenderLaneletNetworkPlugin(
-                lanelet_color=(0.65, 0.65, 0.65, 0.8),
+                lanelet_color=Color((0.65, 0.65, 0.65, 0.8)),
                 lanelet_linewidth=0.2
             ),
             # RenderObstaclesPlugin(RenderObstaclesStyle(
@@ -127,7 +124,7 @@ class TemporalTrajectoryPredictionModel(BaseGeometric):
     def _build(
         self,
         batch: CommonRoadData,
-        trial = None
+        trial=None
     ) -> None:
         self.scenario_encoder = ScenarioEncoderModel(cfg=self.cfg)
 
@@ -156,7 +153,7 @@ class TemporalTrajectoryPredictionModel(BaseGeometric):
                 cfg=self.cfg,
                 vehicle_model=self.vehicle_model,
                 num_predict_time_steps=self.cfg.traffic.temporal.steps_predict,
-                #device=batch.device
+                # device=batch.device
             )
 
     def _check_vehicle_id_order_consistent_across_time_steps(
@@ -167,7 +164,7 @@ class TemporalTrajectoryPredictionModel(BaseGeometric):
         T_obs = self.cfg.traffic.temporal.steps_observe
         vehicle_x_slice = data._slice_dict["vehicle"]["x"]
         assert len(vehicle_x_slice) == T_obs + 1 and \
-            vehicle_x_slice[0] == 0 and vehicle_x_slice[T_obs] == vehicle_mask.size(0)
+               vehicle_x_slice[0] == 0 and vehicle_x_slice[T_obs] == vehicle_mask.size(0)
 
         vehicle_mask_0 = vehicle_mask.detach().clone()
         vehicle_mask_0[vehicle_x_slice[1]:] = False
@@ -208,7 +205,10 @@ class TemporalTrajectoryPredictionModel(BaseGeometric):
         vehicle_mask: BoolTensor = torch.any(data_window_obs.vehicle.id == vehicle_ids_tensor.unsqueeze(0), dim=1)
         # assert vehicle_mask.sum() == len(vehicle_ids) * T_obs
 
-        vehicle_ids_pred, vehicle_mask_last_obs = self._check_vehicle_id_order_consistent_across_time_steps(data_window_obs, vehicle_mask)
+        vehicle_ids_pred, vehicle_mask_last_obs = self._check_vehicle_id_order_consistent_across_time_steps(
+            data=data_window_obs,
+            vehicle_mask=vehicle_mask
+        )
         # vehicle_mask_last_obs masks out all vehicles except the ones in the last observed time step (T_obs - 1)
 
         vehicle_states_last_obs = KinematicSingleTrackVehicleStates(

@@ -17,8 +17,8 @@ from projects.geometric_models.drivable_area.utils.confusion_matrix import BaseC
 class DrivableAreaDecoder(BaseModel):
 
     def __init__(
-        self, 
-        cfg: Config, 
+        self,
+        cfg: Config,
     ):
         super().__init__()
         self.cfg = cfg
@@ -132,10 +132,12 @@ class DrivableAreaDecoder(BaseModel):
         ...
 
     @overload
-    def forward(self, data: CommonRoadData, x: Tensor, sampling_weights: Optional[Tensor] = None) -> Tuple[Tensor, Optional[Tensor]]:
+    def forward(self, data: CommonRoadData, x: Tensor,
+                sampling_weights: Optional[Tensor] = None) -> Tuple[Tensor, Optional[Tensor]]:
         ...
 
-    def forward(self, data: CommonRoadData, x: Union[Tensor, Tuple[Union[Data, Batch], Tensor]], sampling_weights: Optional[Tensor] = None) -> Union[Tensor, Tuple[Tensor, Optional[Tensor]]]:
+    def forward(self, data: CommonRoadData, x: Union[Tensor, Tuple[Union[Data, Batch], Tensor]],
+                sampling_weights: Optional[Tensor] = None) -> Union[Tensor, Tuple[Tensor, Optional[Tensor]]]:
         N = x.size(0)
         assert_size(x, (N, self.cfg.node_feature_size))
 
@@ -170,7 +172,8 @@ class DrivableAreaDecoder(BaseModel):
     def compute_loss(self, data: Union[CommonRoadData, CommonRoadDataTemporal], prediction: Tensor) -> Tensor:
         if isinstance(prediction, tuple):
             prediction, sample_ind = prediction
-            drivable_area = data.v.drivable_area.index_select(0, sample_ind) if sample_ind is not None else data.v.drivable_area
+            drivable_area = data.v.drivable_area.index_select(
+                0, sample_ind) if sample_ind is not None else data.v.drivable_area
         else:
             drivable_area = data.v.drivable_area
         N = prediction.shape[0]
@@ -209,7 +212,8 @@ class DrivableAreaDecoder(BaseModel):
     ) -> Tensor:
         if isinstance(prediction, tuple):
             prediction, sample_ind = prediction
-            drivable_area = data.v.drivable_area.index_select(0, sample_ind) if sample_ind is not None else data.v.drivable_area
+            drivable_area = data.v.drivable_area.index_select(
+                0, sample_ind) if sample_ind is not None else data.v.drivable_area
         else:
             drivable_area = data.v.drivable_area
         N = prediction.shape[0]

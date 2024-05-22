@@ -1,6 +1,6 @@
 import logging
 import os
-import pathlib
+from pathlib import Path
 import xml.etree.ElementTree as et
 
 from commonroad.scenario.lanelet import LaneletNetwork
@@ -30,9 +30,9 @@ __status__ = "Released"
 
 class ScenarioWrapper(AbstractScenarioWrapper):
     def __init__(self):
-        self.scenario_name: str = ''
-        self.net_file: str = ''
-        self.cr_map_file: str = ''
+        self.scenario_name: Path = Path('')
+        self.net_file: Path = Path('')
+        self.cr_map_file: Path = Path('')
         self.sumo_cfg_file = None
         self.ego_start_time: int = 0
         self.sumo_net = None
@@ -40,9 +40,9 @@ class ScenarioWrapper(AbstractScenarioWrapper):
         self._route_planner = None
 
     def initialize(self,
-                   scenario_name: str,
-                   sumo_cfg_file: str,
-                   cr_map_file: str,
+                   scenario_name: Path,
+                   sumo_cfg_file: Path,
+                   cr_map_file: Path,
                    ego_start_time: int = None) -> None:
         """
         Initializes the ScenarioWrapper.
@@ -64,7 +64,7 @@ class ScenarioWrapper(AbstractScenarioWrapper):
     @classmethod
     def init_from_scenario(cls,
                            config: DefaultConfig,
-                           scenario_path=str,
+                           scenario_path=Path,
                            ego_start_time: int = None,
                            cr_map_file=None) -> 'ScenarioWrapper':
         """
@@ -81,11 +81,9 @@ class ScenarioWrapper(AbstractScenarioWrapper):
 
         obj = cls()
         scenario_path = config.scenarios_path if config.scenarios_path is not None else scenario_path
-        sumo_cfg_file = os.path.join(scenario_path,
-                                     config.scenario_name + '.sumo.cfg')
+        sumo_cfg_file = Path(scenario_path, config.scenario_name + '.sumo.cfg')
         if cr_map_file is None:
-            cr_map_file = os.path.join(scenario_path,
-                                       config.scenario_name + '.cr.xml')
+            cr_map_file = Path(scenario_path, config.scenario_name + '.cr.xml')
 
         obj.initialize(config.scenario_name, sumo_cfg_file, cr_map_file,
                        ego_start_time)
@@ -104,14 +102,15 @@ class ScenarioWrapper(AbstractScenarioWrapper):
 
         """
         sumo_scenario = cls()
-        out_folder = os.path.dirname(sumo_cfg_file)
+        out_folder = sumo_cfg_file.parent
         net_file = sumo_scenario._get_net_file(sumo_cfg_file)
         scenario_name = get_scenario_name_from_netfile(net_file)
         generate_rou_file(net_file, out_folder, conf)
 
-        cr_map_file = os.path.join(os.path.dirname(__file__),
+        #!!! todo FIX THIS LOGIC USE DIRECTLY PATH
+        cr_map_file = Path(os.path.join(os.path.dirname(__file__),
                                    '../../scenarios/', scenario_name,
-                                   scenario_name + '.cr.xml')
+                                   scenario_name + '.cr.xml'))
 
         sumo_scenario.initialize(scenario_name, sumo_cfg_file, cr_map_file,
                                  conf.ego_start_time)
@@ -119,8 +118,8 @@ class ScenarioWrapper(AbstractScenarioWrapper):
 
     @classmethod
     def init_from_cr_file(
-        cls, cr_file: str,
-        conf: DefaultConfig = DefaultConfig()) -> 'ScenarioWrapper':
+            cls, cr_file: Path,
+            conf: DefaultConfig = DefaultConfig()) -> 'ScenarioWrapper':
         """
         Convert CommonRoad xml to sumo net file and return Scenario Wrapper.
         :param cr_file: path to the cr map file
@@ -132,9 +131,9 @@ class ScenarioWrapper(AbstractScenarioWrapper):
                                    'crdesigner which is yet to be released.')
 
         scenario_name = get_scenario_name_from_crfile(cr_file)
-        out_folder = os.path.join(conf.scenarios_path, scenario_name)
-        pathlib.Path(out_folder).mkdir(parents=True, exist_ok=True)
-        net_file = os.path.join(out_folder, scenario_name + '.net.xml')
+        out_folder = Path(conf.scenarios_path, scenario_name)
+        out_folder.mkdir(parents=True, exist_ok=True)
+        net_file = out_folder.joinpath(scenario_name + '.net.xml')
 
         # convert from cr to net
         cr2sumo_converter = CR2SumoMapConverter.from_file(
@@ -168,7 +167,7 @@ class ScenarioWrapper(AbstractScenarioWrapper):
 
         """
         assert len(conf.ego_ids) <= conf.n_ego_vehicles, "total number of given ego_vehicles must be <= n_ego_vehicles, but {}not<={}"\
-            .format(len(conf.ego_ids),conf.n_ego_vehicles)
+            .format(len(conf.ego_ids), conf.n_ego_vehicles)
         assert conf.n_ego_vehicles <= conf.n_vehicles_max
 
         sumo_scenario = cls()
@@ -192,7 +191,7 @@ class ScenarioWrapper(AbstractScenarioWrapper):
                                  conf.ego_start_time)
         return sumo_scenario
 
-    def _get_net_file(self, sumo_cfg_file: str) -> str:
+    def _get_net_file(self, sumo_cfg_file: Path) -> str:
         """
         Gets the net file configured in the cfg file.
 

@@ -1,40 +1,44 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING, Tuple, Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Protocol, Sequence, TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 from commonroad.planning.planning_problem import PlanningProblemSet
 from commonroad.scenario.scenario import Scenario
-from commonroad_geometric.rendering.viewer.viewer_2d import Viewer2D
 
 if TYPE_CHECKING:
     from commonroad_geometric.dataset.commonroad_data import CommonRoadData
     from commonroad_geometric.dataset.commonroad_data_temporal import CommonRoadDataTemporal
+    from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer
     from commonroad_geometric.simulation.base_simulation import BaseSimulation
     from commonroad_geometric.simulation.ego_simulation.ego_vehicle import EgoVehicle
     from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
-    from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer
 
-T_Frame = Optional[np.ndarray]
+T_Frame = np.ndarray
+T_Position2D = Union[np.ndarray, Tuple[float, float]]
+T_Position3D = Union[np.ndarray, Tuple[float, float, float]]
+T_Angle = float
+T_Vertices = np.ndarray
+
 
 class SkipRenderInterrupt(BaseException):
     pass
 
 
 @dataclass
-class CameraView:
-    position: np.ndarray # [x, y]
+class CameraView2D:
+    center_position: np.ndarray  # [x, y]
     orientation: float
-    range: Optional[float] = None
+    view_range: Optional[float] = None
 
 
 @dataclass
 class RenderParams:
     """
-        RenderParams is the input data structure of renderer plugins:
+    RenderParams is the input data structure of renderer plugins:
 
+    Attributes:
         time_step(int): Count of numerical step of simulation. Simulation time is calculated by time_step * dt.
         scenario: Current scenario to be rendered
         planning_problem_set: Optional argument, contains the goal condition for ego vehicle
@@ -46,28 +50,26 @@ class RenderParams:
 
     """
     time_step: Optional[int] = None
-    camera_view: Optional[CameraView] = None
     scenario: Optional[Scenario] = None
     planning_problem_set: Optional[PlanningProblemSet] = None
     ego_vehicle: Optional[EgoVehicle] = None
     ego_vehicle_simulation: Optional[EgoVehicleSimulation] = None
     simulation: Optional[BaseSimulation] = None
     data: Optional[Union[CommonRoadData, CommonRoadDataTemporal]] = None
-    render_kwargs: Optional[Dict[str, Any]] = None
+    render_kwargs: Dict[str, Any] = field(default_factory=dict)
 
 
-class Renderable(ABC):
+class Renderable(Protocol):
+    """
+    The Renderable protocol indicates that something can be rendered with a TrafficSceneRenderer.
+    """
 
-    @abstractmethod
     def render(
         self,
         *,
-        renderer: TrafficSceneRenderer,
+        renderers: Sequence[TrafficSceneRenderer],
         render_params: Optional[RenderParams] = None,
-        return_rgb_array: bool = False,
-        **render_kwargs: Any
-    ) -> T_Frame:
+        return_frames: bool = False,
+        **render_kwargs: Dict[str, Any]
+    ) -> Sequence[T_Frame]:
         ...
-
-
-T_RendererPlugin = Callable[[Viewer2D, RenderParams], None]

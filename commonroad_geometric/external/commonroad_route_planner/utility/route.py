@@ -195,7 +195,7 @@ def sort_lanelet_ids_by_goal(scenario: Scenario, goal: GoalRegion) -> List[int]:
         return sort_lanelet_ids_by_orientation(
             scenario.lanelet_network.find_lanelet_by_shape(goal_shape),
             goal_orientation,
-#            np.array(goal_shape.shapely_object.centroid),
+            #            np.array(goal_shape.shapely_object.centroid),
             goal_shape.shapely_object.centroid.coords,
             scenario
         )

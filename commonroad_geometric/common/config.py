@@ -141,10 +141,11 @@ class Config:
         return self.__class__(data, _root=root)
 
     def __repr__(self) -> str:
-        return repr(dict(self)) # TODO
+        return repr(self.as_dict())
 
     def __str__(self) -> str:
-        return str(dict(self))
+        from pprint import pformat
+        return pformat(self.as_dict())
 
 class MutableConfig(Config):
 

@@ -1,37 +1,37 @@
 import os
 
 import torch
-import dill
+import logging
+from pathlib import Path
 
 from commonroad_geometric.learning.geometric.base_geometric import MODEL_FILE, STATE_DICT_FILE
 from commonroad_geometric.learning.geometric.training.callbacks.base_callback import BaseCallback, CheckpointCallbackParams
 
+logger = logging.getLogger(__name__)
 
 class SaveCheckpointCallback(BaseCallback[CheckpointCallbackParams]):
 
     def __init__(
         self,
-        directory: str
+        directory: Path
     ):
         self._directory = directory
-        self._checkpoint_path = f'{self._directory}/{STATE_DICT_FILE}'
-        self._model_path = f'{self._directory}/{MODEL_FILE}'
         self._call_count = 0
-
-    @property
-    def checkpoint_path(self) -> str:
-        return self._checkpoint_path
-
-    @property
-    def model_path(self) -> str:
-        return self._model_path
-
+        
     def __call__(self, params: CheckpointCallbackParams):
-        os.makedirs(self._directory, exist_ok=True)
-        params.ctx.model.save_model(self._model_path)
-        params.ctx.model.save_state(self._checkpoint_path)
-        torch.save(params.ctx.optimizer.state_dict(), f'{self._directory}/optimizer.pt')
-        if self._call_count == 0:
-            # just testing
-            params.ctx.model.load(self._model_path)
+        curr_directory = self._directory.joinpath(f"{type(params.ctx.model).__name__}_{params.ctx.epoch}")
+        curr_directory.mkdir(parents=True, exist_ok=True)
+
+        model_path = curr_directory.joinpath(MODEL_FILE)
+        checkpoint_path = curr_directory.joinpath(STATE_DICT_FILE)
+        optimizer_path = curr_directory.joinpath('optimizer.pt')
+
+        params.ctx.model.save_model(model_path)
+        params.ctx.model.save_state(checkpoint_path)
+        torch.save(params.ctx.optimizer.state_dict(), optimizer_path)
+        # if self._call_count == 0:
+        #     # just testing
+        #     params.ctx.model.load(model_path)
         self._call_count += 1
+        
+        logger.info(f"Saved model checkpoint to {curr_directory}")

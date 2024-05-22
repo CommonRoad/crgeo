@@ -14,7 +14,7 @@ from commonroad.planning.goal import GoalRegion
 from commonroad.planning.planning_problem import PlanningProblem
 from commonroad.scenario.lanelet import Lanelet
 from commonroad.scenario.scenario import Scenario
-from commonroad.scenario.trajectory import State
+from commonroad.scenario.state import State
 from commonroad_dc.geometry.util import compute_polyline_length, resample_polyline
 from scipy.spatial import KDTree
 from shapely.geometry import Polygon
@@ -43,7 +43,7 @@ class Navigator(AutoReprMixin):
             return [item.value for item in cls]
 
     def __init__(
-        self, 
+        self,
         scenario: Scenario,
         planning_problem: PlanningProblem
     ):
@@ -253,11 +253,11 @@ class Navigator(AutoReprMixin):
 
         # remove consecutive duplicates, because they hurt runtime and may cause out of domain errors
         # disabled, leads to crash for nuplan dataset
-        #resampled_polyline_shifted = np.roll(resampled_polyline, 1, axis=0)
+        # resampled_polyline_shifted = np.roll(resampled_polyline, 1, axis=0)
         # slice all x,y points, where the next point is np.isclose to previous one
-        #index_slice = np.any(np.invert(np.isclose(resampled_polyline, resampled_polyline_shifted)), axis=1)
+        # index_slice = np.any(np.invert(np.isclose(resampled_polyline, resampled_polyline_shifted)), axis=1)
         # sort out duplicated points
-        #resampled_polyline = resampled_polyline[index_slice]
+        # resampled_polyline = resampled_polyline[index_slice]
 
         if resampled_polyline.shape[0] <= 3:
             logger.warning(
@@ -996,7 +996,7 @@ class Navigator(AutoReprMixin):
 
         # logger.error(distance_lanelets)
 
-        idx_closest_lanelet = self.route.list_ids_lanelets.index(
+        idx_closest_lanelet = self.route.list_ids_lanelets.time_step(
             distance_lanelets[0][0]
         )
         for count, rel_id in enumerate(lanelets_id_rel):

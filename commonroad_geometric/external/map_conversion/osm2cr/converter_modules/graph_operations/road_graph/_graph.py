@@ -148,7 +148,7 @@ class Graph:
         to_delete = []
         for node in self.nodes:
             if node.is_crossing:
-                cropping_dist = intersection_dist/10.0
+                cropping_dist = intersection_dist / 10.0
             else:
                 cropping_dist = intersection_dist
             node_point = np.array([node.x, node.y])
@@ -715,7 +715,7 @@ class Graph:
         points_to_edge = dict()
         for edge in edges:
             edge_orientation = edge.get_compass_degrees()
-            if direction is not None and abs(edge_orientation-direction) < 60:  # degrees threshold
+            if direction is not None and abs(edge_orientation - direction) < 60:  # degrees threshold
                 for waypoint in edge.get_waypoints():
                     cartesian_waypoint = geometry.cartesian_to_lon_lat(waypoint, self.center_point)
                     points.append(cartesian_waypoint)

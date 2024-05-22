@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Optional, Set, Tuple, Union, overload
-from typing_extensions import Literal
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 from commonroad.common.solution import VehicleType
@@ -20,6 +19,7 @@ from commonroad_geometric.common.io_extensions.obstacle import state_at_time
 from commonroad_geometric.common.types import T_CountParam
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractionParams, TrafficExtractor
+from commonroad_geometric.rendering.color.color import Color
 from commonroad_geometric.rendering.traffic_scene_renderer import RenderParams, T_Frame, TrafficSceneRenderer
 from commonroad_geometric.rendering.types import Renderable
 from commonroad_geometric.simulation.base_simulation import BaseSimulation
@@ -42,11 +42,13 @@ class EgoVehicleSimulationNotYetStartedException(AttributeError):
 class EgoVehicleSimulationFinishedException(StopIteration):
     pass
 
+
 @dataclass(frozen=True)
 class EgoVehicleCollisionInfo:
     collision: bool
     ego_at_fault: Optional[bool]
     closest_obstacle_id: Optional[int]
+
 
 @dataclass
 class EgoVehicleSimulationOptions:
@@ -90,12 +92,15 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
         self._renderers = renderers if renderers is not None else []
         self._traffic_extractor = traffic_extractor
         self._initial_planning_problem_set = planning_problem_set
-        self._initial_planning_problem = next(iter(planning_problem_set.planning_problem_dict.values())) if planning_problem_set is not None and len(planning_problem_set.planning_problem_dict) > 0 else None
+        self._initial_planning_problem = next(
+            iter(
+                planning_problem_set.planning_problem_dict.values())) if planning_problem_set is not None and len(
+            planning_problem_set.planning_problem_dict) > 0 else None
         self._ego_vehicle = EgoVehicle(
             vehicle_model=options.vehicle_model,
             vehicle_type=options.vehicle_type,
             dt=simulation.dt,
-            ego_route=None #ego_route,
+            ego_route=None  # ego_route,
         )
         self._reset_count: int = 0
         self._respawn_count: int = 0
@@ -239,7 +244,8 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
 
     @property
     def current_lanelets(self) -> List[Lanelet]:
-        current_lanelets = list(map(self._simulation.current_scenario.lanelet_network.find_lanelet_by_id, self.current_lanelet_ids))
+        current_lanelets = list(
+            map(self._simulation.current_scenario.lanelet_network.find_lanelet_by_id, self.current_lanelet_ids))
         return current_lanelets
 
     @property
@@ -256,7 +262,8 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
             except RespawnerSetupFailure:
                 respawn_success = False
             if not respawn_success:
-                logger.warning(f"Failed to spawn ego vehicle in scenario {self.simulation.current_scenario.scenario_id}")
+                logger.warning(
+                    f"Failed to spawn ego vehicle in scenario {self.simulation.current_scenario.scenario_id}")
                 if not respawn_until_success:
                     return False
             if not respawn_until_success or respawn_success:
@@ -265,7 +272,8 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
         self._respawn_count += 1
         self.simulation.assign_unassigned_obstacles(obstacles=[self.ego_vehicle.as_dynamic_obstacle])
         self.simulation._update_obstacle_index_mappings(obstacle_id_to_lanelet_id_t={})
-        logger.debug(f"Ego vehicle {self.ego_vehicle.obstacle_id} now located at lanelets {self.simulation.obstacle_id_to_lanelet_id[self.ego_vehicle.obstacle_id]} at time-step {self.current_time_step}")
+        logger.debug(
+            f"Ego vehicle {self.ego_vehicle.obstacle_id} now located at lanelets {self.simulation.obstacle_id_to_lanelet_id[self.ego_vehicle.obstacle_id]} at time-step {self.current_time_step}")
         return True
 
     def start(self, respawn_until_success: bool = False) -> bool:
@@ -331,8 +339,8 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
         cache = self._cached_data
         if cache.is_settable(self.current_time_step, overwrite=not use_cached):
             value = self.traffic_extractor.extract(
-                TrafficExtractionParams(
-                    index=self.current_time_step,
+                time_step=self.current_time_step,
+                params=TrafficExtractionParams(
                     ego_vehicle=self.ego_vehicle,
                 )
             )
@@ -372,7 +380,7 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
             else:
                 obstacle_states = [
                     state_at_time(
-                        self._simulation.current_scenario._dynamic_obstacles[oid], 
+                        self._simulation.current_scenario._dynamic_obstacles[oid],
                         self.current_time_step,
                         assume_valid=True
                     ) for oid in obstacle_ids
@@ -384,17 +392,19 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
                 ]
                 closest_obstacle_idx = min(range(len(distances)), key=lambda i: distances[i])
                 closest_obstacle_arclength = current_lanelet_polyline.get_projected_arclength(
-                    obstacle_states[closest_obstacle_idx].position
+                    obstacle_states[closest_obstacle_idx].position,
+                    linear_projection=self.simulation.options.linear_lanelet_projection
                 )
                 closest_obstacle_id = obstacle_ids[closest_obstacle_idx]
                 ego_arclength = current_lanelet_polyline.get_projected_arclength(
-                    self.ego_vehicle.state.position
+                    self.ego_vehicle.state.position,
+                    linear_projection=self.simulation.options.linear_lanelet_projection
                 )
                 ego_at_fault = closest_obstacle_arclength > ego_arclength or \
                     abs(relative_orientation(
                         self.ego_vehicle.state.orientation,
                         obstacle_states[closest_obstacle_idx].orientation
-                    )) > np.pi / 6 # TODO
+                    )) > np.pi / 6  # TODO
                 return_struct = EgoVehicleCollisionInfo(
                     collision=True,
                     ego_at_fault=ego_at_fault,
@@ -423,97 +433,66 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
         polyline = self.ego_route.planning_problem_path_polyline
         if polyline is None:
             return True
-        completed_route = polyline.get_projected_arclength(self.ego_vehicle.state.position, relative=True) >= 1.0
+        completed_route = polyline.get_projected_arclength(
+            self.ego_vehicle.state.position,
+            relative=True,
+            linear_projection=True
+        ) >= 1.0
         return completed_route
 
     def check_if_offroad(self) -> bool:
         return len(self.current_lanelet_ids) == 0
 
     def check_if_offroute(self) -> bool:
-        return len(self.current_lanelet_ids) == 0 or self.current_lanelet_ids[0] not in self.ego_route.lanelet_id_route_set
+        return len(
+            self.current_lanelet_ids) == 0 or self.current_lanelet_ids[0] not in self.ego_route.lanelet_id_route_set
 
     def check_if_violates_friction(self) -> bool:
         return self.ego_vehicle.violate_friction
-
-    @overload
-    def render(
-        self,
-        renderers: None,
-        render_params: Optional[RenderParams],
-        return_rgb_array: Literal[True],
-        **render_kwargs: Any
-    ) -> np.ndarray:
-        ...  # no renderer (creating new)
-
-    @overload
-    def render(
-        self,
-        renderers: TrafficSceneRenderer,
-        render_params: Optional[RenderParams],
-        return_rgb_array: Literal[True],
-        **render_kwargs: Any
-    ) -> np.ndarray:
-        ...  # single renderer
-
-    @overload
-    def render(
-        self,
-        renderers: List[TrafficSceneRenderer],
-        render_params: Optional[RenderParams],
-        return_rgb_array: Literal[True],
-        **render_kwargs: Any
-    ) -> List[np.ndarray]:
-        ...  # multiple renderers
-
-    @overload
-    def render(
-        self,
-        renderers: None,
-        render_params: Optional[RenderParams],
-        return_rgb_array: Literal[False],
-        **render_kwargs: Any
-    ) -> None:
-        ...  # no renderer (creating new)
-
-    @overload
-    def render(
-        self,
-        renderers: TrafficSceneRenderer,
-        render_params: Optional[RenderParams],
-        return_rgb_array: Literal[False],
-        **render_kwargs: Any
-    ) -> None:
-        ...  # single renderer
-
-    @overload
-    def render(
-        self,
-        renderers: List[TrafficSceneRenderer],
-        render_params: Optional[RenderParams],
-        return_rgb_array: Literal[False],
-        **render_kwargs: Any
-    ) -> List[None]:
-        ...  # multiple renderers
+    
+    def check_if_overshot_goal(self) -> bool:
+        ego_position = self.ego_vehicle.state.position
+        ego_trajectory_polyline = self.ego_vehicle.ego_route.planning_problem_path_polyline
+        arclength = ego_trajectory_polyline.get_projected_arclength(
+            ego_position,
+            relative=True,
+            linear_projection=True
+        )
+        return arclength >= 1
 
     def render(
         self,
-        renderers: Union[List[TrafficSceneRenderer], TrafficSceneRenderer, None] = None,
+        *,
+        renderers: Sequence[TrafficSceneRenderer],
         render_params: Optional[RenderParams] = None,
-        return_rgb_array: bool = False,
-        **render_kwargs: Any
-    ) -> Union[T_Frame, List[T_Frame]]:
+        return_frames: bool = False,
+        **render_kwargs: Dict[str, Any]
+    ) -> Sequence[T_Frame]:
+        """
+        Renders the current state of the ego simulation for each of the renderers.
+        If no or partial render_params are passed, only ego simulation specific attributes (time_step and current_scenario)
+        are rendered.
+
+        Args:
+            renderers (Sequence[TrafficSceneRenderer]): Sequence of TrafficSceneRenderer's which are called
+            render_params (Optional[RenderParams]): Optional parameters which should be rendered. Defaults to None.
+            return_frames (bool): Whether to return frames from the renderers. Defaults to False.
+            **render_kwargs (Dict[str, Any]): Additional kwargs which will be passed to the renderers
+
+        Returns:
+            - a sequences of frames with one frame per renderer (list[np.ndarray]) if return_frames is True
+            - an empty list ([]) if return_frames is False
+        """
+        if not renderers:
+            self._renderers = [TrafficSceneRenderer()]
+        renderers = renderers or self._renderers
+
         render_params = render_params or RenderParams()
-
-        if renderers is None:
-            if not self._renderers:
-                self._renderers = [TrafficSceneRenderer()]
-            renderers = self._renderers
-
         render_kwargs = render_params.render_kwargs or {}
         if self.check_if_has_reached_goal() and 'ego_vehicle_color' not in render_kwargs:
-            render_kwargs['ego_vehicle_color'] = (0.1, 0.1, 0.8, 1.0)
+            render_kwargs['ego_vehicle_color'] = Color((0.1, 0.1, 0.8, 1.0))
         if self.simulation.collision_checker.collide(self.ego_vehicle.collision_object):
-            render_kwargs['ego_vehicle_color'] = (1.0, 0.0, 0.0, 1.0)
+            render_kwargs['ego_vehicle_color'] = Color((1.0, 0.0, 0.0, 1.0))
 
         try:
             render_params.data = self._cached_data.value
@@ -526,7 +505,7 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
         return self._simulation.render(
             renderers=renderers,
             render_params=render_params,
-            return_rgb_array=return_rgb_array,
+            return_frames=return_frames,
             **render_kwargs
         )
 

@@ -50,7 +50,7 @@ class OpenDriveConverter:
             for lane_offset in lane_offsets:
                 if lane_offset.start_pos in reference_border.width_coefficient_offsets:
                     # offset is already there, delete previous entries
-                    idx = reference_border.width_coefficient_offsets.index(
+                    idx = reference_border.width_coefficient_offsets.time_step(
                         lane_offset.start_pos
                     )
                     del reference_border.width_coefficient_offsets[idx]

@@ -5,12 +5,13 @@ import numpy as np
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.base_reward_computer import BaseRewardComputer
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.types import MissingFeatureException
+from commonroad_geometric.learning.reinforcement.observer.base_observer import T_Observation
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
 
 
 class GoalDistanceProgressionRewardComputer(BaseRewardComputer):
     def __init__(
-        self, 
+        self,
         weight: float,
         reward_threshold: Optional[float] = None
     ) -> None:
@@ -23,7 +24,8 @@ class GoalDistanceProgressionRewardComputer(BaseRewardComputer):
         self,
         action: np.ndarray,
         simulation: EgoVehicleSimulation,
-        data: CommonRoadData
+        data: CommonRoadData,
+        observation: T_Observation
     ) -> float:
         try:
             goal_distance = data.ego.goal_distance.item()
@@ -35,8 +37,8 @@ class GoalDistanceProgressionRewardComputer(BaseRewardComputer):
             progression = self._last_goal_distance - goal_distance
 
         self._last_goal_distance = goal_distance
-        reward = self._weight*progression
-        
+        reward = self._weight * progression
+
         reward = max(0.0, min(reward, self._reward_threshold))
 
         return reward

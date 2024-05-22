@@ -5,6 +5,7 @@ import argparse
 import os
 
 import matplotlib
+from pathlib import Path
 from commonroad.common.file_writer import CommonRoadFileWriter, OverwriteExistingFile
 from commonroad.planning.planning_problem import PlanningProblemSet
 from commonroad.scenario.scenario import Tag
@@ -20,19 +21,16 @@ from crdesigner.ui.gui.mwindow.service_layer.osm_gui_modules.gui_embedding impor
 matplotlib.use("Qt5Agg")
 
 
-def convert(filename_open, filename_store=None):
+def convert(filename_open: Path, filename_store=None):
     """
     opens and converts a map
 
     :param filename_open: the file to open
-    :type filename_open: str
     :param filename_store: the file to open
     :type filename_store: str
     :return: None
     """
     scenario = converter.GraphScenario(filename_open)
-    #scenario.save_as_cr(filename_store)
-
     interm_format = IntermediateFormat.extract_from_road_graph(scenario.graph)
     scenario_cr = interm_format.to_commonroad_scenario()
     problemset = PlanningProblemSet(None)
@@ -43,7 +41,7 @@ def convert(filename_open, filename_store=None):
     tags = []
     for tag_str in tags_str.split():
         tags.append(Tag[tag_str.upper()])
-    file_path = config.SAVE_PATH + config.BENCHMARK_ID + ".xml"
+    file_path = Path(config.SAVE_PATH,config.BENCHMARK_ID + ".xml")
     # in the current commonroad version the following line works
     file_writer = CommonRoadFileWriter(
         scenario_cr, problemset, author, affiliation, source, tags, decimal_precision=16
@@ -60,7 +58,7 @@ def download_and_convert():
     """
     x, y = config.DOWNLOAD_COORDINATES
     if not os.path.exists(config.SAVE_PATH):
-        os.makedirs(config.SAVE_PATH)
+        config.SAVE_PATH.mkdir(parents=True, exist_ok=True)
     download_around_map(
         config.SAVE_PATH + config.BENCHMARK_ID + "_downloaded.osm",
         x,
@@ -83,9 +81,9 @@ def main():
         description="download or open an OSM file and convert it to CR or use GUI"
     )
     parser.add_argument("action",
-                        choices=["g", "gui", "d","download", "o", "open"],
+                        choices=["g", "gui", "d", "download", "o", "open"],
                         help="g or gui for starting the gui, d or download to "
-                            + "download a OSM file, o or open to convert files")
+                        + "download a OSM file, o or open to convert files")
     parser.add_argument("file", nargs="?", help="file input for the converter")
     args = parser.parse_args()
     if args.action == "d" or args.action == "download":

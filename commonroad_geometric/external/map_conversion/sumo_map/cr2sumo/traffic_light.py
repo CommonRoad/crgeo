@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Set, List, Dict, Tuple
 
 import numpy as np
-from commonroad.scenario.traffic_sign import TrafficLight, TrafficLightCycleElement, TrafficLightState
+from commonroad.scenario.traffic_light import TrafficLight, TrafficLightCycleElement, TrafficLightState
 from commonroad_geometric.external.map_conversion.sumo_map.sumolib_net import TLSProgram, Connection, NodeType, SignalState, Node, Phase
 from commonroad_geometric.external.map_conversion.sumo_map.util import lines_intersect, compute_max_curvature_from_polyline
 

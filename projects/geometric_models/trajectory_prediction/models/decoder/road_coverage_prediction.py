@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch_geometric.data import Data
-from torch_geometric.nn import HEATConv
+from torch_geometric.nn.conv import HEATConv
 
 from commonroad_geometric.common.config import Config
 from commonroad_geometric.common.torch_utils.helpers import assert_size
@@ -118,7 +118,12 @@ class LaneletNetworkGNN(BaseModel):
             if self.cfg.gnn_type == "EGATConv":
                 x_new = graph_conv(x=x, edge_index=edge_index, edge_attr=edge_attr)
             elif self.cfg.gnn_type == "HEATConv":
-                x_new = graph_conv(x=x, edge_index=edge_index, edge_attr=edge_attr, node_type=node_type, edge_type=edge_type)
+                x_new = graph_conv(
+                    x=x,
+                    edge_index=edge_index,
+                    edge_attr=edge_attr,
+                    node_type=node_type,
+                    edge_type=edge_type)
             x_new = F.relu(x_new)
             assert_size(x_new, (N, self.cfg.node_feature_size))
 

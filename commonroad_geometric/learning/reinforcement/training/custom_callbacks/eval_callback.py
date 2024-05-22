@@ -1,22 +1,20 @@
+import logging
 import os
 import warnings
 from typing import Any, Dict, Optional, Union
-
-import gym
-import logging
+from pathlib import Path
+import gymnasium
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback, EventCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, sync_envs_normalization
 
-
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
 
 class EvalCallback(EventCallback):
     # NOTE: This is a slightly modified version of the one provided by SB3
-    
+
     """
     Callback for evaluating an agent.
 
@@ -45,12 +43,12 @@ class EvalCallback(EventCallback):
 
     def __init__(
         self,
-        eval_env: Union[gym.Env, VecEnv],
+        eval_env: Union[gymnasium.Env, VecEnv],
         callback_on_new_best: Optional[BaseCallback] = None,
         n_eval_episodes: int = 5,
         eval_freq: int = 10,
-        log_path: Optional[str] = None,
-        best_model_save_path: Optional[str] = None,
+        log_path: Optional[Path] = None,
+        best_model_save_path: Optional[Path] = None,
         deterministic: bool = True,
         render: bool = False,
         verbose: int = 1,
@@ -183,7 +181,7 @@ class EvalCallback(EventCallback):
     def _on_rollout_end(self):
         self.n_rollouts += 1
         if self.execute_on_rollout_end and self.eval_freq > 0 and self.n_rollouts % self.eval_freq == 0:
-            try: 
+            try:
                 self._run_eval()
             except Exception as e:
                 logger.error(e, exc_info=True)

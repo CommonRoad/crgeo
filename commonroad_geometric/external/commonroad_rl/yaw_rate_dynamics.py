@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 import numpy as np
 from commonroad.common.solution import VehicleModel, VehicleType
-from commonroad.scenario.trajectory import State
+from commonroad.scenario.state import State
 from commonroad_dc.feasibility.vehicle_dynamics import VehicleDynamics
 from scipy.optimize import Bounds
 from vehiclemodels.vehicle_parameters import VehicleParameters

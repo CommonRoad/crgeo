@@ -2,6 +2,7 @@ import torch
 from torch import nn, Tensor
 import numpy as np
 
+
 class Time2Vec(nn.Module):
     """Implementation of time representation from Time2Vec paper.
     https://arxiv.org/pdf/1907.05321.pdf

@@ -4,12 +4,11 @@ from typing import Type
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
-from commonroad_geometric.dataset.iteration.scenario_iterator import ScenarioBundle
+from commonroad_geometric.dataset.scenario.iteration.scenario_bundle import ScenarioBundle
 from commonroad_geometric.simulation.base_simulation import BaseSimulation, BaseSimulationOptions
 from commonroad_geometric.simulation.ego_simulation.control_space.base_control_space import BaseControlSpace, BaseControlSpaceOptions
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation, EgoVehicleSimulationOptions
 from commonroad_geometric.simulation.ego_simulation.respawning import BaseRespawner, BaseRespawnerOptions
-from commonroad_geometric.simulation.interfaces.static.compressed_scenario_simulation import CompressedSimulationOptions
 
 
 class EgoVehicleSimulationFactory(AutoReprMixin):
@@ -37,15 +36,12 @@ class EgoVehicleSimulationFactory(AutoReprMixin):
         self,
         scenario_bundle: ScenarioBundle,
     ) -> EgoVehicleSimulation:
-        if scenario_bundle.trajectory_pickle_file is not None and isinstance(self._simulation_options, CompressedSimulationOptions):
-            self._simulation_options.trajectory_pickle_file = scenario_bundle.trajectory_pickle_file
-
         simulation = self._simulation_cls(
             initial_scenario=scenario_bundle.preprocessed_scenario,
             options=self._simulation_options,
         )
 
-        extractor = self._extractor_factory.create(simulation=simulation)
+        extractor = self._extractor_factory(simulation=simulation)
         ego_vehicle_simulation = EgoVehicleSimulation(
             simulation=simulation,
             control_space=self._control_space_cls(options=self._control_space_options),

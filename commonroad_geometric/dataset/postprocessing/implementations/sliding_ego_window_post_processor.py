@@ -5,10 +5,12 @@ from commonroad_geometric.dataset.postprocessing.base_data_postprocessor import 
 from commonroad_geometric.simulation.base_simulation import BaseSimulation
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle import EgoVehicle
 
+
 class SlidingEgoWindowPostProcessor(BaseDataPostprocessor):
     """
-    Inserts a virtual lanelet node at the current ego vehicle position. 
+    Inserts a virtual lanelet node at the current ego vehicle position.
     """
+
     def __init__(
         self,
         lanelet_length: float
@@ -27,4 +29,3 @@ class SlidingEgoWindowPostProcessor(BaseDataPostprocessor):
         ego_vehicle: Optional[EgoVehicle] = None
     ) -> List[CommonRoadData]:
         raise NotImplementedError()
-        

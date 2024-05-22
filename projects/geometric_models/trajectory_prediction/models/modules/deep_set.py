@@ -1,7 +1,7 @@
-from typing import List, Dict, Tuple, Literal
+from typing import Literal
 
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 
 
 class DeepSetInvariant(nn.Module):

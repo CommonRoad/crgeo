@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class OccupancyPenaltyRewardComputer(BaseRewardComputer):
     def __init__(
-        self, 
+        self,
         penalty: float = -0.04,
         discount_factor: float = 0.95,
         time_start: float = 0.0,
@@ -37,14 +37,15 @@ class OccupancyPenaltyRewardComputer(BaseRewardComputer):
         data: CommonRoadData
     ) -> float:
         if self._time_cutoff_mask is None:
-            self._time_cutoff_mask =  int(self.time_cutoff // simulation.dt)
+            self._time_cutoff_mask = int(self.time_cutoff // simulation.dt)
         if self._time_start_mask is None:
-            self._time_start_mask =  int(self.time_start // simulation.dt)
+            self._time_start_mask = int(self.time_start // simulation.dt)
 
         try:
             pred = data.ego_shape_occupancy_predictions[self._time_start_mask:self._time_cutoff_mask]
         except AttributeError:
-            logger.warning("Data instance does not contain ego shape occupancy predictions. OccupancyEncodingPostProcessor likely not successfully applied. Setting zero reward")    
+            logger.warning(
+                "Data instance does not contain ego shape occupancy predictions. OccupancyEncodingPostProcessor likely not successfully applied. Setting zero reward")
             return 0.0
 
         discounts = torch.cumprod(
@@ -60,11 +61,11 @@ class OccupancyPenaltyRewardComputer(BaseRewardComputer):
         if not mask.any():
             return 0.0
 
-        discounted_preds = (pred*discounts)[mask]
+        discounted_preds = (pred * discounts)[mask]
         if self.use_max:
             agg_p = discounted_preds.max().item()
         else:
             agg_p = discounted_preds.sum().item()
-        penalty = self.penalty*agg_p
+        penalty = self.penalty * agg_p
 
         return penalty

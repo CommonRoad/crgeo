@@ -24,9 +24,9 @@ def offset_graph(graph: rg.Graph) -> None:
                     if len(incoming) < len(outgoing):
                         # new lanes are created, outgoing edge is set off
                         offset = (
-                                (len(outgoing) - len(incoming))
-                                / 2
-                                * config.LANEWIDTHS[edge.roadtype]
+                            (len(outgoing) - len(incoming))
+                            / 2
+                            * config.LANEWIDTHS[edge.roadtype]
                         )
                         if lane_linker.merge_left(incoming, outgoing):
                             offset *= -1
@@ -36,9 +36,9 @@ def offset_graph(graph: rg.Graph) -> None:
                     elif len(incoming) > len(outgoing):
                         # lanes are removed, incoming edge is set off
                         offset = (
-                                (len(incoming) - len(outgoing))
-                                / 2
-                                * config.LANEWIDTHS[edge.roadtype]
+                            (len(incoming) - len(outgoing))
+                            / 2
+                            * config.LANEWIDTHS[edge.roadtype]
                         )
                         if lane_linker.merge_left(incoming, outgoing):
                             offset *= -1
@@ -50,7 +50,7 @@ def offset_graph(graph: rg.Graph) -> None:
             # edges are sorted counterclockwise
             edges = sorted(node.edges, key=lambda e: e.get_orientation(node))
             for edge_index, edge in enumerate(edges):
-                other_edges = edges[edge_index + 1 :] + edges[:edge_index]
+                other_edges = edges[edge_index + 1:] + edges[:edge_index]
                 if (
                     edge.node2 == node
                     and edge.oneway
@@ -67,9 +67,9 @@ def offset_graph(graph: rg.Graph) -> None:
                         raise ValueError("Graph is malformed")
                     if len(incoming) < len(outgoing):
                         offset = (
-                                (len(outgoing) - len(incoming))
-                                / 2
-                                * config.LANEWIDTHS[edge.roadtype]
+                            (len(outgoing) - len(incoming))
+                            / 2
+                            * config.LANEWIDTHS[edge.roadtype]
                         )
                         if not to_right:
                             offset *= -1
@@ -78,9 +78,9 @@ def offset_graph(graph: rg.Graph) -> None:
                         )
                     elif len(incoming) > len(outgoing):
                         offset = (
-                                (len(incoming) - len(outgoing))
-                                / 2
-                                * config.LANEWIDTHS[edge.roadtype]
+                            (len(incoming) - len(outgoing))
+                            / 2
+                            * config.LANEWIDTHS[edge.roadtype]
                         )
                         if to_right:
                             offset *= -1

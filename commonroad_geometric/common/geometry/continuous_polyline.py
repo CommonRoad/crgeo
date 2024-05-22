@@ -4,10 +4,10 @@ from typing import Optional, Tuple, Type, Union
 
 import numpy as np
 import shapely
+from shapely.geometry.base import BaseGeometry
 from shapely.geometry.linestring import LineString
 from commonroad.geometry.transform import rotate_translate
 from scipy import interpolate
-from shapely.geometry.base import BaseGeometry
 
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 
@@ -20,10 +20,10 @@ class ContinuousPolyline(AutoReprMixin):
 
     def __init__(
         self,
-        waypoints: Union[np.ndarray,LineString],
+        waypoints: Union[np.ndarray, LineString],
         # TODO: Are there defaults reasonable?
-        waypoint_resolution: int = 200,
-        linestring_resolution: int = 200,
+        waypoint_resolution: int = 50,
+        linestring_resolution: int = 50,
         extrapolate: bool = False,
         refinement_steps: int = 3,
         min_waypoint_distance: float = 1e-3,
@@ -62,7 +62,8 @@ class ContinuousPolyline(AutoReprMixin):
         self._linspace = np.linspace(0, self.length, self._num_points)
         self._coordinate_arr = self._path_coords(self._linspace)
         self._derivative_arr = self._path_derivatives(self._linspace)
-        self._tangential_dir_arr = np.arctan2(self._derivative_arr[:, 1], self._derivative_arr[:, 0])  # TODO: Only compute on first access
+        # TODO: Only compute on first access
+        self._tangential_dir_arr = np.arctan2(self._derivative_arr[:, 1], self._derivative_arr[:, 0])
         self._linestring = shapely.geometry.LineString(self._coordinate_arr)
 
         self._curvature_arr: Optional[np.ndarray] = None
@@ -70,6 +71,9 @@ class ContinuousPolyline(AutoReprMixin):
 
         self._start_direction = self.get_direction(0)
         self._end_direction = self.get_direction(self.length)
+        self._path_vector = self.end - self.start
+        self._path_vector_square_magnitude = np.dot(self._path_vector, self._path_vector)
+        self._path_vector_magnitude = np.sqrt(self._path_vector_square_magnitude)
 
     @property
     def length(self) -> float:
@@ -112,10 +116,10 @@ class ContinuousPolyline(AutoReprMixin):
     def slice(self, from_arclength: float, to_arclength: float, inclusive: bool = True) -> np.ndarray:
         assert to_arclength > from_arclength
         start_index = self._get_cache_index(from_arclength)
-        end_index =  self._get_cache_index(to_arclength)
+        end_index = self._get_cache_index(to_arclength)
         return self._coordinate_arr[start_index:end_index + int(inclusive)]
 
-    def __call__(self, arclength: float, use_cached: bool = False) -> np.ndarray:
+    def __call__(self, arclength: float, use_cached: bool = True) -> np.ndarray:
         """
         Returns the (x,y) point corresponding to the
         specified arclength.
@@ -170,7 +174,7 @@ class ContinuousPolyline(AutoReprMixin):
             yd = self._derivative_arr[:, 1]
             xdd = dd_arr[:, 0]
             ydd = dd_arr[:, 1]
-            self._curvature_arr = (xd*ydd - yd*xdd) / np.power(xd** 2 + yd** 2, 1.5)
+            self._curvature_arr = (xd * ydd - yd * xdd) / np.power(xd ** 2 + yd ** 2, 1.5)
         return self._curvature_arr
 
     def get_normal_vector(self, arclength) -> np.ndarray:
@@ -179,34 +183,60 @@ class ContinuousPolyline(AutoReprMixin):
         index = self._get_cache_index(arclength)
         return self._normal_arr[index]
 
-    def get_projected_direction(
-        self,
-        position: np.ndarray,
-        use_cached: bool = True
-    ) -> float:
-        arclength = self.get_projected_arclength(position)
-        return self.get_direction(arclength, use_cached=use_cached)
-
     def get_projected_arclength(
         self,
         position: np.ndarray,
+        *,
         relative: bool = False,
+        linear_projection: bool = False
     ) -> float:
         """
         Returns the arc length value corresponding to the point
         on the path which is closest to the specified position.
 
+        Parameters
+        ----------
+        position : np.ndarray
+            The position for which to find the closest arc length.
+        relative : bool, optional
+            If True, the returned arc length will be relative to the total length of the path.
+        linear_projection : bool, optional
+            If True, the linear projection method will be used for the arc length calculation.
+
         Returns
         -------
         arclength : float
+            The closest arc length value to the specified position.
         """
-        arclength = self._linestring.project(shapely.geometry.Point(position))
+
+        if linear_projection:
+            position_vector = position - self.start
+            projection = np.dot(position_vector, self._path_vector) / self._path_vector_square_magnitude
+            arclength = self.length * projection
+        else:
+            arclength = self._linestring.project(shapely.geometry.Point(position))
+
         arclength = max(0.0, min(arclength, self.length))
         if relative:
             return arclength / self.length
         return arclength
 
-    def get_projected_position(self, position: np.ndarray) -> np.ndarray:
+    def get_projected_direction(
+        self,
+        position: np.ndarray,
+        *,
+        linear_projection: bool = False,
+        use_cached: bool = True
+    ) -> float:
+        arclength = self.get_projected_arclength(position, linear_projection=linear_projection)
+        return self.get_direction(arclength, use_cached=use_cached)
+
+    def get_projected_position(
+        self,
+        position: np.ndarray,
+        *,
+        linear_projection: bool = False
+    ) -> np.ndarray:
         """
         Projects position to polyline.
 
@@ -214,13 +244,18 @@ class ContinuousPolyline(AutoReprMixin):
         -------
         projection : np.ndarray
         """
-        arclength = self.get_projected_arclength(position)
+        arclength = self.get_projected_arclength(
+            position,
+            linear_projection=linear_projection
+        )
         projection = self(arclength)
         return projection
 
     def get_projected_distance(
         self,
         position: np.ndarray,
+        *,
+        linear_projection: bool = False,
         arclength: Optional[float] = None,
         use_cached: bool = True
     ) -> float:
@@ -233,7 +268,10 @@ class ContinuousPolyline(AutoReprMixin):
         arclength : float
         """
         if arclength is None:
-            arclength = self.get_projected_arclength(position)
+            arclength = self.get_projected_arclength(
+                position,
+                linear_projection=linear_projection
+            )
         if arclength > self.length:
             projection = self(self.length)
         elif arclength < 0:
@@ -243,8 +281,16 @@ class ContinuousPolyline(AutoReprMixin):
         distance = float(np.linalg.norm(position - projection))
         return distance
 
-    def get_lateral_distance(self, position: np.ndarray) -> float:
-        arclength = self.get_projected_arclength(position)
+    def get_lateral_distance(
+        self,
+        position: np.ndarray,
+        *,
+        linear_projection: bool = False,
+    ) -> float:
+        arclength = self.get_projected_arclength(
+            position,
+            linear_projection=linear_projection
+        )
         xy_diff_position = position - self(arclength)
         lateral_distance = rotate_translate(
             xy_diff_position[None, :],
@@ -256,14 +302,14 @@ class ContinuousPolyline(AutoReprMixin):
     def lateral_translate(self, distance: float) -> ContinuousPolyline:
         if self._normal_arr is None:
             self._normal_arr = self._compute_normal_arr()
-        new_waypoints = self._coordinate_arr + distance*self._normal_arr
+        new_waypoints = self._coordinate_arr + distance * self._normal_arr
         return type(self)(new_waypoints)
 
     def lateral_translate_point(self, arclength: float, lateral_distance: float) -> np.ndarray:
         if self._normal_arr is None:
             self._normal_arr = self._compute_normal_arr()
         index = self._get_cache_index(arclength)
-        point = self._coordinate_arr[index] + lateral_distance*self._normal_arr[index]
+        point = self._coordinate_arr[index] + lateral_distance * self._normal_arr[index]
         return point
 
     def intersect(self, other: 'ContinuousPolyline') -> BaseGeometry:

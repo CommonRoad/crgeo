@@ -3,19 +3,18 @@ from __future__ import annotations
 import logging
 import os
 import os.path
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Type, Union
 
 import numpy as np
 import torch
 from stable_baselines3.common.base_class import BaseAlgorithm
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, BaseCallback
 from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
 from wandb.integration.sb3 import WandbCallback
 
 from commonroad_geometric.common.logging import stdout
-from commonroad_geometric.common.utils.string import numpy_prettify
 from commonroad_geometric.learning.reinforcement.experiment import RLExperiment
 from commonroad_geometric.learning.reinforcement.training.custom_callbacks import EvalCallback, LogEpisodeMetricsCallback, LogPolicyMetricsCallback, RecordVideoSubprocCallback
 from commonroad_geometric.learning.reinforcement.training.types import T_GymEnvironment
@@ -44,7 +43,8 @@ class RLTrainerConfig:
     normalize_rewards: bool = False
     normalize_rewards_threshold: float = 10.0
     record_backoff: float = 1.0
-    record_freq: Optional[int] = 10000
+    video_frequency: int = 10000
+    video_recording: bool = True
     total_timesteps: int = 1_000_000
     verbose: int = 0
     video_length: int = 200
@@ -54,14 +54,16 @@ class RLTrainerConfig:
 @dataclass
 class RLTrainerParams:
     experiment: RLExperiment
-    project_name: str
-    scenario_dir: str
+    project_name: Path
+    scenario_dir: Path
     output_dir: Path
-    checkpoint: Optional[str]
+    checkpoint: Optional[Path]
     warmstart: bool
     seed: int
-    model_cfg: RLModelConfig
     train_cfg: RLTrainerConfig
+    model_cfg: RLModelConfig
+    project_cfg: dict
+    custom_callbacks: list[BaseCallback]
 
 
 class RLTrainer:
@@ -81,9 +83,14 @@ class RLTrainer:
 
     def play(
         self,
-        predict_agent: bool = True,
+        predict_agent: bool = True
     ) -> None:
-        env = self.params.experiment.make_env(scenario_dir=self.params.scenario_dir)
+        self.params.experiment.config.env_options.render_on_step = False
+        env = self.params.experiment.make_env(
+            scenario_dir=self.params.scenario_dir,
+            async_resets=False
+        )
+
         experiment_name = self.params.experiment.create_name()
         if predict_agent and self._agent is None:
             self.init_agent(
@@ -93,8 +100,11 @@ class RLTrainer:
                 output_dir=os.path.join(self.params.output_dir, 'play', experiment_name) if self.params.output_dir is not None else None
             )
         obs = env.reset()
-        logger.info("Playing environment as game with keyboard input. Press R to reset and Q to quit.")
-        
+        logger.info("""
+        Playing environment as game with keyboard input.
+        Press R to reset the current scenario, A to advance to the next one and Q to quit.
+        """)
+
         total_reward: float = 0.0
         while 1:
             if predict_agent:
@@ -102,7 +112,7 @@ class RLTrainer:
             else:
                 agent_action = None
             try:
-                action = get_keyboard_action(renderer=env.get_attr('renderers')[0][0])
+                action = get_keyboard_action(env.get_attr('renderers')[0][0].viewer)
             except UserResetInterrupt:
                 env.env_method('respawn')
                 action = np.array([0.0, 0.0], dtype=np.float32)
@@ -115,12 +125,12 @@ class RLTrainer:
                 return
             obs, reward, done, info = env.step([action])
             total_reward += reward.item()
-            msg = f"reward: {reward.item():.3f} ({total_reward:.3f}), low: {info[0]['lowest_reward_computer']} ({info[0]['lowest_reward']:.3f}), high: {info[0]['highest_reward_computer']} ({info[0]['highest_reward']:.3f}), t: {info[0]['time_step']}"
-            if predict_agent:
-                msg += f", agent: {numpy_prettify(agent_action)}"
-            stdout(msg)
+            if self.params.train_cfg.verbose > 0:
+                msg = f"reward: {reward.item():.3f} ({total_reward:.3f}), low: {info[0]['lowest_reward_computer']} ({info[0]['lowest_reward']:.3f}), high: {info[0]['highest_reward_computer']} ({info[0]['highest_reward']:.3f}), t: {info[0]['time_step']}"
+                #, {obs=}
+                stdout(msg)
             if not done:
-                env.render()
+                env.render('rgb_array')
             else:
                 total_reward = 0.0
 
@@ -141,17 +151,14 @@ class RLTrainer:
             )
             experiment_name = wandb_service.start_experiment(
                 name=experiment_name,
-                metadata=dict(
-                    params=self.params,
-                    config=self.train_cfg
-                ),
+                metadata=asdict(self.params.project_cfg),
                 include_timestamp=False,
                 include_random_name=True,
                 update_terminal_title=True,
                 sync_tensorboard=True
             )
 
-        output_dir = os.path.join(self.params.output_dir, experiment_name) if self.params.output_dir is not None else None
+        output_dir = self.params.output_dir.joinpath(experiment_name) if self.params.output_dir is not None else None
 
         logger.debug(f"Creating {n_envs} training environment(s) with seed {self.params.seed}")
         train_env = self.params.experiment.make_env(self.params.scenario_dir, n_envs, seed=self.params.seed)
@@ -185,7 +192,8 @@ class RLTrainer:
                 output_dir=output_dir,
                 checkpoint=self.params.checkpoint if self.params.warmstart else None
             )
-        except ValueError:
+        except ValueError as e:
+            logger.error(e, exc_info=True)
             logger.warn("Failed to warmstart agent - initializing new")
             self.init_agent(
                 env=train_env,
@@ -202,30 +210,30 @@ class RLTrainer:
         if output_dir is not None:
             callbacks.append(CheckpointCallback(
                 save_freq=max(self.train_cfg.checkpoint_freq // n_envs, 1),
-                save_path=os.path.join(output_dir, 'checkpoints'),
+                save_path=output_dir.joinpath('checkpoints'),
                 name_prefix=experiment_name,
                 verbose=self.train_cfg.verbose
             ))
-            if self.train_cfg.eval_freq is not None:
+            if self.train_cfg.eval_freq is not None and self.train_cfg.n_eval_episodes > 0:
                 callbacks.append(
                     EvalCallback(
                         eval_env=eval_env,
                         n_eval_episodes=self.train_cfg.n_eval_episodes,
                         eval_freq=max(self.train_cfg.eval_freq // n_envs, 1),
-                        log_path=os.path.join(output_dir, 'evaluations'),
-                        best_model_save_path=os.path.join(output_dir, 'best'),
+                        log_path=output_dir.joinpath('evaluations'),
+                        best_model_save_path=output_dir.joinpath('best'),
                         verbose=self.train_cfg.verbose
                     )
                 )
 
-            if self.train_cfg.record_freq is not None:
+            if self.train_cfg.video_recording and self.train_cfg.video_frequency is not None and self.train_cfg.video_frequency > 0:
                 callbacks.append(
                     RecordVideoSubprocCallback(
                         scenario_dir=self.params.scenario_dir,
                         experiment_file=experiment_file_path,
-                        record_freq=self.train_cfg.record_freq,
+                        video_frequency=self.train_cfg.video_frequency,
                         record_backoff=self.train_cfg.record_backoff,
-                        video_folder=os.path.join(output_dir, 'videos'),
+                        video_folder=output_dir.joinpath( 'videos'),
                         video_length=self.train_cfg.video_length,
                         device='cpu'
                     )
@@ -234,9 +242,11 @@ class RLTrainer:
         if self.train_cfg.wandb_logging and wandb_service.success:
             callbacks.append(WandbCallback(
                 gradient_save_freq=self.train_cfg.gradient_save_freq,
-                model_save_path=os.path.join(output_dir, 'wandb-models') if output_dir is not None else None,
+                model_save_path=output_dir.joinpath('wandb-models') if output_dir is not None else None,
                 verbose=2,
             ))
+
+        callbacks.extend(self.params.custom_callbacks)
         callbacks = CallbackList(callbacks)
 
         try:
@@ -248,6 +258,7 @@ class RLTrainer:
             )
         except KeyboardInterrupt as e:
             # Exiting gracefully
+            logger.info('Received KeyBoardInterrupt - exiting training process')
             train_env.close()
             eval_env.close()
             raise e
@@ -259,11 +270,10 @@ class RLTrainer:
     def enjoy(
         self,
         total_timesteps: Optional[int] = None,
-        deterministic: Optional[Union[Callable[[int], bool], bool]] = None
+        deterministic: bool = True
     ) -> Iterable[Dict[str, float]]:
-    
-        if deterministic is None:
-            deterministic = lambda i: int(i // 50) % 2 == 0
+        self.params.experiment.config.env_options.render_on_step = False
+        logger.info("Enjoying agent")
 
         for obs, reward, done, info in render_agent(
             agent=self._agent,
@@ -278,16 +288,21 @@ class RLTrainer:
 
     def record(
         self,
-        scenario_dir: str,
-        video_folder: str,
+        scenario_dir: Path,
+        video_folder: Path,
         video_length: Optional[int] = None,
         deterministic: bool = True,
         seed: int = 0,
         n_videos: int = 1
     ) -> Iterable[Dict[str, float]]: # TODO redundant
-        os.makedirs(video_folder, exist_ok=True)
+        self.params.experiment.config.env_options.render_on_step = False
+        video_folder.mkdir(parents=True, exist_ok=True)
 
-        env = self.params.experiment.make_env(scenario_dir, seed=seed)
+        env = self.params.experiment.make_env(
+            scenario_dir,
+            seed=seed,
+            async_resets=False
+        )
         for i in range(n_videos):
             list(render_agent(
                 agent=self._agent,
@@ -298,7 +313,8 @@ class RLTrainer:
                 total_timesteps=video_length,
                 deterministic=deterministic,
                 seed=seed,
-                break_on_done=True
+                break_on_done=True,
+                verbose=1
             ))
 
     def init_agent(
@@ -307,9 +323,9 @@ class RLTrainer:
         device: Optional[torch.device] = None,
         env: Optional[Optional[T_GymEnvironment]] = None,
         seed: int = 0,
-        output_dir: Optional[str] = None,
-        checkpoint: Optional[str] = None,
-        scenario_dir: Optional[str] = None
+        output_dir: Optional[Path] = None,
+        checkpoint: Optional[Path] = None,
+        scenario_dir: Optional[Path] = None
     ) -> None:
         if device is None:
             device = self.train_cfg
@@ -320,7 +336,8 @@ class RLTrainer:
                 scenario_dir=scenario_dir
             )
         self._env = env
-        tensorboard_log = os.path.join(output_dir, 'tensorboard') if output_dir is not None else None
+        tensorboard_log = output_dir.joinpath('tensorboard') if output_dir is not None else None
+
         if checkpoint is None:
             self._agent = self.model_cfg.agent_cls(
                 env=env,
@@ -329,6 +346,7 @@ class RLTrainer:
                 seed=seed,
                 **self.model_cfg.agent_kwargs
             )
+            logger.info(f"Initialized new {self.model_cfg.agent_cls.__name__} agent.")
 
         else:
             self._agent = self.model_cfg.agent_cls.load(
@@ -339,5 +357,4 @@ class RLTrainer:
                 seed=seed,
                 **self.model_cfg.agent_kwargs
             )
-
-        logger.info(f"Loaded {self.model_cfg.agent_cls.__name__} agent from {checkpoint}")
+            logger.info(f"Loaded {self.model_cfg.agent_cls.__name__} agent from {checkpoint=}")

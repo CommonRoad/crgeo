@@ -5,7 +5,7 @@ import numpy as np
 
 
 def debugger_is_active() -> bool:
-    gettrace = getattr(sys, 'gettrace', lambda : None) 
+    gettrace = getattr(sys, 'gettrace', lambda: None)
     return gettrace() is not None
 
 
@@ -18,8 +18,8 @@ def get_gpu_count() -> int:
 
 
 def get_gpu_usage() -> float:
-    #t = torch.cuda.get_device_properties(0).total_memory
+    # t = torch.cuda.get_device_properties(0).total_memory
     r = torch.cuda.memory_reserved(0)
     a = torch.cuda.memory_allocated(0)
-    #f = r-a  # free inside reserved
+    # f = r-a  # free inside reserved
     return a / r if r > 0 else np.nan

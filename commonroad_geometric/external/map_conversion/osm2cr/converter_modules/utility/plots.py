@@ -45,14 +45,14 @@ def draw_edge_orientation(edge: rg.GraphEdge, ax: axis):
 
     # draw an arrow from start to end of edge
     ax.scatter(edge.node1.x, edge.node1.y, color="blue")
-    ax.arrow(x=edge.node1.x,  y=edge.node1.y,  dx=edge.node2.x - edge.node1.x,  dy=edge.node2.y - edge.node1.y,
-             color="red",  width=1, head_width=6)
+    ax.arrow(x=edge.node1.x, y=edge.node1.y, dx=edge.node2.x - edge.node1.x, dy=edge.node2.y - edge.node1.y,
+             color="red", width=1, head_width=6)
     # print compass degrees
     ax.text(
-        x=(edge.node1.x + edge.node2.x)/2,
-        y=(edge.node1.y + edge.node2.y)/2,
+        x=(edge.node1.x + edge.node2.x) / 2,
+        y=(edge.node1.y + edge.node2.y) / 2,
         s='{}'.format(int(edge.get_compass_degrees()))
-        )
+    )
 
 
 def draw_lanelet_direction(lane: rg.Lane, ax: axis):

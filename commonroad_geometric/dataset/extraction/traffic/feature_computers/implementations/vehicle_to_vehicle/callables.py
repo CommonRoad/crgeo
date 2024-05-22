@@ -41,8 +41,8 @@ def ft_rel_state_ego(params: V2VFeatureParams, simulation: BaseSimulation) -> Fe
 
     source_velocity_y = params.source_state.velocity_y if "velocity_y" in params.source_state.attributes else 0.0
     target_velocity_y = params.target_state.velocity_y if "velocity_y" in params.target_state.attributes else 0.0
-    source_acceleration = params.source_state.acceleration if "acceleration" in params.source_state.attributes else 0.0
-    target_acceleration = params.target_state.acceleration if "acceleration" in params.target_state.attributes else 0.0
+    source_acceleration = params.source_state.acceleration if "acceleration" in params.source_state.attributes and params.source_state.acceleration is not None else 0.0
+    target_acceleration = params.target_state.acceleration if "acceleration" in params.target_state.attributes and params.target_state.acceleration is not None else 0.0
     source_acceleration_y = params.source_state.acceleration_y if "acceleration_y" in params.source_state.attributes else 0.0
     target_acceleration_y = params.target_state.acceleration_y if "acceleration_y" in params.target_state.attributes else 0.0
 

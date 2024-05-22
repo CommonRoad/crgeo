@@ -8,7 +8,6 @@ from commonroad_geometric.learning.training.wandb_service.wandb_service import W
 from projects.geometric_models.drivable_area.utils.visualization.plotting import create_drivable_area_prediction_image
 
 
-
 class LogDrivableAreaWandb(BaseCallback[EarlyStoppingCallbacksParams]):
     def __init__(self, wandb_service: WandbService):
         self.wandb_service = wandb_service
@@ -19,9 +18,9 @@ class LogDrivableAreaWandb(BaseCallback[EarlyStoppingCallbacksParams]):
 
         images: List[Tensor] = []
         try:
-            time_step, prediction = params.output[-2], params.output[-1]
+            time_step, prediction = params.output[1], params.output[2]
         except IndexError:
-            return # TODO, trajectory prediction model
+            return  # TODO, trajectory prediction model
         if isinstance(prediction, tuple):
             prediction, sample_ind = prediction
         prediction_size = params.ctx.model.cfg.drivable_area_decoder.prediction_size
@@ -30,7 +29,8 @@ class LogDrivableAreaWandb(BaseCallback[EarlyStoppingCallbacksParams]):
 
         prediction = prediction.view(prediction.size(0), prediction_size, prediction_size)
         prediction_rgb = create_drivable_area_prediction_image(prediction).numpy()
-        for idx in range(min(30, params.batch.vehicle.drivable_area.size(0))): # torch.randint(0, prediction.size(0), size=(12,)):
+        # torch.randint(0, prediction.size(0), size=(12,)):
+        for idx in range(min(30, params.batch.vehicle.drivable_area.size(0))):
             prediction_img = prediction_rgb[idx]
             drivable_area_img = (params.batch.vehicle.drivable_area[idx] * 255).type(torch.uint8).cpu().numpy()
             images += [

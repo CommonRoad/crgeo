@@ -25,9 +25,6 @@ class CommonRoadDataTemporal(CommonRoadData):
     """A CommonRoadData heterogeneous temporal graph.
     Spatio-temporal graphs encode spatial relationships as well as a time dimension in the graph structure.
     For example, nodes can be associated with a time step and edges can encode relative positions of connected nodes.
-
-    Please note that creating a batch of CommonRoadDataTemporal instances comes with some problems.
-    For more information check out https://gitlab.lrz.de/cps/commonroad-geometric/-/issues/229.
     """
 
     @classmethod
@@ -142,7 +139,7 @@ class CommonRoadDataTemporal(CommonRoadData):
                                 feature_dict = feature_computer(params)
                                 for k, v in feature_dict.items():
                                     if k not in edge_attr_indices_mapping:
-                                        feature_size = v.shape[0] if isinstance(v, Tensor) else 1 # TODO
+                                        feature_size = v.shape[0] if isinstance(v, Tensor) else 1  # TODO
                                         edge_attr_indices_mapping[k] = (num_edge_attr, num_edge_attr + feature_size)
                                         num_edge_attr += feature_size
 
@@ -175,16 +172,22 @@ class CommonRoadDataTemporal(CommonRoadData):
         num_unique_edges = data.lanelet_to_lanelet.num_edges // N
 
         # check assumptions
-        assert (torch.diff(data._slice_dict["lanelet"]["x"]) == num_unique_nodes).all()  # equal number of nodes in each graph
+        assert (torch.diff(data._slice_dict["lanelet"]["x"]) ==
+                num_unique_nodes).all()  # equal number of nodes in each graph
         # same node attributes
         for i in range(1, N):
-            assert (data.lanelet.x[:num_unique_nodes] == data.lanelet.x[i*num_unique_nodes:(i+1)*num_unique_nodes]).all()
-        assert (torch.diff(data._inc_dict["lanelet", "to", "lanelet"]["edge_index"][:, 0, 0]) == num_unique_nodes).all()  # equal number of nodes in each graph
-        assert (torch.diff(data._slice_dict["lanelet", "to", "lanelet"]["edge_index"]) == num_unique_edges).all()  # equal number of edges in each graph
+            assert (data.lanelet.x[:num_unique_nodes] == data.lanelet.x[i *
+                    num_unique_nodes:(i + 1) * num_unique_nodes]).all()
+        assert (torch.diff(data._inc_dict["lanelet", "to", "lanelet"]["edge_index"]
+                [:, 0, 0]) == num_unique_nodes).all()  # equal number of nodes in each graph
+        assert (torch.diff(data._slice_dict["lanelet", "to", "lanelet"]["edge_index"])
+                == num_unique_edges).all()  # equal number of edges in each graph
         # same edge order & edge attributes
         for i in range(1, N):
-            assert (data.lanelet_to_lanelet.edge_index[:, :num_unique_edges] == (data.lanelet_to_lanelet.edge_index[:, i*num_unique_edges:(i+1)*num_unique_edges] % num_unique_nodes)).all()
-            assert (data.lanelet_to_lanelet.edge_attr[:num_unique_edges] == (data.lanelet_to_lanelet.edge_attr[i*num_unique_edges:(i+1)*num_unique_edges])).all()
+            assert (data.lanelet_to_lanelet.edge_index[:, :num_unique_edges] == (
+                data.lanelet_to_lanelet.edge_index[:, i * num_unique_edges:(i + 1) * num_unique_edges] % num_unique_nodes)).all()
+            assert (data.lanelet_to_lanelet.edge_attr[:num_unique_edges] == (
+                data.lanelet_to_lanelet.edge_attr[i * num_unique_edges:(i + 1) * num_unique_edges])).all()
 
         # replace duplicate lanelet edge indices
         data.lanelet_to_vehicle.edge_index[0] = data.lanelet_to_vehicle.edge_index[0] % num_unique_nodes
@@ -280,7 +283,8 @@ class CommonRoadDataTemporal(CommonRoadData):
                 else:
                     edge_index_inv_mask = edge_index_mask_end
 
-            data_slice.vehicle_temporal_vehicle.edge_index = self.vehicle_temporal_vehicle.edge_index[:, ~edge_index_inv_mask]
+            data_slice.vehicle_temporal_vehicle.edge_index = self.vehicle_temporal_vehicle.edge_index[
+                :, ~edge_index_inv_mask]
             if start > 0:
                 data_slice.vehicle_temporal_vehicle.edge_index -= edge_index_start
 
@@ -344,16 +348,17 @@ class CommonRoadDataTemporal(CommonRoadData):
     def vehicle_at_time_step(self, t: int) -> VirtualAttributesNodeStorage:
         return self.storage_at_time_step("vehicle", t)
 
-    def get_node_features_temporal_sequence_for_vehicle(self, vehicle_id: int, keys: Optional[Sequence[str]] = None) -> Tensor:
+    def get_node_features_temporal_sequence_for_vehicle(
+            self, vehicle_id: int, keys: Optional[Sequence[str]] = None) -> Tensor:
         # TODO: Document, rename & unit-test
         if self.vehicle is None:
             raise AttributeError("self.vehicle is None")
         if keys is None:
-            x = self.vehicle.x # type: ignore
+            x = self.vehicle.x  # type: ignore
         else:
             x = torch.cat([self.vehicle[key] for key in keys], dim=-1)
-        id = self.vehicle.id.squeeze() # type: ignore
-        x_v: Tensor = x[id==vehicle_id, :]
+        id = self.vehicle.id.squeeze()  # type: ignore
+        x_v: Tensor = x[id == vehicle_id, :]
         return x_v
 
     def get_node_features_temporal_sequence(self, keys: Optional[Sequence[str]] = None) -> Tensor:
@@ -378,6 +383,7 @@ class CommonRoadDataTemporal(CommonRoadData):
     def __reduce__(self) -> Tuple:
         # https://docs.python.org/3/library/pickle.html#object.__reduce__
         return CommonRoadDataTemporal, (), self.__getstate__()
+
 
 class CommonRoadDataTemporalBatch(Batch):
     """
@@ -409,13 +415,14 @@ class CommonRoadDataTemporalBatch(Batch):
         batch._temporal_data_inc_dict = temporal_data_inc_dict
 
         return batch
+
     def get_example(self, idx: int) -> BaseData:
 
         if not hasattr(self, '_slice_dict'):
             raise RuntimeError(
                 ("Cannot reconstruct 'Data' object from 'Batch' because "
                  "'Batch' was not created via 'Batch.from_data_list()'"))
-        
+
         data = separate(
             cls=self.__class__.__bases__[-1],
             batch=self,

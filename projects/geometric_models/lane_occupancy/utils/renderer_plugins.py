@@ -1,56 +1,90 @@
-from typing import List, Optional, Set
-import torch
 import os
-import numpy as np
 import warnings
-import matplotlib.pyplot as plt
+from typing import List, Optional, Set
+
 import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 from matplotlib.colors import LinearSegmentedColormap
-#import seaborn
 
 from commonroad_geometric.common.geometry.continuous_polyline import ContinuousPolyline
 from commonroad_geometric.common.math import calc_closest_factors
 from commonroad_geometric.common.utils.system import debugger_is_active
-from commonroad_geometric.rendering.base_renderer_plugin import BaseRendererPlugin
-from commonroad_geometric.rendering.color_utils import cmyk_to_rgb, rgb_to_cmyk
-from commonroad_geometric.rendering.defaults import ColorTheme
-from commonroad_geometric.rendering.plugins.render_lanelet_network_plugin import draw_lanelet
+from commonroad_geometric.rendering import Color
+from commonroad_geometric.rendering.color.theme import ColorTheme
+from commonroad_geometric.rendering.plugins.base_renderer_plugin import BaseRenderPlugin
+from commonroad_geometric.rendering.plugins.implementations.render_lanelet_network_plugin import draw_lanelet
 from commonroad_geometric.rendering.types import RenderParams
-from commonroad_geometric.rendering.viewer.viewer_2d import Viewer2D
+from commonroad_geometric.rendering.viewer.pyglet.gl_viewer_2d import GLViewer2D
+
+# import seaborn
 
 np.set_printoptions(formatter={'float': lambda x: "{0:0.4e}".format(x)})
 matplotlib.rcParams['hatch.linewidth'] = 0.7
 
 plt.style.use('ggplot')
-#plt.rc('font', family='serif')
+# plt.rc('font', family='serif')
 matplotlib.rc('text', usetex=True)
-#plt.rc('font', family='serif', serif='Times')
-#plt.rc('text', usetex=True) #RAISES FILENOTFOUNDERROR
+# plt.rc('font', family='serif', serif='Times')
+# plt.rc('text', usetex=True) #RAISES FILENOTFOUNDERROR
 plt.rc('xtick', labelsize=39)
 plt.rc('ytick', labelsize=39)
 plt.rc('axes', labelsize=47)
-plt.rc('legend',fontsize=23)
+plt.rc('legend', fontsize=23)
+
 
 # TODO Needs cleanup: Lots of duplicate code, inconsistent responsibilities, matplotlib hacks
 
-class RenderLaneletOccupancyPredictionPlugin(BaseRendererPlugin):
+def rgb_to_cmyk(r, g, b):
+    if (r == 0) and (g == 0) and (b == 0):
+        # black
+        return 0.0, 0.0, 0.0, 1.0
+
+    # rgb [0,1] -> cmy [0,1]
+    c = 1 - r
+    m = 1 - g
+    y = 1 - b
+
+    # extract out k [0,1]
+    min_cmy = min(c, m, y)
+    c = (c - min_cmy)
+    m = (m - min_cmy)
+    y = (y - min_cmy)
+    k = min_cmy
+
+    return c, m, y, k
+
+
+def cmyk_to_rgb(c, m, y, k):
+    r = 1.0 - (c + k)
+    g = 1.0 - (m + k)
+    b = 1.0 - (y + k)
+    return r, g, b
+
+
+class RenderLaneletOccupancyPredictionPlugin(BaseRenderPlugin):
     _suppress_warnings = False
 
     def __init__(
         self,
         included_lanelet_ids: Optional[Set[int]] = None,
-        enable_matplotlib_plot: bool = True,
-        plot_freq: int = 10
+        enable_matplotlib_plot: bool = False,
+        show_plots: bool = True,
+        plot_freq: int = 10,
+        recreate_polyline: bool = False
     ) -> None:
         self.enable_matplotlib_plot = enable_matplotlib_plot
         self.plot_freq = plot_freq
         self.included_lanelet_ids = included_lanelet_ids
         self.call_count = 0
+        self.show_plots = show_plots
         self.plot_count = 0
+        self.recreate_polyline = recreate_polyline
 
-    def __call__(
+    def render(
         self,
-        viewer: Viewer2D,
+        viewer: GLViewer2D,
         params: RenderParams
     ) -> None:
         if not hasattr(self, 'call_count'):
@@ -83,53 +117,57 @@ class RenderLaneletOccupancyPredictionPlugin(BaseRendererPlugin):
 
         num_lanelets = joint_occ_probs.shape[0]
         time_horizon = joint_occ_probs.shape[1]
-        resolution = joint_occ_probs.shape[2]
+        resolution = joint_occ_probs.shape[2] # IndexError: Sure that it is not accessing path occupancy?
 
         lane_timespace = torch.linspace(
-            0, 
-            1, 
+            0,
+            1,
             time_horizon,
             dtype=torch.float32
         )[None, :, None].repeat(num_lanelets, 1, resolution)
         lane_linspace = torch.linspace(
-            0, 
-            1, 
+            0,
+            1,
             resolution,
             dtype=torch.float32
         )[None, None, :].repeat(num_lanelets, time_horizon, 1)
 
-        road_color_blue = (joint_occ_probs*lane_timespace).max(axis=1)[0]
-        road_color_red = (joint_occ_probs*(1-lane_timespace)).max(axis=1)[0]
+        road_color_blue = (joint_occ_probs * lane_timespace).max(axis=1)[0]
+        road_color_red = (joint_occ_probs * (1 - lane_timespace)).max(axis=1)[0]
 
         for lanelet_idx, lanelet_id_th in enumerate(params.data.lanelet.id):
             lanelet_id = lanelet_id_th.item()
             if self.included_lanelet_ids is not None and lanelet_id not in self.included_lanelet_ids:
                 continue
 
-            center_vertices = params.simulation.lanelet_network.find_lanelet_by_id(lanelet_id).center_vertices
-            center_vertices = center_vertices[~(center_vertices == 0.0).all(axis=1)]
-            
-            lanelet_centerline = params.simulation.get_lanelet_center_polyline(lanelet_id, vertices=center_vertices)
+            if self.recreate_polyline:
+                lanelet_centerline = ContinuousPolyline(params.data.l.center_vertices[lanelet_idx])
+            else:
+                center_vertices = params.simulation.lanelet_network.find_lanelet_by_id(lanelet_id).center_vertices
+                center_vertices = center_vertices[~(center_vertices == 0.0).all(axis=1)]
+                lanelet_centerline = params.simulation.get_lanelet_center_polyline(lanelet_id, vertices=center_vertices)
 
             for t in range(resolution):
                 if road_color_red[lanelet_idx, t].item() > 0.05 or road_color_blue[lanelet_idx, t].item() > 0.05:
-                    color = (
+                    rgb_color = (
                         road_color_red[lanelet_idx, t].item(),
                         0.0,
-                        road_color_blue[lanelet_idx, t].item(), 
-                        1.0
+                        road_color_blue[lanelet_idx, t].item(),
                     )
-            
-                    path_var = lanelet_centerline.length*t/(resolution - 1)
+                    if viewer.options.theme == ColorTheme.BRIGHT:
+                        c, m, y, k = rgb_to_cmyk(*rgb_color)
+                        k = 0
+                        rgb_color = cmyk_to_rgb(c, m, y, k)
+                        rgb_color = (rgb_color[0], rgb_color[1], rgb_color[2], 0.5)
+
+                    path_var = lanelet_centerline.length * t / (resolution - 1)
                     pos = lanelet_centerline(path_var)
 
                     viewer.draw_circle(
+                        creator=self.__class__.__name__,
                         origin=pos,
                         radius=0.8,
-                        color=color,
-                        outline=False,
-                        linecolor=(0.1,1.0,0.1),
-                        linewidth=None
+                        fill_color=Color(rgb_color),
                     )
 
         if not hasattr(self, 'enable_matplotlib_plot'):
@@ -143,24 +181,25 @@ class RenderLaneletOccupancyPredictionPlugin(BaseRendererPlugin):
             return
 
         # TODO: less hardcoding, cleanup
-        
+
         selected_lanelet_idx = self.plot_count % num_lanelets
         selected_lanelet_id = params.data.lanelet.id[selected_lanelet_idx].item()
         frame_interval = 5
         selected_lanelet = params.simulation.find_lanelet_by_id(selected_lanelet_id)
-            
+
         # highlight focused lanelet
-        color = (1.0, 1.0, 1.0, 0.5) if viewer.theme == ColorTheme.DARK else (0.0, 0.8, 0.0, 1.0)
+        color = Color((1.0, 1.0, 1.0, 0.5)) if viewer.options.theme == ColorTheme.DARK else Color((0.0, 0.8, 0.0, 1.0))
 
         draw_lanelet(
+            creator=self.__class__.__name__,
             viewer=viewer,
             left_vertices=selected_lanelet.left_vertices,
             center_vertices=selected_lanelet.center_vertices,
             right_vertices=selected_lanelet.right_vertices,
             color=color,
             linewidth=1.0,
+            label=None,
             font_size=14,
-            label=None
         )
 
         if self.call_count % self.plot_freq != 0:
@@ -171,10 +210,10 @@ class RenderLaneletOccupancyPredictionPlugin(BaseRendererPlugin):
         matplotlib.rcParams['hatch.linewidth'] = 0.7
         plt.style.use('ggplot')
         plt.rc('font', family='serif')
-        #plt.rc('font', family='serif', serif='Times')
-        #plt.rc('text', usetex=True) #RAISES FILENOTFOUNDERROR
+        # plt.rc('font', family='serif', serif='Times')
+        # plt.rc('text', usetex=True) #RAISES FILENOTFOUNDERROR
         plt.rc('xtick', labelsize=21)
-        plt.rc('legend',fontsize=21)
+        plt.rc('legend', fontsize=21)
         plt.rc('ytick', labelsize=21)
         plt.rc('axes', labelsize=26)
 
@@ -189,7 +228,7 @@ class RenderLaneletOccupancyPredictionPlugin(BaseRendererPlugin):
         #         continue_plotting = True
         # except:
         #     continue_plotting = False
-        #if continue_plotting:
+        # if continue_plotting:
         try:
             occ_prob_components = output_pred[1][1]['occ_prob_components'].squeeze(0)
         except KeyError:
@@ -198,48 +237,53 @@ class RenderLaneletOccupancyPredictionPlugin(BaseRendererPlugin):
 
         plt.cla()
         fig, ax = plt.subplots(figsize=(8, 8))
-        #frames = list(range(time_horizon))
+        # frames = list(range(time_horizon))
         frames = list(range(20))
-        def draw_frame(frame: int): #, joint_occ_probs, occ_probs):
+
+        def draw_frame(frame: int):  # , joint_occ_probs, occ_probs):
             legend = []
-            #for frame in frames:
+            # for frame in frames:
             ax.clear()
             ax.set_ylim(0, 1)
-            ax.set_xlim(0, params.data.lanelet.lanelet_length[selected_lanelet_idx].item())
-            #ax.set_title(f"t+{frame+1}")
-            #ax.set_title(f"Joint lanelet occupancy predictions")
+            ax.set_xlim(0, params.data.lanelet.length[selected_lanelet_idx].item())
+            # ax.set_title(f"t+{frame+1}")
+            # ax.set_title(f"Joint lanelet occupancy predictions")
             ax.set_xlabel("x [m]")
             ax.set_ylabel("p(x)")
 
             for t in range(0, time_horizon, frame_interval):
-
-                x = (params.data.lanelet.lanelet_length[selected_lanelet_idx]*lane_linspace[selected_lanelet_idx, t, :]).detach().numpy()
+                x = (params.data.lanelet.length[selected_lanelet_idx]*lane_linspace[selected_lanelet_idx, t, :]).detach().numpy()
                 y = joint_occ_probs[selected_lanelet_idx, t, :].detach().numpy()
-                color = (1 - t/time_horizon, 0, t/time_horizon)
+                color = (1 - t / time_horizon, 0, t / time_horizon)
                 ax.plot(x, y, color=color, linewidth=1.5)
 
                 # print(t, color, frame, x.shape, y.shape, y.mean())
-                
+
                 time = params.scenario.dt * t
-                
+
                 # for c in range(n_distr):
                 #     y_c = occ_prob_components[selected_lanelet_idx, t, :, c].detach().numpy()
                 #     ax.plot(x, y_c, linestyle='dotted', color=color, linewidth=1.0)
-                
+
                 legend.append(f'{time:.1f}s')
 
             ax.legend(legend)
             return [ax]
-                #
-                #plt.show()
-                #ax.vlines(mu_t[frame, 0, :], ymin=1-0.1*w_arr, ymax=1+0.1*w_arr)
-                #ax.vlines(data.pos.ravel(), ymin=0.0, ymax=0.1, colors='green')
+            #
+            # plt.show()
+            # ax.vlines(mu_t[frame, 0, :], ymin=1-0.1*w_arr, ymax=1+0.1*w_arr)
+            # ax.vlines(data.pos.ravel(), ymin=0.0, ymax=0.1, colors='green')
 
-            #animation = FuncAnimation(fig, draw_frame, 20, blit=True)
-            #writergif = PillowWriter(fps=len(frames)/7.5)
+            # animation = FuncAnimation(fig, draw_frame, 20, blit=True)
+            # writergif = PillowWriter(fps=len(frames)/7.5)
+
         ax = draw_frame(0)
         figure_dir = os.path.join('tutorials', 'output', 'figures')
         os.makedirs(figure_dir, exist_ok=True)
+
+        if self.show_plots:
+            plt.show()
+
         plt.savefig(os.path.join(figure_dir, f'occpred_{self.call_count}.pdf'))
         plt.close()
         plt.clf()
@@ -260,16 +304,12 @@ class RenderLaneletOccupancyPredictionPlugin(BaseRendererPlugin):
         plt.clf()
         plt.cla()
 
-
-
         # animation = FuncAnimation(fig, draw_frame, 20, blit=True)
         # writergif = PillowWriter(fps=len(frames)/7.5)
         # animation.save(f'movingdistr.gif', writer=writergif)
 
 
-
-
-class RenderLaneletEncodingPlugin(BaseRendererPlugin):
+class RenderLaneletEncodingPlugin(BaseRenderPlugin):
     _suppress_warnings = False
 
     def __init__(
@@ -292,9 +332,9 @@ class RenderLaneletEncodingPlugin(BaseRendererPlugin):
         self.included_lanelet_ids = included_lanelet_ids
         self.ego_lanelet_color = ego_lanelet_color
 
-    def __call__(
+    def render(
         self,
-        viewer: Viewer2D,
+        viewer: GLViewer2D,
         params: RenderParams
     ) -> None:
 
@@ -308,7 +348,6 @@ class RenderLaneletEncodingPlugin(BaseRendererPlugin):
                 has_ego_lanelet = False
         else:
             ego_lanelet_id = None
-
 
         try:
             output = params.data.l.occupancy_encodings
@@ -326,7 +365,7 @@ class RenderLaneletEncodingPlugin(BaseRendererPlugin):
             z, (joint_occ_probs, info) = output
 
         self.dim_reduction = z.shape[1] // self.grid_size
-        binned_z = z[:, :(z.shape[1] // self.dim_reduction)*self.dim_reduction].reshape(z.shape[0], z.shape[1] // self.dim_reduction, -1)
+        binned_z = z[:, :(z.shape[1] // self.dim_reduction) * self.dim_reduction].reshape(z.shape[0], z.shape[1] // self.dim_reduction, -1)
         if self.compute_max:
             z_agg = torch.max(binned_z, 2)[0]
         else:
@@ -340,7 +379,7 @@ class RenderLaneletEncodingPlugin(BaseRendererPlugin):
 
             is_ego_lanelet = has_ego_lanelet and lanelet_id == ego_lanelet_id
 
-            length = lanelet_centerline.length/z_agg.shape[1]
+            length = lanelet_centerline.length / z_agg.shape[1]
             width = 2.2
             vertices = np.array([
                 [- 0.5 * length, - 0.5 * width], [- 0.5 * length, + 0.5 * width],
@@ -350,17 +389,17 @@ class RenderLaneletEncodingPlugin(BaseRendererPlugin):
 
             for t in range(z_agg.shape[1]):
 
-                z_value = 0.5 + self.multiplier*(z_agg[lanelet_idx, t].item())
+                z_value = 0.5 + self.multiplier * (z_agg[lanelet_idx, t].item())
                 z_value = np.clip(z_value, 0, 1)
 
-                if z_value < 0.25: # don't draw black circles
+                if z_value < 0.25:  # don't draw black circles
                     continue
 
                 if is_ego_lanelet and self.ego_lanelet_color:
                     color = color = (
                         z_value,
                         z_value,
-                        z_value, 
+                        z_value,
                         0.8
                     )
                 else:
@@ -370,24 +409,21 @@ class RenderLaneletEncodingPlugin(BaseRendererPlugin):
                         0.0,
                         self.alpha
                     )
-            
-                arclength = lanelet_centerline.length*t/(z_agg.shape[1] - 1)
+
+                arclength = lanelet_centerline.length * t / (z_agg.shape[1] - 1)
                 pos = lanelet_centerline(arclength) + self.offset
                 orientation = lanelet_centerline.get_direction(arclength)
 
-                viewer.draw_shape(
+                viewer.draw_2d_shape(
+                    creator=self.__class__.__name__,
                     vertices=vertices,
-                    position=pos,
-                    angle=orientation,
-                    filled=True,
-                    color=color
+                    fill_color=Color(color),
+                    translation=pos,
+                    rotation=orientation
                 )
 
 
-
-
-
-class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
+class RenderPathOccupancyPredictionPlugin(BaseRenderPlugin):
     def __init__(
         self,
         render_ego_encoding: bool = True,
@@ -428,8 +464,8 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
         self.offset_ego = encoding_offset_ego
         self.multi_color = multi_color
         self.draw_lanelet_indicators = draw_lanelet_indicators
-        self.enable_plots = enable_plots #or debugger_is_active()
-        self.show_plots_debugger = show_plots_debugger #or debugger_is_active()
+        self.enable_plots = enable_plots  # or debugger_is_active()
+        self.show_plots_debugger = show_plots_debugger  # or debugger_is_active()
         self.plot_subcomponents = plot_subcomponents
         self.plot_freq = plot_freq
         self.render_ego_vehicle = render_ego_vehicle
@@ -448,14 +484,16 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
         # if debugger_is_active():
         #     shutil.rmtree(self.figure_dir, ignore_errors=True)
 
-    def __call__(
+    def render(
         self,
-        viewer: Viewer2D,
+        viewer: GLViewer2D,
         params: RenderParams
     ) -> None:
         if not hasattr(self, 'call_count'):
             self.call_count = 0
         self.call_count += 1
+        # TODO frame_count was moved to TrafficSceneRenderer which we can't access here
+        # Pass frame_count as kwarg like 'call_count'?
         should_create_plot = (self.enable_plots or self.show_plots_debugger) and viewer.frame_count % self.plot_freq == 0
 
         try:
@@ -482,7 +520,7 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
 
         if should_create_plot:
             should_create_plot = should_create_plot and joint_occ_probs.max().item() > self.plot_prob_threshold_max and joint_occ_probs.mean().item() > self.plot_prob_threshold_mean
-            if not should_create_plot and self.skip_frames: 
+            if not should_create_plot and self.skip_frames:
                 viewer.skip_frames(n=1)
                 print(f"Skip frames... too low density (max={joint_occ_probs.max().item():.4f}, mean={joint_occ_probs.mean().item():.4f}")
                 return
@@ -510,35 +548,35 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
                 target_pos = target_lanelet_centerline(target_lanelet_centerline.length / 2)
 
                 viewer.draw_line(
-                    source_pos,
-                    target_pos,
-                    linewidth=4,
-                    color=(
+                    creator=self.__class__.__name__,
+                    start=source_pos,
+                    end=target_pos,
+                    color=Color((
                         sigmoid_intensity_means[edge_idx].item(),
                         sigmoid_intensity_means[edge_idx].item(),
                         sigmoid_intensity_means[edge_idx].item(),
                         1.0
-                    ),
+                    )),
+                    line_width=4,
                 )
-                
-        
+
         # 1 x TIME_HORIZON x RESOLUTION
         time_horizon = joint_occ_probs.shape[1]
         resolution = joint_occ_probs.shape[2]
-        
+
         linspace = torch.linspace(
-            0, 
-            1, 
+            0,
+            1,
             time_horizon,
             dtype=torch.float32,
             device=joint_occ_probs.device
         ).unsqueeze(-1).repeat(1, resolution).unsqueeze(0)
 
-        road_color_blue = (joint_occ_probs*linspace).max(axis=1)[0]
-        road_color_red = (joint_occ_probs*(1-linspace)).max(axis=1)[0]
+        road_color_blue = (joint_occ_probs * linspace).max(axis=1)[0]
+        road_color_red = (joint_occ_probs * (1 - linspace)).max(axis=1)[0]
 
         path_length = params.data.path_length
-        arclengths = np.arange(resolution) * path_length / resolution # TODO linspace instead...
+        arclengths = np.arange(resolution) * path_length / resolution  # TODO linspace instead...
         if not hasattr(params.data, 'cumulative_prior_length_abs'):
             # hack to avoid OccupancyEncodingPostProcessor crash due to not storing tensors # TODO fix, remove deepcopy dep.
             from projects.geometric_models.lane_occupancy.utils import preprocess_conditioning
@@ -552,15 +590,15 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
         n_lanelets = params.data.cumulative_prior_length_abs.shape[0]
 
         lanelet_counter = -1
-        
+
         try:
             integration_domains_masked = params.data.integration_domains_positive_path
             integration_domains_masked_neg = params.data.integration_domains_negative_path
         except AttributeError:
             integration_domains_masked, integration_domains_masked_neg = None, None
-        
+
         # print('n occ slots', integration_domains_masked.shape[0], '/', integration_domains_masked_neg.shape[0], 'loss', params.data.positive_integrals_path.mean().item(), params.data.negative_integrals_path.mean().item())
-        
+
         merged_centerline_input: List[ContinuousPolyline] = []
         merged_leftline_input: List[ContinuousPolyline] = []
         merged_rightline_input: List[ContinuousPolyline] = []
@@ -594,25 +632,24 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
             print(e)
             return
 
-        
         # fill path
         # viewer.draw_polygon(
         #     v=np.vstack([merged_leftline.waypoints, merged_rightline.waypoints[::-1], merged_leftline.waypoints[:1]]),
-        #     color=(0.1, 0.1, 0.1, 0.3),
+        #     color=Color((0.1, 0.1, 0.1, 0.3)),
         # )
         width = merged_leftline.get_lateral_distance(merged_rightline(0)) - 0.15
-        merged_leftline = merged_centerline.lateral_translate(distance=-width/2)
-        merged_rightline = merged_centerline.lateral_translate(distance=width/2)
+        merged_leftline = merged_centerline.lateral_translate(distance=-width / 2)
+        merged_rightline = merged_centerline.lateral_translate(distance=width / 2)
 
         if self.fill_path:
-            # color = (0.0, 0.0, 0.0, 1.0) if viewer.theme == ColorTheme.DARK else (0.825, 0.8, 0.825, 0.4)
-            # color = (0.0, 0.0, 0.0, 1.0) if viewer.theme == ColorTheme.DARK else (0.8, 0.8, 0.8, 0.6)
-            color = (0.0, 0.0, 0.0, 1.0) if viewer.theme == ColorTheme.DARK else (0.8, 0.95, 0.8, 1.0)
+            # color = Color((0.0, 0.0, 0.0, 1.0)) if viewer.options.theme == ColorTheme.DARK else Color((0.825, 0.8, 0.825, 0.4))
+            # color = Color((0.0, 0.0, 0.0, 1.0)) if viewer.options.theme == ColorTheme.DARK else Color((0.8, 0.8, 0.8, 0.6))
+            color = Color((0.0, 0.0, 0.0, 1.0)) if viewer.options.theme == ColorTheme.DARK else Color((0.8, 0.95, 0.8, 1.0))
             path_fill_res = 100
-            length = merged_centerline.length/path_fill_res
+            length = merged_centerline.length / path_fill_res
 
             for t in range(path_fill_res):
-                arclength = merged_centerline.length*t/(path_fill_res - 1)
+                arclength = merged_centerline.length * t / (path_fill_res - 1)
                 pos = merged_centerline(arclength)
                 vertices = np.array([
                     [- 0.5 * length, - 0.5 * width], [- 0.5 * length, + 0.5 * width],
@@ -620,63 +657,67 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
                     [- 0.5 * length, - 0.5 * width]
                 ])
                 orientation = merged_centerline.get_direction(arclength)
-                viewer.draw_shape(
+                viewer.draw_2d_shape(
+                    creator=self.__class__.__name__,
                     vertices=vertices,
-                    position=pos,
-                    angle=orientation,
-                    filled=True,
-                    color=color,
-                    linewidth=0,
-                    border=False,
-                    index=0
+                    translation=pos,
+                    rotation=orientation,
+                    fill_color=color,
+                    line_width=0,
                 )
 
         if self.border_path:
             if self.fill_path:
-                #color = (0.6, 0.6, 0.6, 1.0) if viewer.theme == ColorTheme.DARK else (0.75, 0.75, 0.75, 1.0)
-                color = (0.6, 0.6, 0.6, 1.0) if viewer.theme == ColorTheme.DARK else (0.0, 0.0, 0.0, 1.0)
+                # color = Color((0.6, 0.6, 0.6, 1.0)) if viewer.options.theme == ColorTheme.DARK else Color((0.75, 0.75, 0.75, 1.0))
+                color = Color((0.6, 0.6, 0.6, 1.0)) if viewer.options.theme == ColorTheme.DARK else Color((0.0, 0.0, 0.0, 1.0))
             else:
-                color = (0.6, 0.6, 0.6, 1.0) if viewer.theme == ColorTheme.DARK else (0.0, 0.8, 0.0, 1.0)
-            linewidth = 0.7 if viewer.theme == ColorTheme.DARK else 1.0
+                color = Color((0.6, 0.6, 0.6, 1.0)) if viewer.options.theme == ColorTheme.DARK else Color((0.0, 0.8, 0.0, 1.0))
+            line_width = 0.7 if viewer.options.theme == ColorTheme.DARK else 1.0
             viewer.draw_polyline(
-                v=merged_leftline.waypoints,
-                linewidth=linewidth,
+                creator=self.__class__.__name__,
+                vertices=merged_leftline.waypoints,
+                is_closed=False,
                 color=color,
+                line_width=line_width,
             )
             viewer.draw_polyline(
-                v=merged_rightline.waypoints,
-                linewidth=linewidth,
+                creator=self.__class__.__name__,
+                vertices=merged_rightline.waypoints,
+                is_closed=False,
                 color=color,
+                line_width=line_width,
             )
 
             viewer.draw_line(
-                merged_rightline.waypoints[0],
-                merged_leftline.waypoints[0],
-                linewidth=linewidth,
+                creator=self.__class__.__name__,
+                start=merged_rightline.waypoints[0],
+                end=merged_leftline.waypoints[0],
                 color=color,
+                line_width=line_width,
             )
             viewer.draw_line(
-                merged_rightline.waypoints[-1],
-                merged_leftline.waypoints[-1],
-                linewidth=linewidth,
+                creator=self.__class__.__name__,
+                start=merged_rightline.waypoints[-1],
+                end=merged_leftline.waypoints[-1],
                 color=color,
+                line_width=line_width,
             )
 
         if self.render_ego_vehicle:
-            viewer.draw_shape(
-                np.array([
+            viewer.draw_2d_shape(
+                creator=self.__class__.__name__,
+                vertices=np.array([
                     [-2.4, -1.],
                     [-2.4, 1.],
                     [2.4, 1.],
                     [2.4, -1.],
                     [-2.4, -1.]
                 ]),
-                merged_centerline(0),
-                merged_centerline.get_direction(0),
-                filled=True,
-                linewidth=0.4,
-                fill_color=(1.0, 1.0, 1.0, 0.5),
-                border=(1.0, 1.0, 1.0, 1.0)
+                fill_color=Color((1.0, 1.0, 1.0, 0.5)),
+                border_color=Color((1.0, 1.0, 1.0, 1.0)),
+                translation=merged_centerline(0),
+                rotation=merged_centerline.get_direction(0),
+                line_width=0.4,
             )
 
         lanelet_counter = -1
@@ -690,40 +731,37 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
                     lanelet_leftline = params.simulation.get_lanelet_left_polyline(lanelet_id.item())
                     lanelet_rightline = params.simulation.get_lanelet_right_polyline(lanelet_id.item())
 
-                    #print('draw_lanelet', lanelet_id, lanelet_length, prior_length_rel, prior_length_abs, integration_lower_limits_abs, 
+                    # print('draw_lanelet', lanelet_id, lanelet_length, prior_length_rel, prior_length_abs, integration_lower_limits_abs,
                     # integration_upper_limits_abs, integration_lower_limits_rel, integration_upper_limits_rel
-                        
+
                     # highlight focused lanelet
                     if self.lanelet_highlighting:
                         draw_lanelet(
+                            creator=self.__class__.__name__,
                             viewer=viewer,
                             left_vertices=lanelet_leftline.slice(integration_lower_limits_abs, integration_upper_limits_abs),
                             center_vertices=lanelet_centerline.slice(integration_lower_limits_abs, integration_upper_limits_abs),
                             right_vertices=lanelet_rightline.slice(integration_lower_limits_abs, integration_upper_limits_abs),
-                            color=(1.0, 1.0, 1.0, 0.2),
+                            color=Color((1.0, 1.0, 1.0, 0.2)),
                             linewidth=0.5,
+                            label=None,
                             font_size=14,
-                            label=None
                         )
                         viewer.draw_circle(
+                            creator=self.__class__.__name__,
                             origin=lanelet_leftline(integration_lower_limits_abs),
                             radius=0.25,
-                            color=(1.0, 0.0, 0.0, 1.0),
-                            outline=False,
-                            linecolor=(1.0,0.0,0.0),
-                            linewidth=None
+                            fill_color=Color((1.0, 0.0, 0.0, 1.0)),
                         )
                         viewer.draw_circle(
+                            creator=self.__class__.__name__,
                             origin=lanelet_rightline(integration_upper_limits_abs),
                             radius=0.25,
-                            color=(0.0, 0.0, 1.0, 1.0),
-                            outline=False,
-                            linecolor=(0.0,0.0,0.0),
-                            linewidth=None
+                            fill_color=Color((0.0, 0.0, 1.0, 1.0)),
                         )
 
-                    #y_cont_lanelet = y_cont[lanelet_idx, 0, :, :]
-                    #y_cont_lanelet_active = y_cont_lanelet[y_cont_lanelet[:, 2] == 1.0, :]
+                    # y_cont_lanelet = y_cont[lanelet_idx, 0, :, :]
+                    # y_cont_lanelet_active = y_cont_lanelet[y_cont_lanelet[:, 2] == 1.0, :]
 
                     # for y_cont_idx in range(y_cont_lanelet_active.shape[0]):
                     #     start_arclength = y_cont_lanelet_active[y_cont_idx, 0].item() 
@@ -734,98 +772,90 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
                     #     start_arclength_global = start_arclength * params.data.lanelet.lanelet_length[lanelet_idx].item() / path_length - params.data.integration_lower_limits[lanelet_counter].item() + params.data.cumulative_prior_length[lanelet_counter].item()
                     #     end_arclength_global = end_arclength * params.data.lanelet.lanelet_length[lanelet_idx].item() / path_length - params.data.integration_lower_limits[lanelet_counter].item() + params.data.cumulative_prior_length[lanelet_counter].item()
 
-                        #print(y_cont_lanelet_active.shape[0], start_arclength_global, end_arclength_global)
+                    # print(y_cont_lanelet_active.shape[0], start_arclength_global, end_arclength_global)
 
-                        # viewer.draw_circle(
-                        #     origin=start_pos,
-                        #     radius=1.5,
-                        #     color=(1.0, 0.0, 0.0, 1.0),
-                        #     outline=False,
-                        #     linecolor=(0.1,1.0,0.1),
-                        #     linewidth=None
-                        # )
-                        # viewer.draw_circle(
-                        #     origin=end_pos,
-                        #     radius=1.5,
-                        #     color=(0.0, 0.0, 1.0, 1.0),
-                        #     outline=False,
-                        #     linecolor=(0.1,1.0,0.1),
-                        #     linewidth=None
-                        # )
+                    # viewer.draw_circle(
+                    #     origin=start_pos,
+                    #     radius=1.5,
+                    #     color=Color((1.0, 0.0, 0.0, 1.0)),
+                    #     outline=False,
+                    #     linecolor=(0.1,1.0,0.1),
+                    #     linewidth=None
+                    # )
+                    # viewer.draw_circle(
+                    #     origin=end_pos,
+                    #     radius=1.5,
+                    #     color=Color((0.0, 0.0, 1.0, 1.0)),
+                    #     outline=False,
+                    #     linecolor=(0.1,1.0,0.1),
+                    #     linewidth=None
+                    # )
 
-
-            if not viewer.pretty and max(road_color_red[0, t].item(), road_color_blue[0, t].item()) < self.occ_render_threshold:
+            occ = max(road_color_red[0, t].item(), road_color_blue[0, t].item())
+            if not viewer.options.is_pretty and occ < self.occ_render_threshold:
                 continue
-                
-            center_arclength =  merged_centerline.length*t/resolution
+
+            center_arclength = merged_centerline.length * t / resolution
             pos = merged_centerline(center_arclength)
 
-            length = path_length/resolution
+            length = path_length / resolution
             top_arclength = center_arclength + length
             bottom_arclength = center_arclength
             width = merged_leftline.get_lateral_distance(merged_rightline(center_arclength)) - 0.1
-            top_left = merged_centerline.lateral_translate_point(top_arclength, -width/2) - pos
-            top_right = merged_centerline.lateral_translate_point(top_arclength, width/2) - pos
-            bottom_left = merged_centerline.lateral_translate_point(bottom_arclength, -width/2) - pos
-            bottom_right = merged_centerline.lateral_translate_point(bottom_arclength, width/2) - pos
-
+            top_left = merged_centerline.lateral_translate_point(top_arclength, -width / 2) - pos
+            top_right = merged_centerline.lateral_translate_point(top_arclength, width / 2) - pos
+            bottom_left = merged_centerline.lateral_translate_point(bottom_arclength, -width / 2) - pos
+            bottom_right = merged_centerline.lateral_translate_point(bottom_arclength, width / 2) - pos
 
             vertices = np.array([
                 bottom_left, top_left,
                 top_right, bottom_right,
                 bottom_left
             ])
-            #orientation = lanelet_centerline.get_direction(path_var)
+            # orientation = lanelet_centerline.get_direction(path_var)
 
-            rgb_color = (
+            rgb_color = Color((
                 road_color_red[0, t].item(),
                 0.0,
                 road_color_blue[0, t].item()
-            )
+            ))
 
-            if viewer.theme == ColorTheme.DARK:
+            if viewer.options.theme == ColorTheme.DARK:
                 if self.occupancy_circles:
                     viewer.draw_circle(
+                        creator=self.__class__.__name__,
                         origin=pos,
                         radius=1.2,
-                        color=rgb_color,
-                        outline=False,
-                        linecolor=(0.1, 1.0, 0.1),
-                        linewidth=None
+                        fill_color=rgb_color,
+                        line_width=0.0
                     )
                 else:
-                    viewer.draw_shape(
+                    viewer.draw_2d_shape(
+                        creator=self.__class__.__name__,
                         vertices=vertices,
-                        filled=True,
-                        color=rgb_color,
-                        linewidth=0,
-                        border=False,
-                        index=0
+                        fill_color=rgb_color,
+                        line_width=0.0
                     )
             else:
-                c, m, y, k = rgb_to_cmyk(*rgb_color)
+                c, m, y, k = rgb_to_cmyk(*rgb_color.as_rgba()[:3])
                 k = 0
-                rgb_color = cmyk_to_rgb(c, m, y, k)
+                rgb_color = Color(cmyk_to_rgb(c, m, y, k))
 
                 if self.occupancy_circles:
-                    rgb_color = (rgb_color[0], rgb_color[1], rgb_color[2], 0.5)
+                    rgb_color = rgb_color.with_alpha(alpha=0.5)
                     viewer.draw_circle(
+                        creator=self.__class__.__name__,
                         origin=pos,
                         radius=1.2,
-                        color=rgb_color,
-                        outline=False,
-                        linecolor=(0.1, 1.0, 0.1),
-                        linewidth=0.0,
-                        border=False
+                        fill_color=rgb_color,
+                        line_width=0.0
                     )
                 else:
-                    viewer.draw_shape(
+                    viewer.draw_2d_shape(
+                        creator=self.__class__.__name__,
                         vertices=vertices,
-                        filled=True,
-                        color=rgb_color,
-                        linewidth=0,
-                        border=False,
-                        index=0
+                        fill_color=rgb_color,
+                        line_width=0.0
                     )
 
             if not hasattr(self, 'draw_lanelet_indicators'):
@@ -833,44 +863,42 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
             if self.draw_lanelet_indicators:
                 if t == 0:
                     viewer.draw_circle(
+                        creator=self.__class__.__name__,
                         origin=pos,
                         radius=0.25,
-                        color=(1.0, 0.0, 0.0, 1.0),
-                        outline=False,
-                        linecolor=(0.1,1.0,0.1),
-                        linewidth=None
+                        fill_color=Color((1.0, 0.0, 0.0, 1.0)),
                     )
                 elif t == len(arclengths) - 1:
                     viewer.draw_circle(
+                        creator=self.__class__.__name__,
                         origin=pos,
                         radius=0.25,
-                        color=(0.0, 0.0, 1.0, 1.0),
-                        outline=False,
-                        linecolor=(0.1,1.0,0.1),
-                        linewidth=None
+                        fill_color=Color((0.0, 0.0, 1.0, 1.0)),
                     )
-        
+
         if integration_domains_masked is not None:
             # for i, domain in enumerate(integration_domains_masked_neg):
             #     line = merged_centerline._path_coords(params.data.path_length*domain)
             #     viewer.draw_polyline(
             #         v=line,
             #         linewidth=0.2,
-            #         color=(1.0, 0.0, 0.0, 1.0),
+            #         color=Color((1.0, 0.0, 0.0, 1.0)),
             #     )
             for i, domain in enumerate(integration_domains_masked):
-                line = merged_centerline._path_coords(params.data.path_length*domain)
+                line = merged_centerline._path_coords(params.data.path_length * domain)
                 viewer.draw_polyline(
-                    v=line,
-                    linewidth=0.2,
-                    color=(0.0, 1.0, 0.0, 1.0),
+                    creator=self.__class__.__name__,
+                    vertices=line,
+                    is_closed=True,
+                    color=Color((0.0, 1.0, 0.0, 1.0)),
+                    line_width=0.2,
                 )
 
         if self.render_lanelet_encodings:
             z = params.data.lanelet.occupancy_encodings
             if self.grid_size is not None and self.grid_size > z.shape[1]:
                 self.dim_reduction = z.shape[1] // self.grid_size
-                binned_z = z[:, :(z.shape[1] // self.dim_reduction)*self.dim_reduction].reshape(z.shape[0], z.shape[1] // self.dim_reduction, -1)
+                binned_z = z[:, :(z.shape[1] // self.dim_reduction) * self.dim_reduction].reshape(z.shape[0], z.shape[1] // self.dim_reduction, -1)
                 if self.compute_max:
                     z_agg = torch.max(binned_z, 2)[0]
                 else:
@@ -883,7 +911,7 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
                 lanelet_centerline = params.simulation.get_lanelet_center_polyline(lanelet_id)
                 draw_line = lanelet_centerline.lateral_translate(self.offset)
 
-                length = lanelet_centerline.length/z_agg.shape[1]
+                length = lanelet_centerline.length / z_agg.shape[1]
                 width = 2.2
                 vertices = np.array([
                     [- 0.5 * length, - 0.5 * width], [- 0.5 * length, + 0.5 * width],
@@ -892,71 +920,59 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
                 ])
 
                 for t in range(z_agg.shape[1]):
-                    arclength = draw_line.length*t/(z_agg.shape[1] - 1)
+                    arclength = draw_line.length * t / (z_agg.shape[1] - 1)
                     pos = draw_line(arclength)
                     orientation = draw_line.get_direction(arclength)
 
-                    if viewer.theme == ColorTheme.DARK:
+                    if viewer.options.theme == ColorTheme.DARK:
                         if self.multi_color:
-                            z_value = self.multiplier*(z_agg[lanelet_idx, t].item())
-                            color = (
+                            z_value = self.multiplier * (z_agg[lanelet_idx, t].item())
+                            color = Color((
                                 min(1.0, abs(min(z_value, 0.0))),
                                 min(1.0, max(z_value, 0.0)),
                                 0.0,
-                                self.alpha*0.8
-                            )
+                                self.alpha * 0.8
+                            ))
                         else:
-                            z_value = 0.5 + self.multiplier*(z_agg[lanelet_idx, t].item())
+                            z_value = 0.5 + self.multiplier * (z_agg[lanelet_idx, t].item())
                             z_value = np.clip(z_value, 0, 1)
 
-                            if z_value < 0.25: # don't draw black circles
+                            if z_value < 0.25:  # don't draw black circles
                                 continue
 
-                            color = (
+                            color = Color((
                                 0.0,
                                 z_value,
                                 0.0,
-                                self.alpha*0.8
-                            )
+                                self.alpha * 0.8
+                            ))
 
-                        viewer.draw_shape(
+                        viewer.draw_2d_shape(
+                            creator=self.__class__.__name__,
                             vertices=vertices,
-                            position=pos,
-                            angle=orientation,
-                            filled=True,
-                            color=color,
-                            linewidth=0,
-                            border=False
+                            fill_color=color,
+                            translation=pos,
+                            rotation=orientation,
+                            line_width=0,
                         )
 
                     else:
-                        viewer.draw_shape(
+                        red = Color((1.0, 0.0, 0.0), alpha=min(1.0, max(z_value, 0.0)))
+                        viewer.draw_2d_shape(
+                            creator=self.__class__.__name__,
                             vertices=vertices,
-                            position=pos,
-                            angle=orientation,
-                            filled=True,
-                            color=(
-                                1.0,
-                                0.0,
-                                0.0,
-                                min(1.0, max(z_value, 0.0))
-                            ),
-                            linewidth=0,
-                            border=False
+                            translation=pos,
+                            rotation=orientation,
+                            fill_color=red,
+                            line_width=0,
                         )
-                        viewer.draw_shape(
+                        viewer.draw_2d_shape(
+                            creator=self.__class__.__name__,
                             vertices=vertices,
-                            position=pos,
-                            angle=orientation,
-                            filled=True,
-                            color=(
-                                1.0,
-                                0.0,
-                                0.0,
-                                min(1.0, abs(min(z_value, 0.0)))
-                            ),
-                            linewidth=0,
-                            border=False
+                            translation=pos,
+                            rotation=orientation,
+                            fill_color=red.with_alpha(alpha=min(1.0, abs(min(z_value, 0.0)))),
+                            line_width=0,
                         )
 
         if self.render_ego_encoding:
@@ -964,14 +980,14 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
             draw_line = merged_centerline.lateral_translate(self.offset_ego)
             if self.grid_size is not None and z.shape[1] > self.grid_size:
                 self.dim_reduction = z.shape[1] // self.grid_size
-                binned_z = z[:, :(z.shape[1] // self.dim_reduction)*self.dim_reduction].reshape(z.shape[0], z.shape[1] // self.dim_reduction, -1)
+                binned_z = z[:, :(z.shape[1] // self.dim_reduction) * self.dim_reduction].reshape(z.shape[0], z.shape[1] // self.dim_reduction, -1)
                 if self.compute_max:
                     z_agg = torch.max(binned_z, 2)[0]
                 else:
                     z_agg = torch.mean(binned_z, 2)
             else:
                 z_agg = z
-            length = draw_line.length/z_agg.shape[1] - 0.2
+            length = draw_line.length / z_agg.shape[1] - 0.2
             width = 2.2
             vertices = np.array([
                 [- 0.5 * length, - 0.5 * width], [- 0.5 * length, + 0.5 * width],
@@ -980,81 +996,65 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
             ])
 
             for t in range(z_agg.shape[1]):
-                   
-                arclength = draw_line.length*t/(z_agg.shape[1] - 1)
+
+                arclength = draw_line.length * t / (z_agg.shape[1] - 1)
                 pos = draw_line(arclength)
                 orientation = draw_line.get_direction(arclength)
 
-                if viewer.theme == ColorTheme.DARK:
+                if viewer.options.theme == ColorTheme.DARK:
                     if self.render_lanelet_encodings:
-                        z_value = 0.5 + self.multiplier*(z_agg[0, t].item())
+                        z_value = 0.5 + self.multiplier * (z_agg[0, t].item())
                         z_value = np.clip(z_value, 0, 1)
-                        color = (
+                        color = Color((
                             z_value,
                             z_value,
                             z_value,
                             self.alpha
-                        )
+                        ))
                     elif self.multi_color:
-                        z_value = 1.2*z_agg[0, t].item()
-                        color = (
+                        z_value = 1.2 * z_agg[0, t].item()
+                        color = Color((
                             min(1.0, abs(min(z_value, 0.0))),
                             min(1.0, max(z_value, 0.0)),
                             0.0,
                             1.0
-                        )                        
+                        ))
                     else:
-                        z_value = 0.5 + self.multiplier*(z_agg[0, t].item())
+                        z_value = 0.5 + self.multiplier * (z_agg[0, t].item())
                         z_value = np.clip(z_value, 0, 1)
 
-                        if z_value < 0.25: # don't draw black circles
+                        if z_value < 0.25:  # don't draw black circles
                             continue
-                        color = (
-                            0,
-                            z_value,
-                            0,
-                            self.alpha
-                        )
+                        color = Color((0, z_value, 0), alpha=self.alpha)
 
-                    viewer.draw_shape(
+                    viewer.draw_2d_shape(
+                        creator=self.__class__.__name__,
                         vertices=vertices,
-                        position=pos,
-                        angle=orientation,
-                        filled=True,
-                        color=color,
-                        linewidth=0,
-                        border=False
+                        fill_color=color,
+                        translation=pos,
+                        rotation=orientation,
+                        line_width=0,
                     )
 
                 else:
-                    z_value = 1.2*z_agg[0, t].item()
-                    viewer.draw_shape(
+                    z_value = 1.2 * z_agg[0, t].item()
+                    green = Color((0.0, 0.9, 0.0), alpha=min(1.0, abs(min(z_value, 0.0))))
+                    viewer.draw_2d_shape(
+                        creator=self.__class__.__name__,
                         vertices=vertices,
-                        position=pos,
-                        angle=orientation,
-                        filled=True,
-                        color=(
-                            0.0,
-                            0.9,
-                            0.0,
-                            min(1.0, abs(min(z_value, 0.0)))
-                        ),
-                        linewidth=0,
-                        border=False
+                        translation=pos,
+                        rotation=orientation,
+                        fill_color=green,
+                        line_width=0,
                     )
-                    viewer.draw_shape(
+                    white = Color((0.0, 0.0, 0.0), alpha=min(1.0, max(z_value, 0.0)))
+                    viewer.draw_2d_shape(
+                        creator=self.__class__.__name__,
                         vertices=vertices,
-                        position=pos,
-                        angle=orientation,
-                        filled=True,
-                        color=(
-                            0.0,
-                            0.0,
-                            0.0,
-                            min(1.0, max(z_value, 0.0)),
-                        ),
-                        linewidth=0,
-                        border=False
+                        translation=pos,
+                        rotation=orientation,
+                        fill_color=white,
+                        line_width=0,
                     )
         # try:
         #     user_input = input("Please enter lane index to plot: (Enter q to disable)")
@@ -1067,7 +1067,7 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
         #         continue_plotting = True
         # except:
         #     continue_plotting = False
-        #if continue_plotting:qq
+        # if continue_plotting:qq
         if should_create_plot:
             draw_distrs = self.plot_subcomponents
             if draw_distrs:
@@ -1079,20 +1079,21 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
 
             plt.cla()
             fig, ax = plt.subplots(figsize=(8, 8))
-            #frames = list(range(time_horizon))
+            # frames = list(range(time_horizon))
             frame_interval = 2
             legend_interval = 5
             draw_nonlegend = False
-            def draw_frame(frame: int): #, joint_occ_probs, occ_probs):
+
+            def draw_frame(frame: int):  # , joint_occ_probs, occ_probs):
                 legend = []
-                #for frame in frames:
+                # for frame in frames:
                 ax.clear()
                 ax.set_ylim(0, 1)
                 ax.set_xlim(0, path_length)
                 ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-                #ax.get_xaxis().set_major_formatter(FormatStrFormatter(r'%d m'))
-                #ax.set_title(f"t+{frame+1}")
-                #ax.set_title(f"Joint lanelet occupancy predictions")
+                # ax.get_xaxis().set_major_formatter(FormatStrFormatter(r'%d m'))
+                # ax.set_title(f"t+{frame+1}")
+                # ax.set_title(f"Joint lanelet occupancy predictions")
                 ax.set_xlabel(r"$x \; [m]$")
                 ax.set_ylabel(r"$\hat{o}(x, \tau)$")
 
@@ -1103,33 +1104,34 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
                     y = joint_occ_probs[0, t, :].detach().numpy()
 
                     # print(t, color, frame, x.shape, y.shape, y.mean())
-                    
+
                     time = params.scenario.dt * t
-                    
+
                     if draw_distrs and (t == 0 or t == time_horizon - frame_interval):
-                        color = (1 - t/time_horizon, 0, t/time_horizon, 0.6)
+                        color = (1 - t / time_horizon, 0, t / time_horizon, 0.6)
                         for distr_idx in range(n_distr):
                             y_c = occ_prob_components[0, t, :, distr_idx].detach().numpy()
                             ax.plot(x, y_c, linestyle='dotted', color=color, linewidth=1.0)
                     if c % legend_interval == 0:
-                        color = (1 - t/time_horizon, 0, t/time_horizon)
+                        color = (1 - t / time_horizon, 0, t / time_horizon)
                         ax.plot(x, y, color=color, linewidth=1.4, linestyle='-')
                         legend.append(fr'$\tau = {time:.1f} \; s$')
                     elif draw_nonlegend:
-                        color = (1 - t/time_horizon, 0, t/time_horizon, 0.3)
+                        color = (1 - t / time_horizon, 0, t / time_horizon, 0.3)
                         ax.plot(x, y, color=color, linewidth=1.0, label='_nolegend_', linestyle='-')
-                        
-                    c+= 1
+
+                    c += 1
 
                 ax.legend(legend)
                 return [ax]
-                    #
-                    #plt.show()
-                    #ax.vlines(mu_t[frame, 0, :], ymin=1-0.1*w_arr, ymax=1+0.1*w_arr)
-                    #ax.vlines(data.pos.ravel(), ymin=0.0, ymax=0.1, colors='green')
+                #
+                # plt.show()
+                # ax.vlines(mu_t[frame, 0, :], ymin=1-0.1*w_arr, ymax=1+0.1*w_arr)
+                # ax.vlines(data.pos.ravel(), ymin=0.0, ymax=0.1, colors='green')
 
-                #animation = FuncAnimation(fig, draw_frame, 20, blit=True)
-                #writergif = PillowWriter(fps=len(frames)/7.5)
+                # animation = FuncAnimation(fig, draw_frame, 20, blit=True)
+                # writergif = PillowWriter(fps=len(frames)/7.5)
+
             ax = draw_frame(0)
 
             # col_map = LinearSegmentedColormap.from_list('BlackGreen', [(1, 0, 0), (0, 0, 1)], N=2000)
@@ -1147,24 +1149,24 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
             ax[0].grid(axis='y')
 
             plt.tight_layout()
-            
+
             if self.enable_plots:
                 file_name = f"occpred_path_{self.call_count}_avg_{joint_occ_probs.mean().item():.4f}"
                 os.makedirs(self.figure_dir, exist_ok=True)
-                plt.savefig(os.path.join(self.figure_dir, file_name + '.pdf')) #, facecolor=(0.975, 0.975, 0.975))
-                viewer.screenshot(os.path.join(self.figure_dir, file_name + '.png'))
+                plt.savefig(os.path.join(self.figure_dir, file_name + '.pdf'))  # , facecolor=(0.975, 0.975, 0.975))
+                viewer.take_screenshot(os.path.join(self.figure_dir, file_name + '.png'))
                 print(f"Saved figures to {self.figure_dir=}")
             if debugger_is_active() and self.show_plots_debugger:
                 plt.show()
 
-            plt.close('all') 
+            plt.close('all')
             plt.clf()
             plt.cla()
 
             grid_height, grid_width = calc_closest_factors(z.shape[1])
             selected_z = z.view(grid_height, grid_width).detach().cpu().numpy()
             plt.grid(None)
-            
+
             plt.axis('off')
             cmap = LinearSegmentedColormap.from_list('BlackGreen', [(0, 0, 0), (0, 1, 0)], N=2000)
             heatmap = plt.imshow(selected_z, cmap=cmap)
@@ -1176,7 +1178,7 @@ class RenderPathOccupancyPredictionPlugin(BaseRendererPlugin):
             if debugger_is_active() and self.show_plots_debugger:
                 plt.show()
 
-            plt.close('all') 
+            plt.close('all')
             plt.clf()
             plt.cla()
 

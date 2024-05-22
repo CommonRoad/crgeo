@@ -17,6 +17,7 @@ class GeometricTrainingCallback(ABC):
 T_GeometricTrainingCallback = TypeVar("T_GeometricTrainingCallback", Callable, GeometricTrainingCallback)
 TrainingCallbacks = Dict[str, Union[T_GeometricTrainingCallback, List[T_GeometricTrainingCallback]]]
 
+
 @dataclass
 class GeometricTrainingContext:
     device: torch.device

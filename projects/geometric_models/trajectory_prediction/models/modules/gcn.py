@@ -20,7 +20,8 @@ class GCN(nn.Module):
             activation = nn.ReLU(inplace=True)
 
         self.graph_convs = nn.ModuleList([
-            pyg_nn.GCNConv(in_channels=input_dim if i == 0 else hidden_dim, out_channels=hidden_dim, add_self_loops=True)
+            pyg_nn.GCNConv(in_channels=input_dim if i == 0 else hidden_dim,
+                           out_channels=hidden_dim, add_self_loops=True)
             for i in range(layers)
         ])
         self.activation = activation

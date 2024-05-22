@@ -8,7 +8,6 @@ from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset
 from projects.geometric_models.drivable_area.utils.dataset import average_road_coverage, road_coverage_diff
 
 
-
 def compute_weights_for_target_distribution(
     input_dist: Tensor,
     target_dist: Union[None, Tensor, Callable[[float], float]] = None,
@@ -46,14 +45,13 @@ def compute_weights_for_target_distribution(
     return weights
 
 
-
 def add_sample_weights(
     dataset: CommonRoadDataset,
     lanelet_sampling_weights_num_bins: Union[int, float],
     num_workers: int = 1
 ) -> None:
     if isinstance(lanelet_sampling_weights_num_bins, float):
-        lanelet_sampling_weights_num_bins = max(1, int(lanelet_sampling_weights_num_bins*len(dataset)))
+        lanelet_sampling_weights_num_bins = max(1, int(lanelet_sampling_weights_num_bins * len(dataset)))
 
     def _assign_lanelet_sampling_weight(
         scenario_index: int,
@@ -79,7 +77,7 @@ def add_sample_weights(
     #      https://scipy.github.io/devdocs/reference/generated/scipy.stats.gaussian_kde.html
     all_weights = compute_weights_for_target_distribution(
         input_dist=torch.cat(all_road_coverage_diffs, dim=0),
-        target_dist=None,#lambda v: 1 if v < 200 else 0.1,  # TODO! distribution is arbitrary
+        target_dist=None,  # lambda v: 1 if v < 200 else 0.1,  # TODO! distribution is arbitrary
         num_bins=lanelet_sampling_weights_num_bins,
     )
     assert sum(d.size(0) for d in all_road_coverage_diffs) == all_weights.size(0)

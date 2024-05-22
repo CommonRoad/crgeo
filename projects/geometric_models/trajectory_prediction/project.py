@@ -1,29 +1,31 @@
 import functools
-from typing import List, Type, Union
+from pathlib import Path
+from typing import Type
 
 from commonroad_geometric.common.config import Config
 from commonroad_geometric.common.io_extensions.scenario import LaneletAssignmentStrategy
-from commonroad_geometric.dataset.collection.scenario_dataset_collector import ScenarioDatasetCollector
+from commonroad_geometric.common.io_extensions.scenario_files import filter_max_scenarios
+from commonroad_geometric.dataset.collection.dataset_collector import DatasetCollector
 from commonroad_geometric.dataset.extraction.base_extractor_factory import BaseExtractorFactory
 from commonroad_geometric.dataset.extraction.road_network.implementations.lanelet_graph.graph_conversion import LaneletGraphConverter
 from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle import *
-from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_temporal_vehicle.callables import ft_rel_state_vtv
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_lanelet import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_vehicle import *
-from commonroad_geometric.dataset.extraction.traffic.feature_computers.types import VTVFeatureParams
 from commonroad_geometric.dataset.extraction.traffic.temporal_traffic_extractor import TemporalTrafficExtractorOptions
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions, TrafficFeatureComputerOptions
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TemporalTrafficExtractorFactory, TrafficExtractorFactory
-from commonroad_geometric.dataset.preprocessing.implementations import *
-from commonroad_geometric.dataset.preprocessing.implementations.weakly_connected_filterer import WeaklyConnectedFilterer
+from commonroad_geometric.dataset.scenario.generation.scenario_traffic_generation import generate_traffic
+from commonroad_geometric.dataset.scenario.iteration.scenario_iterator import ScenarioIterator
+from commonroad_geometric.dataset.scenario.preprocessing.filters.implementations import LaneletGraphFilter, WeaklyConnectedFilter
+from commonroad_geometric.dataset.scenario.preprocessing.preprocessors.implementations import SegmentLaneletsPreprocessor
+from commonroad_geometric.dataset.scenario.preprocessing.wrappers.chain_preprocessors import chain_preprocessors
+from commonroad_geometric.dataset.scenario.preprocessing.wrappers.log_exception_wrapper import LogExceptionWrapper
 from commonroad_geometric.dataset.transformation.implementations.feature_normalization.feature_normalization_transformation import FeatureNormalizationTransformation
 from commonroad_geometric.learning.base_project import register_run_command
-from commonroad_geometric.learning.geometric.base_geometric import BaseGeometric, MODEL_FILE
+from commonroad_geometric.learning.geometric.base_geometric import BaseGeometric
 from commonroad_geometric.learning.geometric.project.base_geometric_project import BaseGeometricProject
 from commonroad_geometric.learning.geometric.training.callbacks.callback_computer_container_service import CallbackComputerContainerService, CallbackComputersContainer
-from commonroad_geometric.learning.geometric.training.callbacks.implementations.early_stopping_callback import EarlyStoppingCallback
-from commonroad_geometric.learning.geometric.training.callbacks.implementations.epoch_checkpoint_callback import EpochCheckpointCallback
 from commonroad_geometric.learning.geometric.training.callbacks.implementations.export_latest_model_callback import ExportLatestModelCallback
 from commonroad_geometric.learning.geometric.training.callbacks.implementations.gradient_clipping_callback import GradientClippingCallback
 from commonroad_geometric.learning.geometric.training.callbacks.implementations.log_wandb_callback import LogWandbCallback
@@ -31,10 +33,10 @@ from commonroad_geometric.learning.geometric.training.callbacks.implementations.
 from commonroad_geometric.learning.geometric.training.experiment import GeometricExperiment, GeometricExperimentConfig
 from commonroad_geometric.learning.training.wandb_service.wandb_service import WandbService
 from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRenderer
+from commonroad_geometric.simulation.interfaces.interactive.sumo_simulation import SumoSimulationOptions
 from commonroad_geometric.simulation.interfaces.interactive.traffic_spawning.implementations.constant_rate_spawner import ConstantRateSpawner
 from commonroad_geometric.simulation.interfaces.static.scenario_simulation import ScenarioSimulationOptions
-from projects.geometric_models.drivable_area.utils.heuristic_scenario_filterer import HeuristicOSMScenarioFilterer
-
+from commonroad_geometric.dataset.scenario.preprocessing.filters.implementations.heuristic_scenario_filter import HeuristicOSMScenarioFilter
 
 
 class FeatureComputers:
@@ -45,6 +47,7 @@ class FeatureComputers:
             ft_veh_state,
             VehicleLaneletConnectivityComputer(),
         ]
+
     @staticmethod
     def v2v():
         return [
@@ -54,16 +57,19 @@ class FeatureComputers:
                 max_lanelet_distance_placeholder=60.0 * 1.1,
             ),
         ]
+
     @staticmethod
     def l():
         return [
 
         ]
+
     @staticmethod
     def l2l():
         return [
 
         ]
+
     @staticmethod
     def v2l():
         return [
@@ -78,18 +84,23 @@ class FeatureComputers:
             ),
             # TODO relative position & orientation to lanelet start?
         ]
+
     @staticmethod
     def l2v():
         return [
 
         ]
 
+
 def create_scenario_filterers():
-    return [
-        WeaklyConnectedFilterer(),
-        LaneletGraphFilterer(min_edges=8, min_nodes=10),
-        HeuristicOSMScenarioFilterer(),
-    ]
+    return LogExceptionWrapper(
+        wrapped_preprocessor=chain_preprocessors(*[
+            WeaklyConnectedFilter(),
+            LaneletGraphFilter(min_edges=8, min_nodes=10),
+            HeuristicOSMScenarioFilter(),
+        ])
+    )
+
 
 def create_edge_drawer(edge_range: float):
     return FullyConnectedEdgeDrawer(dist_threshold=edge_range)
@@ -114,7 +125,7 @@ def create_lanelet_graph_conversion_steps(
     ]
     if enable_waypoint_resampling:
         conversion_steps.insert(
-            0, 
+            0,
             functools.partial(
                 LaneletGraphConverter.resample_waypoints,
                 waypoint_density=waypoint_density
@@ -123,16 +134,11 @@ def create_lanelet_graph_conversion_steps(
     return conversion_steps
 
 
-
 class TrajectoryPredictionProject(BaseGeometricProject):
 
     @register_run_command
     def generate_dataset(self) -> None:
         cfg = self.cfg.experiment
-
-        from commonroad_geometric.dataset.iteration.scenario_iterator import ScenarioIterator
-        from commonroad_geometric.dataset.generation.scenario_traffic_generation import generate_traffic
-        from commonroad_geometric.simulation.interfaces.interactive.sumo_simulation import SumoSimulationOptions
 
         traffic_spawner = ConstantRateSpawner(
             p_spawn=cfg["dataset_generation"]["sumo_simulation"]["p_spawn"]
@@ -146,9 +152,8 @@ class TrajectoryPredictionProject(BaseGeometricProject):
         )
         scenario_iterator = ScenarioIterator(
             directory=cfg["dataset_generation"]["input_directory"],
-            prefilters=create_scenario_filterers(),
-            max_scenarios=cfg["dataset_generation"]["max_scenarios"],
-            raise_exceptions=False
+            filter_scenario_paths=functools.partial(filter_max_scenarios,
+                                                    max_scenarios=cfg["dataset_generation"]["max_scenarios"])
         )
         generate_traffic(
             input_scenario_iterator=scenario_iterator,
@@ -181,9 +186,6 @@ class TrajectoryPredictionProject(BaseGeometricProject):
     def configure_experiment(self, cfg: Config) -> GeometricExperimentConfig:
         temporal_enabled: bool = cfg.temporal.enabled
 
-        postprocessors = []
-        
-
         traffic_extractor_factory = TrafficExtractorFactory(
             options=TrafficExtractorOptions(
                 edge_drawer=create_edge_drawer(cfg["edge_range"]),
@@ -197,11 +199,11 @@ class TrajectoryPredictionProject(BaseGeometricProject):
                     l2v=FeatureComputers.l2v()
                 ),
                 assign_multiple_lanelets=True,
-                postprocessors=postprocessors
+                postprocessors=[]
             ),
         )
 
-        extractor_factory: Type[BaseExtractorFactory]
+        extractor_factory: BaseExtractorFactory
         if temporal_enabled:
             extractor_factory = TemporalTrafficExtractorFactory(
                 options=TemporalTrafficExtractorOptions(
@@ -209,12 +211,12 @@ class TrajectoryPredictionProject(BaseGeometricProject):
                     collect_skip_time_steps=cfg.temporal.collect_skip_time_steps,
                     return_incomplete_temporal_graph=False,
                     add_temporal_vehicle_edges=cfg["add_temporal_vehicle_edges"],
-                    #temporal_vehicle_edge_feature_computers=FeatureComputers.vtv()
-                    #max_time_steps_temporal_edge=Unlimited if cfg.temporal.max_time_steps_temporal_edge == "unlimited" else cfg.temporal.max_time_steps_temporal_edge
+                    # temporal_vehicle_edge_feature_computers=FeatureComputers.vtv()
+                    # max_time_steps_temporal_edge=Unlimited if cfg.temporal.max_time_steps_temporal_edge == "unlimited" else cfg.temporal.max_time_steps_temporal_edge
                 ),
                 traffic_extractor_factory=traffic_extractor_factory,
             )
-            
+
         else:
             extractor_factory = traffic_extractor_factory
 
@@ -222,7 +224,7 @@ class TrajectoryPredictionProject(BaseGeometricProject):
             enable_waypoint_resampling=cfg["enable_waypoint_resampling"],
             waypoint_density=cfg["lanelet_waypoint_density"]
         )
-        
+
         if cfg["enable_feature_normalization"]:
             transformations = [
                 FeatureNormalizationTransformation(
@@ -239,19 +241,13 @@ class TrajectoryPredictionProject(BaseGeometricProject):
         else:
             transformations = []
 
-
         experiment_config = GeometricExperimentConfig(
             extractor_factory=extractor_factory,
-            data_collector_cls=ScenarioDatasetCollector,
-            preprocessors=[
-                SegmentLaneletsPreprocessor(
+            dataset_collector_cls=DatasetCollector,
+            scenario_preprocessor=create_scenario_filterers() >> SegmentLaneletsPreprocessor(
                     lanelet_max_segment_length=cfg["pre_transform"]["lanelet_max_segment_length"]
                 ),
-
-            ],
-            postprocessors=[],
             transformations=transformations,
-            filterers=create_scenario_filterers(),
             simulation_options=ScenarioSimulationOptions(
                 lanelet_assignment_order=LaneletAssignmentStrategy.ONLY_SHAPE,
                 collision_checking=False,
@@ -259,21 +255,22 @@ class TrajectoryPredictionProject(BaseGeometricProject):
                 step_renderers=[TrafficSceneRenderer()] if cfg["render_collection"] else None
             )
         )
-            
-        return experiment_config 
+
+        return experiment_config
 
     def configure_training_callbacks(
-        self, 
-        wandb_service: WandbService
+        self,
+        wandb_service: WandbService,
+        model_dir: Path
     ) -> CallbackComputersContainer:
         callbacks_computers = CallbackComputersContainer(
             training_step_callbacks=CallbackComputerContainerService([
                 ExportLatestModelCallback(
-                    directory=self.dir_structure.latest_model_dir,
+                    directory=model_dir,
                     save_frequency=self.cfg.training.checkpoint_frequency,
                     only_best=False
                 ),
-                #LogWandbCallback(wandb_service=wandb_service),
+                # LogWandbCallback(wandb_service=wandb_service),
                 GradientClippingCallback(self.cfg.training.gradient_clipping_threshold)
                 # DebugTrainBackwardGradientsCallback(frequency=200)
             ]),
@@ -287,7 +284,7 @@ class TrajectoryPredictionProject(BaseGeometricProject):
             initialize_training_callbacks=CallbackComputerContainerService([WatchWandbCallback(
                 wandb_service=wandb_service,
                 log_freq=self.cfg.training.log_freq,
-                log_gradients=False #not self.cfg.warmstart
+                log_gradients=False  # not self.cfg.warmstart
             )]),
             # checkpoint_callbacks=CallbackComputerContainerService([EpochCheckpointCallback(
             #     directory=self.dir_structure.model_dir,

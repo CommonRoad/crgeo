@@ -3,15 +3,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Dict, Optional
+from typing import Optional
 
-import gym.spaces
-import gym.spaces
+import gymnasium
 import numpy as np
 
 from commonroad_geometric.common.geometry.helpers import relative_orientation
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
-from commonroad_geometric.learning.reinforcement.observer.base_observer import BaseObserver
+from commonroad_geometric.learning.reinforcement.observer.base_observer import BaseObserver, T_Observation
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
 from projects.geometric_models.lane_occupancy.models.occupancy.occupancy_model import DEFAULT_PATH_LENGTH
 
@@ -52,14 +51,14 @@ class EncodingObserver(BaseObserver):
         Features.VELOCITY: FeatureScaleOptions(0.0, 22.0),
         Features.STEERING_ANGLE_ABS: FeatureScaleOptions(0.0, 0.4),
         Features.STEERING_ANGLE: FeatureScaleOptions(-0.4, 0.4),
-        Features.HEADING_ERROR_ABS: FeatureScaleOptions(0.0, np.pi/4),
+        Features.HEADING_ERROR_ABS: FeatureScaleOptions(0.0, np.pi / 4),
         Features.LATERAL_ERROR_ABS: FeatureScaleOptions(0.0, 2.5),
         Features.LOOK_AHEAD_CURVATURES_ABS: FeatureScaleOptions(0.0, 0.2),
-        Features.LOOK_AHEAD_YAW_DIFFS_ABS: FeatureScaleOptions(0.0, np.pi/2),
-        Features.HEADING_ERROR: FeatureScaleOptions(-np.pi/4, np.pi/4),
+        Features.LOOK_AHEAD_YAW_DIFFS_ABS: FeatureScaleOptions(0.0, np.pi / 2),
+        Features.HEADING_ERROR: FeatureScaleOptions(-np.pi / 4, np.pi / 4),
         Features.LATERAL_ERROR: FeatureScaleOptions(-2.5, 2.5),
         Features.LOOK_AHEAD_CURVATURES: FeatureScaleOptions(-0.2, 0.2),
-        Features.LOOK_AHEAD_YAW_DIFFS: FeatureScaleOptions(-np.pi/2, np.pi/2),
+        Features.LOOK_AHEAD_YAW_DIFFS: FeatureScaleOptions(-np.pi / 2, np.pi / 2),
         Features.Z_EGO: FeatureScaleOptions(None, None),
         Features.ACCELERATION: FeatureScaleOptions(0.0, 20.0)
     }
@@ -78,13 +77,13 @@ class EncodingObserver(BaseObserver):
         self._n_features: int
         super().__init__()
 
-    def setup(self, dummy_data: CommonRoadData) -> gym.spaces.Space:
+    def setup(self, dummy_data: CommonRoadData) -> gymnasium.Space:
         self._n_encoding_features = dummy_data.z_ego_route.shape[0]
         if self.only_abs_geom_features:
             n_features = sum((
                 self._n_encoding_features,
                 EncodingObserver.N_FIXED_EGO_FEATURES,
-                2*len(self.look_ahead_times)
+                2 * len(self.look_ahead_times)
             ))
         elif self.only_longitudinal_features:
             n_features = sum((
@@ -96,17 +95,17 @@ class EncodingObserver(BaseObserver):
                 self._n_encoding_features,
                 EncodingObserver.N_FIXED_EGO_FEATURES,
                 EncodingObserver.N_FIXED_SIGNED_EGO_FEATURES,
-                4*len(self.look_ahead_times)
+                4 * len(self.look_ahead_times)
             ))
         self._n_features = n_features
-        observation_space = gym.spaces.Box(-np.inf, np.inf, (n_features, ), dtype=np.float32)
+        observation_space = gymnasium.spaces.Box(-np.inf, np.inf, (n_features, ), dtype=np.float32)
         return observation_space
 
     def observe(
         self,
         data: CommonRoadData,
         ego_vehicle_simulation: EgoVehicleSimulation
-    ) -> Dict[str, np.ndarray]:
+    ) -> T_Observation:
         opt = EncodingObserver.FEATURE_SCALING_OPTIONS
         F = Features
 
@@ -121,7 +120,8 @@ class EncodingObserver(BaseObserver):
         acceleration = current_state.acceleration
         velocity = EncodingObserver._scale_feature(opt[F.VELOCITY].fmin, opt[F.VELOCITY].fmax, velocity)
         acceleration = EncodingObserver._scale_feature(opt[F.ACCELERATION].fmin, opt[F.ACCELERATION].fmax, acceleration)
-        goal_distance = EncodingObserver._scale_feature(opt[F.GOAL_DISTANCE].fmin, opt[F.GOAL_DISTANCE].fmax, goal_distance)
+        goal_distance = EncodingObserver._scale_feature(
+            opt[F.GOAL_DISTANCE].fmin, opt[F.GOAL_DISTANCE].fmax, goal_distance)
 
         try:
             z_ego = data.z_ego_route.detach().numpy()
@@ -160,16 +160,26 @@ class EncodingObserver(BaseObserver):
         steering_angle = current_state.steering_angle
         steering_angle_abs = abs(steering_angle)
 
-        steering_angle = EncodingObserver._scale_feature(opt[F.STEERING_ANGLE].fmin, opt[F.STEERING_ANGLE].fmax, steering_angle)
-        steering_angle_abs = EncodingObserver._scale_feature(opt[F.STEERING_ANGLE_ABS].fmin, opt[F.STEERING_ANGLE_ABS].fmax, steering_angle_abs)
-        heading_error = EncodingObserver._scale_feature(opt[F.HEADING_ERROR].fmin, opt[F.HEADING_ERROR].fmax, heading_error)
-        heading_error_abs = EncodingObserver._scale_feature(opt[F.HEADING_ERROR_ABS].fmin, opt[F.HEADING_ERROR_ABS].fmax, heading_error_abs)
-        lateral_error = EncodingObserver._scale_feature(opt[F.LATERAL_ERROR].fmin, opt[F.LATERAL_ERROR].fmax, lateral_error)
-        lateral_error_abs = EncodingObserver._scale_feature(opt[F.LATERAL_ERROR_ABS].fmin, opt[F.LATERAL_ERROR_ABS].fmax, lateral_error_abs)
-        look_ahead_curvatures = EncodingObserver._scale_feature(opt[F.LOOK_AHEAD_CURVATURES].fmin, opt[F.LOOK_AHEAD_CURVATURES].fmax, look_ahead_curvatures)
-        look_ahead_yaw_diffs = EncodingObserver._scale_feature(opt[F.LOOK_AHEAD_YAW_DIFFS].fmin, opt[F.LOOK_AHEAD_YAW_DIFFS].fmax, look_ahead_yaw_diffs)
-        look_ahead_curvatures_abs = EncodingObserver._scale_feature(opt[F.LOOK_AHEAD_CURVATURES_ABS].fmin, opt[F.LOOK_AHEAD_CURVATURES_ABS].fmax, look_ahead_curvatures_abs)
-        look_ahead_yaw_diffs_abs = EncodingObserver._scale_feature(opt[F.LOOK_AHEAD_YAW_DIFFS_ABS].fmin, opt[F.LOOK_AHEAD_YAW_DIFFS_ABS].fmax, look_ahead_yaw_diffs_abs)
+        steering_angle = EncodingObserver._scale_feature(
+            opt[F.STEERING_ANGLE].fmin, opt[F.STEERING_ANGLE].fmax, steering_angle)
+        steering_angle_abs = EncodingObserver._scale_feature(
+            opt[F.STEERING_ANGLE_ABS].fmin, opt[F.STEERING_ANGLE_ABS].fmax, steering_angle_abs)
+        heading_error = EncodingObserver._scale_feature(
+            opt[F.HEADING_ERROR].fmin, opt[F.HEADING_ERROR].fmax, heading_error)
+        heading_error_abs = EncodingObserver._scale_feature(
+            opt[F.HEADING_ERROR_ABS].fmin, opt[F.HEADING_ERROR_ABS].fmax, heading_error_abs)
+        lateral_error = EncodingObserver._scale_feature(
+            opt[F.LATERAL_ERROR].fmin, opt[F.LATERAL_ERROR].fmax, lateral_error)
+        lateral_error_abs = EncodingObserver._scale_feature(
+            opt[F.LATERAL_ERROR_ABS].fmin, opt[F.LATERAL_ERROR_ABS].fmax, lateral_error_abs)
+        look_ahead_curvatures = EncodingObserver._scale_feature(
+            opt[F.LOOK_AHEAD_CURVATURES].fmin, opt[F.LOOK_AHEAD_CURVATURES].fmax, look_ahead_curvatures)
+        look_ahead_yaw_diffs = EncodingObserver._scale_feature(
+            opt[F.LOOK_AHEAD_YAW_DIFFS].fmin, opt[F.LOOK_AHEAD_YAW_DIFFS].fmax, look_ahead_yaw_diffs)
+        look_ahead_curvatures_abs = EncodingObserver._scale_feature(
+            opt[F.LOOK_AHEAD_CURVATURES_ABS].fmin, opt[F.LOOK_AHEAD_CURVATURES_ABS].fmax, look_ahead_curvatures_abs)
+        look_ahead_yaw_diffs_abs = EncodingObserver._scale_feature(
+            opt[F.LOOK_AHEAD_YAW_DIFFS_ABS].fmin, opt[F.LOOK_AHEAD_YAW_DIFFS_ABS].fmax, look_ahead_yaw_diffs_abs)
 
         x_scalars = np.array([
             goal_distance,
@@ -213,7 +223,7 @@ class EncodingObserver(BaseObserver):
         if fmin is None or fmax is None:
             return value
         clipped_value = np.clip(value, fmin, fmax)
-        mean = 0.5 * (fmax + fmin) # TODO
+        mean = 0.5 * (fmax + fmin)  # TODO
         interval = 0.5 * (fmax - fmin)
         scaled_value = (clipped_value - mean) / interval
         return scaled_value

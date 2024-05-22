@@ -4,14 +4,14 @@ defaults:
 
 project_dir: ./projects/output/geometric/trajectory_prediction
 seed: 0
-no_wandb: False
+wandb_logging: True
 warmstart: False
 device: auto
 logging_level: info
 disable_postprocessing_inference: True
-profile: True
+profile: False
 
-dataset: 
+dataset:
   train_scenario_dir: &scenario_dir ./projects/output/geometric/trajectory_prediction/generated_dataset #./data/osm_recordings/
   test_scenario_dir: *scenario_dir # TODO
   #val_scenario_dir: ./data/osm_recordings/
@@ -23,7 +23,7 @@ dataset:
   max_samples_per_scenario: &max_samples_per_scenario 100
   max_scenarios: &max_scenarios 5
 
-experiment: 
+experiment:
   edge_range: 42.0
   add_temporal_vehicle_edges: True
   enable_feature_normalization: True
@@ -64,9 +64,9 @@ experiment:
 model:
   graph_features:
     lanelet: &lanelet_features 2
-    lanelet_to_lanelet: &lanelet_to_lanelet_features 6
-    vehicle: 11
-    vehicle_to_vehicle: 9
+    lanelet_to_lanelet: &lanelet_to_lanelet_features 7
+    vehicle: 8
+    vehicle_to_vehicle: 10
     lanelet_to_vehicle: 0
     vehicle_to_lanelet: 3
     vehicle_temporal_vehicle: 0 #8
@@ -122,7 +122,7 @@ model:
     delta_time: *delta_time
 
     kst_vehicle_constraints:  # kinematic single track model vehicle constraints
-      # from Table 1, vehicle identifier 2 https://gitlab.lrz.de/tum-cps/commonroad-vehicle-models/-/raw/master/vehicleModels_commonRoad.pdf
+      # from Table 1, vehicle identifier 2
       steering_angle_bound: 1.066
       velocity_min: -13.6
       velocity_max: 50.8
@@ -154,11 +154,11 @@ model:
       latent_dims: 16
       hybrid_loss_alpha: 0.75
 
-training: 
+training:
   backward_freq: 1
   batch_size: 1
   checkpoint_frequency: 50
-  early_stopping: 
+  early_stopping:
   enable_multi_gpu: False
   enable_rendering: True
   render_subprocess: True
@@ -166,7 +166,7 @@ training:
   log_freq: 2000
   max_epochs: 10000
   max_optimize_samples: 1
-  overfit: True
+  overfit: False
   shuffle: False
   swallow_errors: False
   test_freq: 1
@@ -177,7 +177,7 @@ training:
   verbose: 1
   video_freq: 1000
   video_length: 400
-  video_record_backoff: 1.5
+  video_record_backoff: 1.25
   lr_scheduler_cls: CosineAnnealingWarmRestarts
   lr_scheduler_kwargs:
     T_0: 80

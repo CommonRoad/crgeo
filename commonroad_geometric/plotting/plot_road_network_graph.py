@@ -1,23 +1,24 @@
 import warnings
 from typing import Optional, Sequence, Set, Tuple, Union
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap
 from matplotlib.figure import Figure
-import matplotlib.patches as mpatches
 
 from commonroad_geometric.common.geometry.continuous_polyline import ContinuousPolyline
-from commonroad_geometric.dataset.extraction.road_network.types import LaneletEdgeTypeColorMap, LaneletNodeTypeColorMap
-from commonroad_geometric.dataset.extraction.road_network.types import LaneletEdgeType
+from commonroad_geometric.dataset.extraction.road_network.types import LaneletEdgeType, LaneletEdgeTypeColorMap, LaneletNodeTypeColorMap
+from commonroad_geometric.plotting.set_research_style import set_research_style
+from commonroad_geometric.rendering.color.color import Color
 
 warnings.filterwarnings("ignore", module=r"matplotlib\..*")
 
-from commonroad_geometric.plotting.set_research_style import set_research_style
 
-# TODO xlim, ylim invariance 
+# TODO xlim, ylim invariance
+
 
 def plot_road_network_graph(
     graph: nx.DiGraph,
@@ -79,7 +80,7 @@ def plot_road_network_graph(
         fig (Figure) - The plot of the network graph.
     """
     set_research_style(size_multiplier=0.45)
-    
+
     if ax is not None:
         fig = None
     else:
@@ -104,7 +105,7 @@ def plot_road_network_graph(
     node_start_offset_positions = {}
     node_center_offset_positions = {}
     node_end_offset_positions = {}
-    
+
     node_waypoints = nx.get_node_attributes(graph, 'center_vertices')
     # node_waypoint_lists = [p for p in list(node_waypoints.values()) if p is not None]
     # edge_waypoints = nx.get_edge_attributes(graph, 'edge_waypoints')
@@ -113,26 +114,27 @@ def plot_road_network_graph(
     for node, node_waypoints in node_waypoints.items():
         polyline_draw = ContinuousPolyline(node_waypoints, waypoint_resolution=40, linestring_resolution=40)
         polyline_exact = ContinuousPolyline(node_waypoints, waypoint_resolution=200, linestring_resolution=200)
-        
+
         waypoints = polyline_draw.waypoints
         if show_waypoints:
             line = ax.plot(
                 waypoints[:, 0],
                 waypoints[:, 1],
-                #s=1.0,
-                color=LaneletEdgeTypeColorMap[LaneletEdgeType.SUCCESSOR],
+                # s=1.0,
+                color=LaneletEdgeTypeColorMap[LaneletEdgeType.SUCCESSOR].as_rgba(),
                 linestyle=linestyle,
                 linewidth=linewidth,
                 alpha=edge_alpha,
                 zorder=zorder,
-                #marker='x'
+                # marker='x'
             )[0]
-            #add_arrow(line, color='black', position=polyline(0))
+            # add_arrow(line, color='black', position=polyline(0))
             start = polyline_exact(node_offset_meters - 0.55)
             end = polyline_exact(node_offset_meters - 0.3)
+            edge_color = Color((*LaneletEdgeTypeColorMap[LaneletEdgeType.SUCCESSOR].as_rgba()[:3], edge_alpha))
             add_arrow(
                 line,
-                color=(*LaneletEdgeTypeColorMap[LaneletEdgeType.SUCCESSOR], edge_alpha),
+                color=edge_color.as_rgba(),
                 start=start,
                 end=end,
                 size=arrow_size,
@@ -140,12 +142,16 @@ def plot_road_network_graph(
             )
 
         node_start_offset_positions[node] = polyline_exact(node_offset_meters)
-        node_center_offset_positions[node] = polyline_exact(polyline_exact.length/2 - node_offset_meters/2)
+        node_center_offset_positions[node] = polyline_exact(polyline_exact.length / 2 - node_offset_meters / 2)
         node_end_offset_positions[node] = polyline_exact(polyline_exact.length - node_offset_meters)
-    
+
     if draw_nodes:
         node_types = nx.get_node_attributes(graph, 'node_type')
-        node_to_color = {node: LaneletNodeTypeColorMap[type] for node, type in node_types.items() if node in node_center_positions}
+        node_to_color = {
+            node: LaneletNodeTypeColorMap[node_type].as_rgba()
+            for node, node_type in node_types.items()
+            if node in node_center_positions
+        }
         node_color_list = [node_to_color[n] if n in node_to_color else (0.2, 0.2, 0.2, 0.01) for n in graph.nodes()]
         nx.draw_networkx_nodes(
             graph,
@@ -177,20 +183,20 @@ def plot_road_network_graph(
     edge_types = nx.get_edge_attributes(graph, 'lanelet_edge_type')
     edge_types = {e: t for e, t in edge_types.items() if t not in ignore_edge_types}
     edge_types_included = list(set(edge_types.values()))
-    
+
     if edge_type_legend:
         edge_legend = [
             mpatches.Patch(
-                color=LaneletEdgeTypeColorMap[LaneletEdgeType(t)],
+                color=LaneletEdgeTypeColorMap[LaneletEdgeType(t)].as_rgba(),
                 label=LaneletEdgeType(t).name.lower().replace('_', ' ')
             ) for t in edge_types_included
         ]
         if LaneletEdgeType.SUCCESSOR in ignore_edge_types:
             edge_legend.insert(0, mpatches.Patch(
-                color=LaneletEdgeTypeColorMap[LaneletEdgeType(LaneletEdgeType.SUCCESSOR)],
+                color=LaneletEdgeTypeColorMap[LaneletEdgeType(LaneletEdgeType.SUCCESSOR)].as_rgba(),
                 label=LaneletEdgeType(LaneletEdgeType.SUCCESSOR).name.lower().replace('_', ' ')
             ))
-        
+
         plt.legend(handles=edge_legend)
 
     edge_cardinalities = nx.get_edge_attributes(graph, 'edge_cardinality')
@@ -207,8 +213,15 @@ def plot_road_network_graph(
             alpha=alpha
         )
     else:
-        edge_types_start = {e: t for e, t in edge_types.items() if t not in {LaneletEdgeType.CONFLICTING, LaneletEdgeType.MERGING}}
-        edge_colors_start = [LaneletEdgeTypeColorMap[LaneletEdgeType(edge_types_start[edge])] for edge in edge_types_start]
+        edge_types_start = {
+            e: t
+            for e, t in edge_types.items()
+            if t not in {LaneletEdgeType.CONFLICTING, LaneletEdgeType.MERGING}
+        }
+        edge_colors_start = [
+            LaneletEdgeTypeColorMap[LaneletEdgeType(edge_types_start[edge])].as_rgba()
+            for edge in edge_types_start
+        ]
         nx.draw_networkx_edges(
             graph,
             pos=node_start_offset_positions,
@@ -218,15 +231,15 @@ def plot_road_network_graph(
             style=linestyle,
             alpha=edge_alpha,
             width=linewidth,
-            min_source_margin=0,#0.1,
-            min_target_margin=0,#,0.1,
+            min_source_margin=0,  # 0.1,
+            min_target_margin=0,  # ,0.1,
             connectionstyle=edge_connection_style,
             arrowsize=arrow_size,
-            #zorder=zorder,
+            # zorder=zorder,
         )
 
         edge_types_end = {e: t for e, t in edge_types.items() if t == LaneletEdgeType.MERGING}
-        edge_colors_end = [LaneletEdgeTypeColorMap[LaneletEdgeType(edge_types_end[edge])] for edge in edge_types_end]
+        edge_colors_end = [LaneletEdgeTypeColorMap[LaneletEdgeType(edge_types_end[edge])].as_rgba() for edge in edge_types_end]
         nx.draw_networkx_edges(
             graph,
             pos=node_start_offset_positions,
@@ -236,15 +249,18 @@ def plot_road_network_graph(
             style=linestyle,
             alpha=edge_alpha,
             width=linewidth,
-            min_source_margin=0,#0.1,
-            min_target_margin=0,#,0.1,
-            connectionstyle=edge_connection_style,#'arc3,rad=0.0',
+            min_source_margin=0,  # 0.1,
+            min_target_margin=0,  # ,0.1,
+            connectionstyle=edge_connection_style,  # 'arc3,rad=0.0',
             arrowsize=arrow_size,
-            #zorder=zorder,
+            # zorder=zorder,
         )
 
         edge_types_center = {e: t for e, t in edge_types.items() if t == LaneletEdgeType.CONFLICTING}
-        edge_colors_center = [LaneletEdgeTypeColorMap[LaneletEdgeType(edge_types_center[edge])] for edge in edge_types_center]
+        edge_colors_center = [
+            LaneletEdgeTypeColorMap[LaneletEdgeType(edge_types_center[edge])].as_rgba()
+            for edge in edge_types_center
+        ]
         nx.draw_networkx_edges(
             graph,
             pos=node_start_offset_positions,
@@ -254,11 +270,11 @@ def plot_road_network_graph(
             style=linestyle,
             alpha=edge_alpha,
             width=linewidth,
-            min_source_margin=0,#0.1,
-            min_target_margin=0,#,0.1,
+            min_source_margin=0,  # 0.1,
+            min_target_margin=0,  # ,0.1,
             connectionstyle=edge_connection_style,
             arrowsize=arrow_size,
-            #zorder=zorder,
+            # zorder=zorder,
         )
 
     if draw_conflict_markers:
@@ -273,12 +289,11 @@ def plot_road_network_graph(
                 locations[:, 0],
                 locations[:, 1],
                 marker='x',
-                c=LaneletEdgeTypeColorMap[LaneletEdgeType.CONFLICTING],
+                c=LaneletEdgeTypeColorMap[LaneletEdgeType.CONFLICTING].as_rgba(),
                 s=85,
-                linewidths=linewidth*1.5,
+                linewidths=linewidth * 1.5,
                 zorder=zorder + 1,
             )
-
 
     if show_edge_weights or show_edge_angles or show_edge_labels:
         edge_to_angle = nx.get_edge_attributes(graph, 'exit_angle')
@@ -302,7 +317,7 @@ def plot_road_network_graph(
             ax=ax,
             font_size=6,
             font_weight='heavy',
-            #zorder=zorder + 1,
+            # zorder=zorder + 1,
         )
 
     # xy = np.vstack(node_start_positions.values())
@@ -331,7 +346,7 @@ def plot_road_network_graph(
     return fig
 
 
-def add_arrow(line, start, end, direction='right', size=10, color=None, zorder: int=1):
+def add_arrow(line, start, end, direction='right', size=10, color=None, zorder: int = 1):
     """
     add an arrow to a line.
 
@@ -344,7 +359,8 @@ def add_arrow(line, start, end, direction='right', size=10, color=None, zorder: 
     if color is None:
         color = line.get_color()
 
-    line.axes.annotate('',
+    line.axes.annotate(
+        '',
         xytext=(start[0], start[1]),
         xy=(end[0], end[1]),
         arrowprops=dict(arrowstyle="-|>", color=color),

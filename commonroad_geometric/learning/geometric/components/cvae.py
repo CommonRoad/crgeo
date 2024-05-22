@@ -152,4 +152,5 @@ def kl_divergence_diagonal_normal(
     means2: Tensor, log_variances2: Tensor,
 ) -> Tensor:
     variances1, variances2 = torch.exp(log_variances1) + EPS, torch.exp(log_variances2) + EPS
-    return 0.5 * torch.sum(variances1 / variances2 + (means2 - means1)**2 / variances2 + log_variances2 - log_variances1 - 1.0, dim=-1)
+    return 0.5 * torch.sum(variances1 / variances2 + (means2 - means1)**2 /
+                           variances2 + log_variances2 - log_variances1 - 1.0, dim=-1)

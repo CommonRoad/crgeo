@@ -156,6 +156,7 @@ class SignalReference:
     Signal reference shall be used for signals only.
     For the signal that reuses the content of another signal, the direction for which it is valid shall be specified.
     """
+
     def __init__(self):
         self._s = None
         self._t = None

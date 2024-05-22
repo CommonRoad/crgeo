@@ -1,7 +1,6 @@
 from typing import Any, Optional
 
 import torch
-from optuna import Trial
 from torch import Tensor, nn
 from torch.nn import Tanh
 from torch_geometric.nn.glob import global_add_pool
@@ -39,7 +38,7 @@ class V2LGlobalEncoder(V2LEncoder):
     def build(
         self,
         data: Optional[CommonRoadData],
-        trial: Optional[Trial] = None,
+        trial = None,
         enable_batch_norm: Optional[bool] = None
     ) -> None:
         super().build(data)
@@ -65,12 +64,12 @@ class V2LGlobalEncoder(V2LEncoder):
             out_channels=self.config.hidden_size,
             num_layers=2,
             hidden_channels=self.config.hidden_size,
-            #norm="batch_norm" if enable_batch_norm else None,
+            # norm="batch_norm" if enable_batch_norm else None,
             act=nn.Tanh()
         )
         self.global_key_act = nn.Sigmoid()
 
-        # not used 
+        # not used
         self.global_lin_reconstruct = nn.Linear(V2LGlobalEncoder.NUM_CONTEXT_FEATURES, self.config.hidden_size)
         self.global_reconstruct_act = nn.Tanh()
 
@@ -80,7 +79,7 @@ class V2LGlobalEncoder(V2LEncoder):
             out_channels=self.config.hidden_size,
             num_layers=2,
             hidden_channels=self.config.hidden_size,
-            #norm="batch_norm" if enable_batch_norm else None,
+            # norm="batch_norm" if enable_batch_norm else None,
             act=Tanh
         )
         # self.global_msg_norm = nn.Identity(dim)
@@ -114,11 +113,13 @@ class V2LGlobalEncoder(V2LEncoder):
             self.velocity_conditioning = False
         # used
         self.global_embed_mlp = MLP(
-            in_channels=self.config.hidden_size + int(self.velocity_conditioning),  # 2*dim if isinstance(self.global_pooler, Set2Set) else dim,
+            # 2*dim if isinstance(self.global_pooler, Set2Set) else dim,
+            in_channels=self.config.hidden_size + int(self.velocity_conditioning),
             hidden_channels=self.config.hidden_size,
             out_channels=dim,
             num_layers=2,
-            #norm="batch_norm" if enable_batch_norm else None,  # watch out for low batch size
+            norm=None,
+            # norm="batch_norm" if enable_batch_norm else None,  # watch out for low batch size
             act=nn.Tanh()
         )
 
@@ -200,4 +201,7 @@ class V2LGlobalEncoder(V2LEncoder):
             global_embed_mlp_in = out_z_act
 
         z_ego_route = self.global_embed_mlp(global_embed_mlp_in)
+
+        assert z_ego_route.shape[0] == batch_size
+
         return z_ego_route, z_r, message_intensities  # TODO cleanup

@@ -174,10 +174,10 @@ def get_middle_point(
     else:
         raise ValueError("edge is not at node 1")
     vector1 = (
-            vector1
-            / np.linalg.norm(vector1)
-            * np.linalg.norm(start_point - end_point)
-            * config.BEZIER_PARAMETER
+        vector1
+        / np.linalg.norm(vector1)
+        * np.linalg.norm(start_point - end_point)
+        * config.BEZIER_PARAMETER
     )
     middle_point = start_point + vector1
     return middle_point

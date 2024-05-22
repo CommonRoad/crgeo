@@ -1,11 +1,12 @@
 from enum import Enum, unique
 
+
 @unique
 class V_Feature(Enum):
     """
     Vehicle nodes represents traffic participants at a specific time.
     Since our graph should be transformation-invariant,
-    we do not include the absolute position and orientation of a vehicle in the node attributes. 
+    we do not include the absolute position and orientation of a vehicle in the node attributes.
     """
     Velocity = 'velocity'
     Acceleration = 'acceleration'
@@ -14,10 +15,12 @@ class V_Feature(Enum):
     OrientationVec = 'orientation_vec'
     Length = 'length'
     Width = 'width'
-    LaneletArclengthAbs = 'lanelet_arclength_abs' 
+    LaneletArclengthAbs = 'lanelet_arclength_abs'
     LaneletArclengthRel = 'lanelet_arclength_rel'
     DistLeftBound = 'dist_left_bound'
     DistRightBound = 'dist_right_bound'
+    DistLeftRoadBound = 'dist_left_road_bound'
+    DistRightRoadBound = 'dist_right_road_bound'
     LaneletLateralError = 'lanelet_lateral_error'
     HeadingError = 'heading_error'
     HasAdjLaneLeft = 'has_adj_lane_left'
@@ -32,15 +35,19 @@ class V_Feature(Enum):
     AngleEgoFrame = 'angle_ego_frame'
     VelocityEgoFrame = 'velocity_ego_frame'
     NumLanaletAssignments = 'num_lanelet_assignments'
+    IsOffroad = 'is_offrad'
+
 
 @unique
 class L_Feature(Enum):
+    Id = 'lanelet_id'
     StartCurvature = 'start_curvature'
     Curvature = 'curvature'
     EndCurvature = 'end_curvature'
     DirectionChange = 'direction_change'
     Orientation = 'lanelet_orientation'
     Length = 'lanelet_length'
+
 
 @unique
 class V2V_Feature(Enum):
@@ -68,6 +75,7 @@ class V2V_Feature(Enum):
     ClosestDistanceCLT = 'closest_distance_cl_transform'
     TimeToCollisionCLT = 'time_to_collision_cl_transform'
 
+
 @unique
 class L2L_Feature(Enum):
     RelativeIntersectAngle = 'relative_intersect_angle'
@@ -87,11 +95,12 @@ class L2L_Feature(Enum):
     RelativePosition = 'relative_position'
     Distance = 'distance'
 
+
 @unique
 class V2L_Feature(Enum):
     """
-    Each vehicle v is connected to all lanelets which contain the vehicle center at the current time step 
-    via bidirectional vehicle-lanelet edges. Bidirectional edges are represented as two separate directed edges, 
+    Each vehicle v is connected to all lanelets which contain the vehicle center at the current time step
+    via bidirectional vehicle-lanelet edges. Bidirectional edges are represented as two separate directed edges,
     each with identical edge attributes.
     """
     V2LLaneletArclengthAbs = 'v2l_lanelet_arclength_abs'
@@ -100,6 +109,7 @@ class V2L_Feature(Enum):
     V2LDistRightBound = 'v2l_dist_right_bound'
     V2LLaneletLateralError = 'v2l_lanelet_lateral_error'
     V2LHeadingError = 'v2l_heading_error'
+
 
 @unique
 class L2V_Feature(Enum):

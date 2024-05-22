@@ -7,12 +7,13 @@ import time
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional, Union, Callable, Iterable
+from tqdm import tqdm
 
 import numpy as np
 import torch
 from commonroad_geometric.common.progress_reporter import ProgressReporter
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
-from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset, SaveFunction, LoadFunction
+from commonroad_geometric.dataset.commonroad_dataset import CommonRoadDataset, SaveFunction, LoadFunction, ProcessedFileParsingResult
 from torch_geometric.data import Data, HeteroData
 
 log = logging.getLogger(__name__)
@@ -47,16 +48,13 @@ def dataset_transformation(
         if num_workers <= 1:
             new_samples_per_old_sample = []
             for i, path in enumerate(processed_files):
-                scenario_index = dataset.index_to_scenario_index(i)
                 new_samples_per_old_sample.append(
                     _transformation_worker(
-                        scenario_index=scenario_index,
-                        sample_index=i,
                         sample_path=Path(path),
                         output_directory=output_directory,
                         transform=transform,
-                        save_fn=dataset._save_fn,
-                        load_fn=dataset._load_fn,
+                        save_fn=dataset.config.save_fn,
+                        load_fn=dataset.config.load_fn,
                     )
                 )
                 progress.update(i)
@@ -69,13 +67,11 @@ def dataset_transformation(
                     pool.apply_async(
                         func=_transformation_worker,
                         kwds=dict(
-                            scenario_index=dataset.index_to_scenario_index(i),
-                            sample_index=i,
                             sample_path=Path(path),
                             output_directory=output_directory,
                             transform=transform,
-                            save_fn=dataset._save_fn,
-                            load_fn=dataset._load_fn,
+                            save_fn=dataset.config.save_fn,
+                            load_fn=dataset.config.load_fn,
                         ),
                     )
                     for i, path in enumerate(processed_files)
@@ -93,31 +89,7 @@ def dataset_transformation(
                     if num_ready == len(async_results):
                         break
 
-                    time.sleep(1.0)
-
                 new_samples_per_old_sample = [result.get() for result in async_results]
-
-        num_samples_per_scenario = np.empty(dataset._samples_cumsum.shape[0], dtype=int)
-        i_start = 0
-        for idx, i_end in enumerate(dataset._samples_cumsum):
-            # idx is scenario_id
-            new_samples = new_samples_per_old_sample[i_start:i_end]
-            new_sample_idx = 0
-            for j, samples in enumerate(new_samples):
-                for sample in range(samples):
-                    old_file_name = _transformed_file_name(original_sample_index=i_start + j, new_sample_index=sample)
-                    new_file_name = CommonRoadDataset.processed_file_name(scenario_index=idx, sample_index=new_sample_idx)
-                    new_sample_idx += 1
-                    (output_directory / old_file_name).rename(output_directory / new_file_name)
-
-            num_samples_per_scenario[idx] = sum(new_samples)
-            i_start = i_end
-
-        samples_cumsum = np.cumsum(num_samples_per_scenario)
-
-        samples_file = output_directory / dataset._samples_file.name
-        with samples_file.open("w", encoding="utf-8") as f:
-            json.dump(samples_cumsum.tolist(), f)
 
         log.info("Dataset transformation completed, renaming temporary directory to final output directory")
         shutil.rmtree(final_output_directory, ignore_errors=True)
@@ -126,8 +98,6 @@ def dataset_transformation(
 
 
 def _transformation_worker(
-    scenario_index: int,
-    sample_index: int,
     sample_path: Path,
     output_directory: Path,
     transform: TransformCallable,
@@ -135,11 +105,16 @@ def _transformation_worker(
     load_fn: LoadFunction,
 ) -> int:
     sample_data = load_fn(sample_path, map_location=torch.device("cpu"))
+    if isinstance(sample_data, tuple):
+        sample_data = sample_data[-1]
     new_sample_index = 0
-    for transformed_sample_data in transform(scenario_index, sample_index, sample_data):
-        output_file = output_directory / _transformed_file_name(sample_index, new_sample_index)
+    parsing_result = ProcessedFileParsingResult(processed_path=sample_path)
+    for transformed_sample_data in transform(parsing_result.scenario_index, parsing_result.sample_index, sample_data):
+        output_file = output_directory / sample_path.name
         save_fn(transformed_sample_data, output_file)
         new_sample_index += 1
+        break # TODO Allow multiple?
+    tqdm.write(f"Transformed {parsing_result.scenario_id}/{parsing_result.sample_index}")
     return new_sample_index
 
 

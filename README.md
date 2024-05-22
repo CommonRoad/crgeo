@@ -42,16 +42,6 @@ The easiest way of getting familiar with the framework is to consult the [tutori
 - It is highly recommended to incorporate the package's extendable rendering capabilities as an integral part of your development workflow. This allows you to visualize what is going on in your experiment, greatly simplifying debugging efforts.
 - If you ever find yourself in a situation where you have to modify the internals of this package while working on your research project, it probably means that commonroad-geometric is not flexible enough - please create a corresponding issue.
 
-### Design principles and developer guidelines:
-
-- Frequent use of abstraction classes for a modular and clean framework.
-- Class interfaces should be understandable and well-documented. We use the Google style docstring format across the package (see [PyCharm](https://www.jetbrains.com/help/pycharm/creating-documentation-comments.html), [VSCode](https://github.com/NilsJPWerner/autoDocstring)).
-- As a general rule, everything should be configurable and externalized through class APIs. While ensuring flexibility, however, make sure to provide reasonable defaults for most things to avoid unnecessary overhead for users.
-- Add tutorial scripts to the `tutorials/` directory for easy testing, reviewing and showcasing of new functionality.
-- Use [type hinting](https://docs.python.org/3/library/typing.html) everywhere - it enhances readability and makes the IDE developer experience a lot smoother. Perform [static type checking](https://gitlab.lrz.de/cps/commonroad-geometric/-/wikis/Static-Type-Checking-with-Mypy) with [mypy](https://github.com/python/mypy) (`pip install mypy` + `/commonroad-geometric$ mypy`) for easily discovering inconsistent typing (see [PyCharm extension](https://plugins.jetbrains.com/plugin/11086-mypy), [VS Code extension](https://marketplace.visualstudio.com/items?itemName=matangover.mypy)).
-- Create issues for new tasks with appropriate priority and category labels as well as a corresponding branch.  Create a merge request to the develop branch afterwards.
-- Adhere to [PEP8](https://www.python.org/dev/peps/pep-0008/).
-
 ---
 
 # Installation

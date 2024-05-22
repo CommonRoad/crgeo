@@ -41,7 +41,12 @@ def lanelet_orientation_at_position(lanelet: Lanelet, position: np.ndarray):
 
 
 
-def collect_adjacent_lanelets(lanelet_network: LaneletNetwork, lanelet: Lanelet) -> Tuple[List[Lanelet], List[Lanelet]]:
+def collect_adjacent_lanelets(
+    lanelet_network: LaneletNetwork,
+    lanelet: Lanelet,
+    include_left: bool = True,
+    include_right: bool = True
+) -> Tuple[List[Lanelet], List[Lanelet]]:
     found_lanelet_ids: Set[int] = set()
     adjacent_same_dir: List[Lanelet] = []
     adjacent_opposite_dir: List[Lanelet] = []
@@ -52,12 +57,14 @@ def collect_adjacent_lanelets(lanelet_network: LaneletNetwork, lanelet: Lanelet)
         found_lanelet_ids.add(lanelet_id)
         (adjacent_same_dir if same_direction else adjacent_opposite_dir).append(lanelet)
 
-        if lanelet.adj_left is not None and lanelet.adj_left not in found_lanelet_ids:
-            adj_same_direction = not (same_direction ^ lanelet.adj_left_same_direction)
-            new_adjacent_lanelets.add((lanelet.adj_left, adj_same_direction))
-        if lanelet.adj_right is not None and lanelet.adj_right not in found_lanelet_ids:
-            adj_same_direction = not (same_direction ^ lanelet.adj_right_same_direction)
-            new_adjacent_lanelets.add((lanelet.adj_right, adj_same_direction))
+        if include_left:
+            if lanelet.adj_left is not None and lanelet.adj_left not in found_lanelet_ids:
+                adj_same_direction = not (same_direction ^ lanelet.adj_left_same_direction)
+                new_adjacent_lanelets.add((lanelet.adj_left, adj_same_direction))
+        if include_right:
+            if lanelet.adj_right is not None and lanelet.adj_right not in found_lanelet_ids:
+                adj_same_direction = not (same_direction ^ lanelet.adj_right_same_direction)
+                new_adjacent_lanelets.add((lanelet.adj_right, adj_same_direction))
 
     return adjacent_same_dir, adjacent_opposite_dir
 
@@ -861,5 +868,3 @@ def remove_unconnected_lanelets(lanelet_network: LaneletNetwork) -> LaneletNetwo
     for lanelet_id in unconnected_lanelet_ids:
         lanelet_network.remove_lanelet(lanelet_id)
     lanelet_network.cleanup_lanelet_references()
-
-

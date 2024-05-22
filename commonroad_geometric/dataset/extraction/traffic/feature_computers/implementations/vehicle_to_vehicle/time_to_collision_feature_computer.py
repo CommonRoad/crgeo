@@ -17,7 +17,7 @@ class TimeToCollisionFeatureComputer(BaseFeatureComputer[V2VFeatureParams]):
     Derivation:
         - https://www.geogebra.org/m/fqsdaptc
         - https://www.wolframalpha.com/input?i=minimize+%28x_1+%2B+v_1+t%29%C2%B2+%2B+%28v_0+t-y_1+-+v_2++t%29%C2%B2+wrt+t
-    
+
     """
 
     # TODO: Generalize to curvilinear coordinate frame?
@@ -58,17 +58,17 @@ class TimeToCollisionFeatureComputer(BaseFeatureComputer[V2VFeatureParams]):
 
         # Computing critical time value and distance based on d/dt(distance²(p_source(t), p_target(t))) =: 0
         t_crid_den = (v_0_sq - 2 * v_0 * v_y + v_x_sq + v_y_sq)
-        t_crit = ((v_0 - v_y) * y_1 - v_x * x_1) / t_crid_den if t_crid_den != 0.0 else np.nan
+        t_crit = ((v_0 - v_y) * y_1 - v_x * x_1) / t_crid_den if t_crid_den != 0.0 else 100
         dist_sq_crit_den = (v_x_sq + (v_0 - v_y) ** 2)
-        dist_sq_crit = ((v_0 - v_y) * x_1 + v_x * y_1) ** 2 / dist_sq_crit_den if dist_sq_crit_den != 0.0 else np.nan
-        dist_crit = np.sqrt(dist_sq_crit) if dist_sq_crit_den != 0.0 else np.nan
+        dist_sq_crit = ((v_0 - v_y) * x_1 + v_x * y_1) ** 2 / dist_sq_crit_den if dist_sq_crit_den != 0.0 else 100
+        dist_crit = np.sqrt(dist_sq_crit) if dist_sq_crit_den != 0.0 else 100
 
         # Deciding whether collision will occur
         collision_threshold: float = 2 * params.source_obstacle.obstacle_shape.width  # type: ignore
         expects_collision = math.isfinite(dist_crit) and bool(dist_crit <= collision_threshold)
-        time_to_collision = t_crit if expects_collision else np.nan
+        time_to_collision = t_crit if expects_collision else 100
         if time_to_collision <= 0:
-            time_to_collision = np.nan
+            time_to_collision = 100
             expects_collision = False
 
         features = {

@@ -5,10 +5,10 @@ Use https://pytorch.org/docs/stable/nn.html#transformer-layers instead.
 """
 import copy
 import math
-from typing import List, Dict, Tuple, Optional, Literal
+from typing import Literal, Optional, Tuple
 
 import torch
-from torch import nn, Tensor, BoolTensor
+from torch import BoolTensor, Tensor, nn
 
 from commonroad_geometric.common.torch_utils.helpers import assert_size
 

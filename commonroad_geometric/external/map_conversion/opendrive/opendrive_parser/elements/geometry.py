@@ -324,7 +324,7 @@ def calc_next_s(s_current, curvature: float, error_tolerance: float, min_delta_s
     :return:
     """
     def calc_delta_s(curvature):
-        if type(curvature) == tuple:
+        if isinstance(curvature, tuple):
             curvature, curv_derivative = curvature
             if curvature < 0:
                 curv_derivative = -curv_derivative

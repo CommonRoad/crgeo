@@ -6,8 +6,8 @@ import sys
 from abc import abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple, TypeVar, Union, overload
-from typing_extensions import Literal
+from pathlib import Path
+from typing import Any, Dict, Generic, Iterable, Iterator, List, Optional, Sequence, Set, Tuple, TypeVar, Union, overload
 
 import numpy as np
 from commonroad.common.file_reader import CommonRoadFileReader
@@ -21,18 +21,19 @@ from commonroad_geometric.common.class_extensions.string_resolver_mixing import 
 from commonroad_geometric.common.geometry.continuous_polyline import ContinuousPolyline
 from commonroad_geometric.common.geometry.helpers import relative_orientation
 from commonroad_geometric.common.io_extensions.obstacle import get_obstacle_lanelet_assignment, state_at_time
-from commonroad_geometric.common.io_extensions.scenario import LANELET_ASSIGNMENT_STRATEGIES_CENTER, LANELET_ASSIGNMENT_STRATEGIES_SHAPE, LaneletAssignmentStrategy, backup_scenario, \
+from commonroad_geometric.common.io_extensions.scenario import LANELET_ASSIGNMENT_STRATEGIES_CENTER, \
+    LANELET_ASSIGNMENT_STRATEGIES_SHAPE, LaneletAssignmentStrategy, backup_scenario, \
     get_dynamic_obstacles_at_timestep, iter_dynamic_obstacles_at_timestep, iter_unassigned_dynamic_obstacles_at_timestep
 from commonroad_geometric.common.types import T_CountParam, Unlimited
 from commonroad_geometric.dataset.extraction.road_network.types import GraphConversionStep
-from commonroad_geometric.rendering.traffic_scene_renderer import T_Frame, TrafficSceneRenderer
-from commonroad_geometric.rendering.types import RenderParams, Renderable, T_RendererPlugin
+from commonroad_geometric.rendering.plugins.base_renderer_plugin import T_RendererPlugin
+from commonroad_geometric.rendering.traffic_scene_renderer import T_Frame, TrafficSceneRenderer, GLViewerOptions
+from commonroad_geometric.rendering.types import RenderParams, Renderable
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle import EgoVehicle
 from commonroad_geometric.simulation.exceptions import SimulationNotYetStartedException, SimulationRuntimeError
 from commonroad_geometric.simulation.lanelet_network_info import LaneletNetworkInfo
 
-T_BaseSimulationOptions = TypeVar('T_BaseSimulationOptions', bound='BaseSimulationOptions')
-T_BaseSimulation = TypeVar('T_BaseSimulation', bound='BaseSimulation')
+T_SimulationOptions = TypeVar('T_SimulationOptions', bound='BaseSimulationOptions')
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +49,15 @@ class BaseSimulationOptions:
     """
     dt: float = 0.04
     step_renderers: List[TrafficSceneRenderer] = field(default_factory=list)
-    render_plugins: List[T_RendererPlugin]= field(default_factory=list)
+    render_plugins: List[T_RendererPlugin] = field(default_factory=list)
     render_kwargs: Dict[str, Any] = field(default_factory=dict)
     backup_initial_scenario: bool = False
     backup_current_scenario: bool = False
     collision_checking: bool = True
-    lanelet_assignment_order: LaneletAssignmentStrategy = LaneletAssignmentStrategy.CENTER_FALLBACK_SHAPE
+    lanelet_assignment_order: LaneletAssignmentStrategy = LaneletAssignmentStrategy.ONLY_SHAPE
+    ignore_assignment_opposite_direction: bool = True
     lanelet_graph_conversion_steps: Optional[List[GraphConversionStep]] = None
+    linear_lanelet_projection: bool = False
 
 
 class SimulationLifecycle(StateMachine):  # type: ignore
@@ -70,34 +73,39 @@ class SimulationLifecycle(StateMachine):  # type: ignore
     run = started.to(running) | running_ego.to(running)
     run_ego = started.to(running_ego) | running.to(running_ego)
     finish = running.to(finished) | running_ego.to(finished)
-    close = after_init.to(closed) | started.to(closed) | running.to(closed) | running_ego.to(closed) | finished.to(closed) | closed.to.itself()
-    crash = after_init.to(crashed) | started.to(crashed) | running.to(crashed) | running_ego.to(crashed) | finished.to(crashed) | closed.to(crashed) | crashed.to.itself()
-    reset = running.to(started) | running_ego.to(started) | finished.to(started) | closed.to(started) | started.to.itself()
+    close = after_init.to(closed) | started.to(closed) | running.to(closed) | running_ego.to(closed) | finished.to(
+        closed) | closed.to.itself()
+    crash = after_init.to(crashed) | started.to(crashed) | running.to(crashed) | running_ego.to(crashed) | finished.to(
+        crashed) | closed.to(crashed) | crashed.to.itself()
+    reset = running.to(started) | running_ego.to(started) | finished.to(started) | closed.to(
+        started) | started.to.itself()
 
 
-class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkInfo, StringResolverMixin):
+class BaseSimulation(LaneletNetworkInfo, Renderable, Iterator[Tuple[int, Scenario]], Generic[T_SimulationOptions], StringResolverMixin):
     def __init__(
         self,
-        initial_scenario: Union[Scenario, str],
-        options: BaseSimulationOptions
+        initial_scenario: Union[Scenario, Path],
+        options: T_SimulationOptions
     ) -> None:
         """
         Base class for simulations based on CommonRoad scenarios. Uses TrafficSceneRenderer for rendering.
 
         Args:
             initial_scenario (Union[Scenario, str]): Initial scenario for this simulation.
-            options (BaseSimulationOptions): Options for this simulation.
+            options (T_BaseSimulationOptions): Options for this simulation.
         """
-        if isinstance(initial_scenario, str):
-            initial_scenario, planning_problem_set = CommonRoadFileReader(filename=initial_scenario).open()
-        self._options = options
+        if isinstance(initial_scenario, Path):
+            initial_scenario, planning_problem_set = CommonRoadFileReader(filename=str(initial_scenario)).open()
+        self._options: T_SimulationOptions = options
         initial_scenario.dt = self._options.dt
 
         # sorting lanelets
         initial_scenario.lanelet_network._lanelets = dict(sorted(initial_scenario.lanelet_network._lanelets.items()))
 
-        self._initial_scenario: Scenario = backup_scenario(initial_scenario) if options.backup_initial_scenario else initial_scenario
-        self._current_scenario: Scenario = backup_scenario(initial_scenario) if options.backup_current_scenario else initial_scenario
+        self._initial_scenario: Scenario = backup_scenario(
+            initial_scenario) if options.backup_initial_scenario else initial_scenario
+        self._current_scenario: Scenario = backup_scenario(
+            initial_scenario) if options.backup_current_scenario else initial_scenario
         self._initial_time_step, self._final_time_step = self._get_time_step_bounds()
 
         self._lifecycle: SimulationLifecycle = SimulationLifecycle()
@@ -117,7 +125,10 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
         self._obstacle_id_to_lanelet_id_t_minus_one: Dict[int, List[int]] = {}
         self._step_rendering_disabled: bool = False
 
-        super().__init__(scenario=self.current_scenario, graph_conversion_steps=self._options.lanelet_graph_conversion_steps)
+        super().__init__(
+            scenario=self.current_scenario,
+            graph_conversion_steps=self._options.lanelet_graph_conversion_steps
+        )
 
     @property
     def options(self) -> BaseSimulationOptions:
@@ -133,7 +144,8 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
 
     @current_scenario.setter
     def current_scenario(self, value: Scenario) -> None:
-        raise ValueError(f"Current scenario is immutable for {type(self).__name__}! Full simulation needs to be available in initial_scenario.")
+        raise ValueError(f"Current scenario is immutable for {type(self).__name__}! "
+                         f"Full simulation needs to be available in initial_scenario.")
 
     @property
     def dt(self) -> float:
@@ -151,7 +163,10 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
     @property
     def current_obstacles(self) -> List[DynamicObstacle]:
         if self.current_time_step not in self._time_step_to_obstacles:
-            self._time_step_to_obstacles[self.current_time_step] = get_dynamic_obstacles_at_timestep(self.current_scenario, self.current_time_step)
+            self._time_step_to_obstacles[self.current_time_step] = get_dynamic_obstacles_at_timestep(
+                self.current_scenario,
+                self.current_time_step
+            )
         return self._time_step_to_obstacles[self.current_time_step]
 
     def get_current_obstacle_state(self, obstacle: DynamicObstacle) -> State:
@@ -199,12 +214,14 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
             if self.initial_time_step <= time_step_to_jump_to <= self.final_time_step:
                 self._current_time_step = time_step_to_jump_to
             else:
-                raise ValueError(f"Time-step: {time_step_to_jump_to} is not within bounds [{self.initial_time_step}, {self.final_time_step}] of {type(self).__name__}.")
+                raise ValueError(f"Time-step: {time_step_to_jump_to} is not within bounds [{self.initial_time_step}, "
+                                 f"{self.final_time_step}] of {type(self).__name__}.")
         else:
             if self.initial_time_step <= time_step_to_jump_to:
                 self._current_time_step = time_step_to_jump_to
             else:
-                raise ValueError(f"Time-step: {time_step_to_jump_to} is not within bounds [{self.initial_time_step}, inf] of {type(self).__name__}.")
+                raise ValueError(f"Time-step: {time_step_to_jump_to} is not within bounds "
+                                 f"[{self.initial_time_step}, inf] of {type(self).__name__}.")
 
     @abstractmethod
     def _get_time_step_bounds(self) -> Tuple[int, T_CountParam]:
@@ -232,9 +249,9 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
         return self._current_run_start
 
     @property
-    def num_time_steps(self) -> int:
+    def num_time_steps(self) -> T_CountParam:
         if self.final_time_step is Unlimited:
-            return sys.maxsize
+            return Unlimited
         return self.final_time_step - self.initial_time_step + 1
 
     @property
@@ -262,7 +279,8 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
             self.lifecycle.crash()
             raise SimulationNotYetStartedException("__iter__, not self.lifecycle.is_started")
         if self.final_time_step is not Unlimited and self.initial_time_step > self.final_time_step:
-            raise SimulationRuntimeError(f"BaseSimulation initial time-step {self.initial_time_step} would be after final time-step {self.final_time_step}")
+            raise SimulationRuntimeError(f"BaseSimulation initial time-step {self.initial_time_step} would be after "
+                                         f"final time-step {self.final_time_step}")
         self._current_run = iter(self.iter_time_steps)
         self._current_run_start = self.initial_time_step
         self._current_time_step = self.initial_time_step
@@ -322,13 +340,13 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
         assert num_time_steps is None or from_time_step is None and to_time_step is None, \
             "You can either specify from_time_step and to_time_step or num_time_steps, they are mutually exclusive"
         if not force:
-            if (self.lifecycle.is_running or self.lifecycle.is_running_ego):
+            if self.lifecycle.is_running or self.lifecycle.is_running_ego:
                 # If running just return current iteration without restarting (restart can be done with reset)
                 return self
             if not self.lifecycle.is_started:
                 self.lifecycle.crash()
                 raise SimulationNotYetStartedException("__call__, not self.lifecycle.is_started")
-        
+
         if not self.lifecycle.is_running:
             self.lifecycle.run()
 
@@ -371,7 +389,7 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
             raise StopIteration
 
         # Calling internal step function
-        #try:
+        # try:
         self._step(ego_vehicle=self._current_ego_vehicle if self.lifecycle.is_running_ego else None)
         # except Exception as e:
         #     logger.error(e, exc_info=True)
@@ -426,7 +444,9 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
             return
         if self.current_scenario._is_object_id_used(ego_vehicle.as_dynamic_obstacle.obstacle_id):
             try:
-                self.current_scenario.remove_obstacle(ego_vehicle.as_dynamic_obstacle)
+                # self.current_scenario.remove_obstacle(ego_vehicle.as_dynamic_obstacle)
+                del self.current_scenario._dynamic_obstacles[ego_vehicle.as_dynamic_obstacle.obstacle_id]
+                self.current_scenario._id_set.remove(ego_vehicle.as_dynamic_obstacle.obstacle_id)
             except KeyError:
                 logger.exception(f"Failed to remove ego vehicle obstacle", stack_info=True)
             # Might need to implement _remove_obstacle_index_mapping method here
@@ -516,7 +536,7 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
         return self._obstacle_id_to_lanelet_id_t_minus_one
 
     def get_obstacles_on_lanelet(
-        self, 
+        self,
         lanelet_id: int,
         ignore_ids: Optional[Set[int]] = None
     ) -> List[int]:
@@ -580,7 +600,7 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
                 use_center_lanelet_assignment=self._options.lanelet_assignment_order in LANELET_ASSIGNMENT_STRATEGIES_CENTER,
                 use_shape_lanelet_assignment=self._options.lanelet_assignment_order in LANELET_ASSIGNMENT_STRATEGIES_SHAPE,
             )
-            
+
             assert isinstance(lanelet_assignment, list)
             # if not lanelet_assignment:
             #     warnings.warn(f"Obstacle {obstacle.obstacle_id} missing lanelet assignment at time-step {self.current_time_step}.")
@@ -609,8 +629,10 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
         self._obstacle_id_to_obstacle_idx_t[obstacle_id] = next_available_idx
         self._obstacle_idx_to_obstacle_id_t[next_available_idx] = obstacle_id
         # Assign t_minus one before updating for t
-        self._obstacle_id_to_lanelet_id_t_minus_one[obstacle_id] = self._obstacle_id_to_lanelet_id_t.get(obstacle_id, [])
-        self._obstacle_id_to_lanelet_id_t[obstacle_id] = get_obstacle_lanelet_assignment(obstacle, self.current_time_step)
+        self._obstacle_id_to_lanelet_id_t_minus_one[obstacle_id] = self._obstacle_id_to_lanelet_id_t.get(obstacle_id,
+                                                                                                         [])
+        self._obstacle_id_to_lanelet_id_t[obstacle_id] = get_obstacle_lanelet_assignment(obstacle,
+                                                                                         self.current_time_step)
 
     def assign_unassigned_obstacles(
         self,
@@ -636,13 +658,17 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
             center_assignment_success = False
             lanelet_assignment = []
 
-            if assignment_order in {LaneletAssignmentStrategy.ONLY_CENTER, LaneletAssignmentStrategy.CENTER_FALLBACK_SHAPE}:
-                lanelet_assignment = scenario.lanelet_network.find_lanelet_by_position(point_list=[obstacle_state.position])[0]
+            if assignment_order in {LaneletAssignmentStrategy.ONLY_CENTER,
+                                    LaneletAssignmentStrategy.CENTER_FALLBACK_SHAPE}:
+                lanelet_assignment = scenario.lanelet_network.find_lanelet_by_position(
+                    point_list=[obstacle_state.position]
+                )[0]
                 center_assignment_success = len(lanelet_assignment) > 0
             if not center_assignment_success and assignment_order in LANELET_ASSIGNMENT_STRATEGIES_SHAPE:
                 # Fallback if assignment by position fails,
                 # happens in edge case where obstacle jitters on border of two lanelets during lane change
-                obstacle_shape = obstacle.obstacle_shape.rotate_translate_local(obstacle_state.position, angle=obstacle_state.orientation)
+                obstacle_shape = obstacle.obstacle_shape.rotate_translate_local(obstacle_state.position,
+                                                                                angle=obstacle_state.orientation)
                 lanelet_assignment = scenario.lanelet_network.find_lanelet_by_shape(obstacle_shape)
 
             if sort_lanelet_assignments:
@@ -661,9 +687,9 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
                     for l_former_idx in range(0, l_outer_idx):
                         l_former_id = lanelet_assignment[l_former_idx]
                         if l_outer.adj_left == l_former_id and not l_outer.adj_left_same_direction or \
-                           l_outer.adj_right == l_former_id and not l_outer.adj_right_same_direction:
-                           skip_assignment = True
-                           break
+                            l_outer.adj_right == l_former_id and not l_outer.adj_right_same_direction:
+                            skip_assignment = True
+                            break
                     if not skip_assignment:
                         lanelet_assignment_keep.append(lanelet_assignment[l_outer_idx])
                 lanelet_assignment = lanelet_assignment_keep
@@ -696,82 +722,32 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
         has_changed_lanelet = lanelet_id_t_minus_one != lanelet_id_t
         return has_changed_lanelet
 
-    @overload
-    def render(
-        self,
-        renderers: None,
-        return_rgb_array: Literal[True],
-        render_params: Optional[RenderParams],
-        **render_kwargs: Any
-    ) -> np.ndarray:
-        ...  # no renderer (creating new)
-
-    @overload
-    def render(
-        self,
-        renderers: TrafficSceneRenderer,
-        return_rgb_array: Literal[True],
-        render_params: Optional[RenderParams],
-        **render_kwargs: Any
-    ) -> np.ndarray:
-        ...  # single renderer
-
-    @overload
-    def render(
-        self,
-        renderers: List[TrafficSceneRenderer],
-        return_rgb_array: Literal[True],
-        render_params: Optional[RenderParams],
-        **render_kwargs: Any
-    ) -> List[np.ndarray]:
-        ...  # multiple renderers
-
-    @overload
-    def render(
-        self,
-        renderers: None,
-        return_rgb_array: Literal[False],
-        render_params: Optional[RenderParams],
-        **render_kwargs: Any
-    ) -> None:
-        ...  # no renderer (creating new)
-
-    @overload
-    def render(
-        self,
-        renderers: TrafficSceneRenderer,
-        return_rgb_array: Literal[False],
-        render_params: Optional[RenderParams],
-        **render_kwargs: Any
-    ) -> None:
-        ...  # single renderer
-
-    @overload
-    def render(
-        self,
-        renderers: List[TrafficSceneRenderer],
-        return_rgb_array: Literal[False],
-        render_params: Optional[RenderParams],
-        **render_kwargs: Any
-    ) -> List[None]:
-        ...  # multiple renderers
-
     def render(
         self,
         *,
-        renderers: Union[List[TrafficSceneRenderer], TrafficSceneRenderer, None] = None,
-        return_rgb_array: bool = False,
+        renderers: Sequence[TrafficSceneRenderer],
         render_params: Optional[RenderParams] = None,
-        **render_kwargs: Any
-    ) -> Union[T_Frame, List[T_Frame]]:
-        renderers = renderers if renderers is not None else self._options.step_renderers
+        return_frames: bool = False,
+        **render_kwargs: Dict[str, Any]
+    ) -> Sequence[T_Frame]:
+        """
+        Renders the current state of the simulation for each of the renderers.
+        If no or partial render_params are passed, only simulation specific attributes (time_step and current_scenario)
+        are rendered.
 
-        if isinstance(renderers, TrafficSceneRenderer):
-            renderers = [renderers]
+        Args:
+            renderers (Sequence[TrafficSceneRenderer]): Sequence of TrafficSceneRenderer's which are called
+            render_params (Optional[RenderParams]): Optional parameters which should be rendered. Defaults to None.
+            return_frames (bool): Whether to return frames from the renderers. Defaults to False.
+            **render_kwargs (Dict[str, Any]): Additional kwargs which will be passed to the renderers
 
-        if not renderers:
-            self._spawn_default_renderer()
-            renderers = self._options.step_renderers
+        Returns:
+            - a sequences of frames with one frame per renderer (list[np.ndarray]) if return_frames is True
+            - an empty list ([]) if return_frames is False
+        """
+        if not renderers and not self.options.step_renderers:
+            self.options.step_renderers = [TrafficSceneRenderer()]
+        renderers = renderers or self.options.step_renderers
 
         render_params = render_params or RenderParams()
         if render_params.time_step is None:
@@ -786,23 +762,15 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
         merged_render_kwargs.update(render_kwargs or {})
         render_params.render_kwargs = merged_render_kwargs
 
-        frames = [r.render(return_rgb_array=return_rgb_array, render_params=render_params) for r in renderers]
-
-        if len(frames) == 1:
-            return frames[0]
-        else:
-            return frames
-
-    def _spawn_default_renderer(self) -> None:
-        renderers = [TrafficSceneRenderer()]
-        self._options.step_renderers = renderers
+        frames = [r.render(render_params=render_params, return_frame=return_frames) for r in renderers]
+        return frames if return_frames else []
 
     # Close everything on garbage collection
     def __del__(self) -> None:
         self.close()
 
-    @staticmethod
     def _sorted_lanelet_indices(
+        self,
         lanelet_polylines: List[ContinuousPolyline],
         orientation: float,
         position: np.ndarray
@@ -813,7 +781,10 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
             return [0]
         else:
             def get_lanelet_sort_value(polyline: ContinuousPolyline) -> float:
-                arclength_projection = polyline.get_projected_arclength(position)
+                arclength_projection = polyline.get_projected_arclength(
+                    position,
+                    linear_projection=self.options.linear_lanelet_projection
+                )
                 lanelet_orientation = polyline.get_direction(arclength_projection)
                 relative_arclength_projection = arclength_projection / polyline.length
                 orientation_error = abs(relative_orientation(lanelet_orientation, orientation))
@@ -822,5 +793,7 @@ class BaseSimulation(Renderable, Iterator[Tuple[int, Scenario]], LaneletNetworkI
                     sort_value -= 10.0
                 sort_value -= orientation_error
                 return sort_value
-            sorted_indices = sorted(range(len(lanelet_polylines)), key=lambda i: get_lanelet_sort_value(lanelet_polylines[i]), reverse=True)
+
+            sorted_indices = sorted(range(len(lanelet_polylines)),
+                                    key=lambda i: get_lanelet_sort_value(lanelet_polylines[i]), reverse=True)
             return sorted_indices

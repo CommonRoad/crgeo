@@ -5,6 +5,7 @@ import numpy as np
 
 from commonroad_geometric.common.geometry.helpers import relative_orientation
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
+from commonroad_geometric.learning.reinforcement.observer.base_observer import T_Observation
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.base_reward_computer import BaseRewardComputer
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.types import RewardLossMetric
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
@@ -12,7 +13,7 @@ from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation impor
 
 class YawratePenaltyRewardComputer(BaseRewardComputer):
     def __init__(
-        self, 
+        self,
         weight: float,
         loss_type: RewardLossMetric = RewardLossMetric.L2
     ) -> None:
@@ -25,7 +26,8 @@ class YawratePenaltyRewardComputer(BaseRewardComputer):
         self,
         action: np.ndarray,
         simulation: EgoVehicleSimulation,
-        data: CommonRoadData
+        data: CommonRoadData,
+        observation: T_Observation
     ) -> float:
         if hasattr(simulation.ego_vehicle.state, 'yaw_rate'):
             yaw_rate = simulation.ego_vehicle.state.yaw_rate
@@ -47,7 +49,7 @@ class YawratePenaltyRewardComputer(BaseRewardComputer):
             loss = math.exp(-error**2)
         else:
             raise NotImplementedError()
-        penalty = -self._weight*loss
+        penalty = -self._weight * loss
         return penalty
 
     def _reset(self) -> None:

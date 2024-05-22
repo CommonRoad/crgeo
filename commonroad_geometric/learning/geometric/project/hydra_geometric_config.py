@@ -6,6 +6,7 @@ from omegaconf import MISSING
 from hydra.core.config_store import ConfigStore
 from commonroad_geometric.learning.geometric.training.geometric_trainer import GeometricTrainerConfig
 
+
 @dataclass
 class GeometricDatasetConfig:
     train_scenario_dir: Path = MISSING
@@ -25,7 +26,7 @@ class GeometricProjectConfig:
     project_dir: Path = MISSING
     checkpoint: Optional[str] = None
     seed: int = 0
-    no_wandb: bool = False
+    wandb_logging: bool = True
     warmstart: bool = False
     profile: bool = False
     logging_level: str = 'info'

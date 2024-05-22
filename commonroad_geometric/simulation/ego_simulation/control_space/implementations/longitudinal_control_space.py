@@ -7,12 +7,12 @@ from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 from commonroad.scenario.trajectory import State
-from gym.spaces import Box, Space
+from gymnasium.spaces import Box, Space
 
-from commonroad_geometric.common.geometry.helpers import relative_orientation
 from commonroad_geometric.common.io_extensions.obstacle import state_at_time
 from commonroad_geometric.simulation.ego_simulation.control_space.base_control_space import BaseControlSpace, BaseControlSpaceOptions
-from commonroad_geometric.simulation.ego_simulation.control_space.controllers.pid_controller import PIDController
+from commonroad_geometric.simulation.ego_simulation.control_space.implementations.utils.path_observer import PathObserver
+from commonroad_geometric.simulation.ego_simulation.control_space.implementations.utils.pid_controller import PIDController
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle import ActionBase
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulationFinishedException
 
@@ -39,7 +39,7 @@ class LongitudinalControlOptions(BaseControlSpaceOptions):
     k_I_velocity: float = 0.0
     neg_acc_multiplier: float = 1.0 
     steering_method: DeterministicLateralControlMethod = DeterministicLateralControlMethod.STANLEY
-    la_dist: float = 1.0 # [m]
+    look_ahead_distance: float = 1.0 # [m]
     k_e: float = 12.0
     k_v: float = 8.0
     k_dy: float = 1.4
@@ -68,23 +68,18 @@ class LongitudinalControlSpace(BaseControlSpace):
                 k_D=options.k_D_velocity,
                 k_I=options.k_I_velocity
             )
-
-        self._last_arclength: Optional[float] = None
-        self._last_yaw_diff_look_ahead: Optional[float] = None
-        self._last_yaw_path_look_ahead: Optional[float] = None
-        self._last_yaw_rate_look_ahead: Optional[float] = None
-        self._last_yaw_diff_front: Optional[float] = None
-        self._last_yaw_path_front: Optional[float] = None
-        self._last_yaw_rate_front: Optional[float] = None
-        self._last_steering_angle: Optional[float] = None
+        
+        self.path_observer = PathObserver(
+            look_ahead_distance=options.look_ahead_distance
+        )
 
         super().__init__(options)
 
     @property
     def gym_action_space(self) -> Space:
         return Box(
-            low=np.array([-np.inf]),
-            high=np.array([np.inf]),
+            low=np.array([-1]),
+            high=np.array([1]),
             dtype="float64"
         )
 
@@ -94,7 +89,7 @@ class LongitudinalControlSpace(BaseControlSpace):
         action: np.ndarray,
         substep_index: int
     ) -> bool:
-        longitudinal_action = np.tanh(action[-1])
+        longitudinal_action = action[-1]
         #longitudinal_action = 1.0 # TODO for debugging
         #print("WARN DISABLE THIS")
         ego_vehicle = ego_vehicle_simulation.ego_vehicle
@@ -162,88 +157,26 @@ class LongitudinalControlSpace(BaseControlSpace):
         current_state: State
     ) -> float:
         ego_parameters = ego_vehicle_simulation.ego_vehicle.parameters
-        input_bounds = ego_vehicle_simulation.ego_vehicle.vehicle_dynamic.input_bounds
-        yaw = current_state.orientation
-        v = current_state.velocity
-
-        ego_vehicle_simulation.ego_route.look_ahead_distance = self.options.la_dist
-        path = ego_vehicle_simulation.ego_route.planning_problem_path_polyline
-        assert path is not None
-
-        p_center = current_state.position
-        p_front = p_center + ego_parameters.a*np.array([cos(yaw), sin(yaw)])
-        dynamic_la_dist = self.options.la_dist + 0.1*v
-        p_look_ahead_extrapolation = p_front + dynamic_la_dist*np.array([cos(yaw), sin(yaw)])
-
-        p_center_arclength = path.get_projected_arclength(p_center)
-        p_front_arclength = path.get_projected_arclength(p_front)
-
-        yaw_path_center =  path.get_direction(p_center_arclength)
-        yaw_path_front =  path.get_direction(p_front_arclength)
-
-        p_proj_center = path(p_center_arclength)
-        p_proj_front = path(p_front_arclength)
-
-        p_look_ahead_arclength, p_look_ahead = ego_vehicle_simulation.ego_route.set_look_ahead_point(p_front)
-
-        yaw_path_front =  path.get_direction(p_front_arclength)
-        yaw_path_look_ahead = path.get_direction(p_look_ahead_arclength)
-
-        yaw_diff_front = relative_orientation(yaw_path_front, yaw)
-        yaw_diff_look_ahead = relative_orientation(yaw_path_look_ahead, yaw)
-
-        # front
-        if self._last_yaw_diff_front is not None:
-            yaw_rate_front = relative_orientation(self._last_yaw_diff_front, yaw_diff_front) / ego_vehicle_simulation.dt
-        else:
-            yaw_rate_front = 0.0
-        self._last_yaw_diff_front = yaw_diff_front
-        if self._last_yaw_path_front is not None:
-            yaw_rate_path_front = relative_orientation(self._last_yaw_path_front, yaw_path_front) / ego_vehicle_simulation.dt
-        else:
-            yaw_rate_path_front = 0.0
-        self._last_yaw_path_front = yaw_path_front
-        yaw_rate_diff_front = yaw_rate_front - self._last_yaw_rate_front if self._last_yaw_rate_front is not None else 0.0
-        self._last_yaw_rate_front = yaw_rate_front
-
-        # look ahead
-        if self._last_yaw_diff_look_ahead is not None:
-            yaw_rate_look_ahead = relative_orientation(self._last_yaw_diff_look_ahead, yaw_diff_look_ahead) / ego_vehicle_simulation.dt
-        else:
-            yaw_rate_look_ahead = 0.0
-        self._last_yaw_diff_look_ahead = yaw_diff_look_ahead
-        if self._last_yaw_path_look_ahead is not None:
-            yaw_rate_path_look_ahead = relative_orientation(self._last_yaw_path_look_ahead, yaw_path_look_ahead) / ego_vehicle_simulation.dt
-        else:
-            yaw_rate_path_look_ahead = 0.0
-        self._last_yaw_path_look_ahead = yaw_path_look_ahead
-        yaw_rate_diff_look_ahead = yaw_rate_look_ahead - self._last_yaw_rate_look_ahead if self._last_yaw_rate_look_ahead is not None else 0.0
-        self._last_yaw_rate_look_ahead = yaw_rate_look_ahead
+        obs = self.path_observer.observe(
+            ego_vehicle_simulation=ego_vehicle_simulation
+        )
 
         if self.options.steering_method == DeterministicLateralControlMethod.PURE_PURSUIT:
             steering_angle = atan2(
-                2.0 * ego_parameters.l * sin(yaw_diff_look_ahead) / self.options.la_dist,
+                2.0 * ego_parameters.l * sin(obs.yaw_diff_look_ahead) / self.options.look_ahead_distance,
                 1.0
             )
         else:
             # Stanley
-            p_crosstrack_ref = p_look_ahead_extrapolation
-            crosstrack_error = path.get_lateral_distance(p_crosstrack_ref)
-            yaw_cross_track = np.arctan2(p_crosstrack_ref[1] - p_proj_front[1], p_crosstrack_ref[0] - p_proj_front[0])
-            yaw_path2ct = relative_orientation(yaw_cross_track, yaw_path_front)
-            if yaw_path2ct > 0:
-                crosstrack_error = abs(crosstrack_error)
-            else:
-                crosstrack_error = - abs(crosstrack_error)
             yaw_diff_crosstrack = np.arctan(
-                self.options.k_e * crosstrack_error / (self.options.k_v + v)
+                self.options.k_e * obs.crosstrack_error_look_ahead / (self.options.k_v + current_state.velocity)
             )
             #yaw_diff_correction = self.options.k_dy * (- yaw_rate_front - yaw_rate_path_front)
-            yaw_diff_correction = self.options.k_dy * (- yaw_rate_front - yaw_rate_path_front)
+            yaw_diff_correction = self.options.k_dy * (- obs.yaw_rate_front - obs.yaw_rate_path_front)
 
-            psi_ss = self.options.k_ss * v * yaw_rate_path_look_ahead
+            psi_ss = self.options.k_ss * current_state.velocity * obs.yaw_rate_path_look_ahead
 
-            steering_angle =  - yaw_diff_look_ahead + psi_ss + yaw_diff_correction + yaw_diff_crosstrack
+            steering_angle =  - obs.yaw_diff_look_ahead + psi_ss + yaw_diff_correction + yaw_diff_crosstrack
 
         steering_angle *= self.options.gain
 
@@ -302,14 +235,7 @@ class LongitudinalControlSpace(BaseControlSpace):
         if self.options.pid_control:
             self._pid_controller_velocity.clear()
 
-        self._last_arclength = None
-        self._last_yaw_diff_look_ahead = None
-        self._last_yaw_rate_look_ahead  = None
-        self._last_yaw_path_look_ahead = None
-        self._last_yaw_diff_front = None
-        self._last_yaw_rate_front  = None
-        self._last_yaw_path_front = None
-        self._last_steering_angle = None
+        self.path_observer.reset()
 
         assert ego_vehicle_simulation.ego_vehicle.ego_route is not None
         ego_vehicle_id = -1

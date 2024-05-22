@@ -45,7 +45,7 @@ class LogEpisodeMetricsCallback(BaseCallback):
             self._disabled = True
             return True
         rollout_buffer = self.locals.get('rollout_buffer')
-        infos = copy.deepcopy(self.locals.get('infos')) # TODO: Necessary?
+        infos = copy.deepcopy(self.locals.get('infos'))  # TODO: Necessary?
 
         last_info = self._info_buffer.get(n_steps - 1, None)
         last_done_array = np.array([info['done'] for info in last_info]) if last_info is not None else None
@@ -101,7 +101,9 @@ class LogEpisodeMetricsCallback(BaseCallback):
                 self.logger.record("train/ep_length", episode_length)
 
             for termination_criteria in self._termination_reasons:
-                self.logger.record(f"train/termination_{termination_criteria}", termination_criteria_flags[termination_criteria])
+                self.logger.record(
+                    f"train/termination_{termination_criteria}",
+                    termination_criteria_flags[termination_criteria])
 
             self.n_episodes += n_episodes_done_step
 

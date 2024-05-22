@@ -21,10 +21,9 @@ class DefaultFeatureComputers:
         return [
             ft_veh_state,
             YawRateFeatureComputer(),
-            VehicleLaneletPoseFeatureComputer(),
+            #VehicleLaneletPoseFeatureComputer(),
             VehicleLaneletConnectivityComputer(),
             NumLaneletAssignmentsFeatureComputer(),
-            #GoalAlignmentComputer()
         ]
 
     @staticmethod

@@ -91,7 +91,7 @@ class BaseTrafficSpawner(ABC, AutoReprMixin, StringResolverMixin):
 
     def _spawn_density(self, scenario: Scenario, time_step: int, lanelet_id: int) -> Union[float, bool]:
         """
-        Return spawn probability for the specified lanelet_id 
+        Return spawn probability for the specified lanelet_id
 
         Args:
             lanelet_id (int): Lanelet id.

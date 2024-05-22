@@ -1,5 +1,5 @@
 from typing import Dict, Set, Any
-from commonroad_geometric.common.utils.filesystem import is_picklable
+from commonroad_geometric.common.utils.filesystem import is_pickleable
 
 
 class SafePicklingMixin:
@@ -10,6 +10,6 @@ class SafePicklingMixin:
 
     def __getstate__(self) -> Dict[str, Any]:
         if not hasattr(self, '__pickle_exports__'):
-            self.__pickle_exports__: Set[str] = {k for k, v in self.__dict__.items() if is_picklable(v)}
+            self.__pickle_exports__: Set[str] = {k for k, v in self.__dict__.items() if is_pickleable(v)}
         export = {k: self.__dict__[k] for k in self.__pickle_exports__}
         return export

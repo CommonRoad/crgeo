@@ -97,7 +97,8 @@ def create_intersection_graph_from_lanelet_network(
     else:
         max_adjacency_cardinality = 1
     if adjacency_cardinality_threshold > -1 and max_adjacency_cardinality > adjacency_cardinality_threshold:
-        raise UndesiredLaneletNetworkException(f"max_adjacency_cardinality {max_adjacency_cardinality} > {adjacency_cardinality_threshold}")
+        raise UndesiredLaneletNetworkException(
+            f"max_adjacency_cardinality {max_adjacency_cardinality} > {adjacency_cardinality_threshold}")
     intersection_outgoing_map_w_successors = {**intersection_outgoing_map, **intersection_successor_map}
 
     # Calculating intersection positions
@@ -122,7 +123,8 @@ def create_intersection_graph_from_lanelet_network(
         for lanelet_id in intersection_lanelet_ids:
             node_mapping[lanelet_id] = intersection_id
         intersection_lanelets = {lanelet_network.find_lanelet_by_id(x) for x in intersection_lanelet_ids}
-        intersection_coordinate_set = [l.interpolate_position(l.distance[-1] / 2)[0] for l in intersection_lanelets if l is not None]
+        intersection_coordinate_set = [l.interpolate_position(
+            l.distance[-1] / 2)[0] for l in intersection_lanelets if l is not None]
         node_pos[intersection_id] = np.array(intersection_coordinate_set).mean(axis=0).round(decimal_precision)
         node_is_intersection[intersection_id] = True
         node_cardinality[intersection_id] = 1
@@ -140,7 +142,8 @@ def create_intersection_graph_from_lanelet_network(
         if intersection_id not in node_pos:
             intersection_lanelet_ids = intersection_incoming_lanelet_ids[intersection_id]
             intersection_lanelets = {lanelet_network.find_lanelet_by_id(x) for x in intersection_lanelet_ids}
-            intersection_coordinate_set = [l.interpolate_position(l.distance[-1] / 2)[0] for l in intersection_lanelets if l is not None]
+            intersection_coordinate_set = [l.interpolate_position(
+                l.distance[-1] / 2)[0] for l in intersection_lanelets if l is not None]
 
             for lanelet_id in intersection_lanelet_ids:
                 node_mapping[-lanelet_id] = intersection_id

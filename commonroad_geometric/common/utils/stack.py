@@ -1,15 +1,7 @@
-from collections import defaultdict
-from time import sleep
+import inspect
+import logging
 from types import ModuleType
 from typing import Any, List, Optional, Set, Type
-import ast
-import inspect
-import json
-import logging
-import sys
-import threading
-import warnings
-
 from commonroad_geometric.common.type_checking import is_mutable
 from commonroad_geometric.common.utils.string import resolve_string
 
@@ -84,7 +76,7 @@ def get_submodules(
                 base_module=base_module
             ))
         submodules = submodules_new
-            
+
     return submodules
 
 
@@ -98,8 +90,8 @@ def get_stack_modules(recursive: bool = True) -> Set[ModuleType]:
         stack_modules.update(submodules)
 
     return stack_modules
-    
-    
+
+
 def resolve_string_eval(s: str) -> Any:
     modules = get_stack_modules()
     for m in modules:
@@ -126,7 +118,7 @@ def magic_stack_reassignment(
 
     for obj in stack_objs:
         num_reassignments += _recursive_search_reassignment(
-            obj=obj, 
+            obj=obj,
             search_term=search_term,
             replace=replace,
             visited=visited,
@@ -138,9 +130,9 @@ def magic_stack_reassignment(
 
 
 def _recursive_search_reassignment(
-    obj: Any, 
-    search_term: str, 
-    replace: Any,  
+    obj: Any,
+    search_term: str,
+    replace: Any,
     visited: Set[int],
     recursion_level: int = 0,
     skip_external: bool = True,
@@ -155,7 +147,7 @@ def _recursive_search_reassignment(
         for v in obj:
             if is_mutable(v):
                 num_reassignments += _recursive_search_reassignment(
-                    obj=v, 
+                    obj=v,
                     search_term=search_term,
                     replace=replace,
                     recursion_level=recursion_level + 1,
@@ -168,7 +160,7 @@ def _recursive_search_reassignment(
         for v in obj.values():
             if is_mutable(v):
                 num_reassignments += _recursive_search_reassignment(
-                    obj=v, 
+                    obj=v,
                     search_term=search_term,
                     replace=replace,
                     recursion_level=recursion_level + 1,
@@ -178,14 +170,15 @@ def _recursive_search_reassignment(
         return num_reassignments
 
     try:
-        if skip_external and not (hasattr(obj, '__module__') and obj.__module__.startswith('commonroad_geometric')): # TODO
+        if skip_external and not (hasattr(obj, '__module__')
+                                  and obj.__module__.startswith('commonroad_geometric')):  # TODO
             return 0
     except Exception as e:
         return 0
     if id(obj) in visited:
         return 0
 
-    visited.add(id(obj)) 
+    visited.add(id(obj))
 
     # searching and replacing matching values
     for k, v in obj.__dict__.items():
@@ -201,7 +194,7 @@ def _recursive_search_reassignment(
         if id(v) not in visited:
             if is_mutable(v):
                 num_reassignments_inner = _recursive_search_reassignment(
-                    obj=v, 
+                    obj=v,
                     search_term=search_term,
                     replace=replace,
                     recursion_level=recursion_level + 1,

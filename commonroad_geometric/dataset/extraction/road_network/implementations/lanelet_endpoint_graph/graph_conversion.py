@@ -136,8 +136,10 @@ class LaneletEndpointGraphConverter:
                             [edge_projection, other_edge_projection]
                         ):
                             cut_polylines = cut_polyline(shape, projection)
-                            source_polyline = ContinuousPolyline(cut_polylines[0], waypoint_resolution=self.waypoint_density)
-                            target_polyline = ContinuousPolyline(cut_polylines[1], waypoint_resolution=self.waypoint_density)
+                            source_polyline = ContinuousPolyline(
+                                cut_polylines[0], waypoint_resolution=self.waypoint_density)
+                            target_polyline = ContinuousPolyline(
+                                cut_polylines[1], waypoint_resolution=self.waypoint_density)
                             # Adding edge from source node to conflict node with half weight of original edge
                             g.add_edge(
                                 e[0],

@@ -17,7 +17,7 @@ class DelayedExecutor(AutoReprMixin):
 
     The motivation for this was to alleviate the bottleneck caused by how rollout data is collected
     from parallel environments in Stable Baselines 3, where at each step, the root process waits for each worker
-    to return the current observations. Since our gym environment's reset() call was significantly slower than the step() calls 
+    to return the current observations. Since our gym environment's reset() call was significantly slower than the step() calls
     (by many orders of magnitude), this introduced a bottleneck where each process was regulary forced to wait for a single process to
     complete a time-expensive reset call. By instead spreading the reset compute workload over the preceding step() calls, this problem
     is avoided. However, as one cannot easily set the thread scheduling priorities in Python, the reset thread will naturally be allocated too much CPU time,
@@ -84,14 +84,14 @@ class DelayedExecutor(AutoReprMixin):
         Args:
             multiplier (float): Multiplier to apply.
         """
-        self.set_sleep_duration(self._sleeper.duration*multiplier)
+        self.set_sleep_duration(self._sleeper.duration * multiplier)
 
     def inject_delays(
         self,
         fn: AnyCallable[T_AnyReturn]
     ) -> AnyCallable[T_AnyReturn]:
         """
-        Creates a new function with injected delays. 
+        Creates a new function with injected delays.
 
         Simple example as follows:
 
@@ -117,12 +117,14 @@ class DelayedExecutor(AutoReprMixin):
 
         # extracting the length (LOC) of the function header
         # TODO: this is very hacky, should be done via inspect
-        header_end_line_idx = next((i for i in range(len(source_code)) if source_code[i].rstrip('\n').rstrip(' ').endswith(':'))) 
+        header_end_line_idx = next((i for i in range(len(source_code))
+                                   if source_code[i].rstrip('\n').rstrip(' ').endswith(':')))
 
         # merging the LOC to a single-line function header (can originally be split over multiple lines)
         # TODO: this is very hacky, should be done via inspect
         delayed_fn_name = f"delayed_{fn.__name__}"
-        header = ''.join([source_code[i].rstrip('\n').lstrip() for i in range(header_end_line_idx + 1) if len(source_code[i].strip('\n')) > 0]) 
+        header = ''.join([source_code[i].rstrip('\n').lstrip()
+                         for i in range(header_end_line_idx + 1) if len(source_code[i].strip('\n')) > 0])
 
         base_indent = get_indent(source_code[0])
 
@@ -134,7 +136,7 @@ class DelayedExecutor(AutoReprMixin):
         # initializing the delay-injected code (one list item = one line of code)
         # TODO: we should not use str.replace here at all, as it can fail for some edge cases
         delayed_code: List[str] = [
-            lstrip_n(header.replace(fn.__name__, delayed_fn_name, 1).replace('self', 'self, _Sleeper'), base_indent), 
+            lstrip_n(header.replace(fn.__name__, delayed_fn_name, 1).replace('self', 'self, _Sleeper'), base_indent),
         ]
 
         # keeping track of current indentation level (number of spaces)
@@ -154,7 +156,7 @@ class DelayedExecutor(AutoReprMixin):
                 # calculating the appropriate indentation for the sleep statement to avoid syntax errors
                 sleep_indent = max(prev_indent, this_indent)
                 # here we insert the sleep statement
-                sleep_statement_line = lstrip_n(' '*sleep_indent + sleep_statement, base_indent) + '\n'
+                sleep_statement_line = lstrip_n(' ' * sleep_indent + sleep_statement, base_indent) + '\n'
                 delayed_code.append(sleep_statement_line)
                 prev_indent = this_indent
             delayed_code.append(lstrip_n(line, base_indent) + '\n')

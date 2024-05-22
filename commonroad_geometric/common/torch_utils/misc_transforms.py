@@ -6,8 +6,8 @@ from torch import Tensor
 
 
 def greedy_argmin_permutation(z: Tensor) -> Tensor:
-    # TODO: Documentation
-    # TODO: cleanup
+    # TODO: Documentation - Issue 3
+    # TODO: cleanup - Issue 3
     mask = torch.zeros_like(z, device=z.device, dtype=torch.bool)
     a = z
 
@@ -16,12 +16,12 @@ def greedy_argmin_permutation(z: Tensor) -> Tensor:
 
     asort, aidx = torch.sort(a, dim=dim2, stable=True)
     row_order = torch.sort(asort[..., 0], dim=dim2, stable=True)[1]
-    row_order_view = row_order.unsqueeze(-1).repeat(*(row_order.ndim*[1] + [z.shape[dim2]]))
+    row_order_view = row_order.unsqueeze(-1).repeat(*(row_order.ndim * [1] + [z.shape[dim2]]))
     b = torch.gather(a, dim1, row_order_view)
     # bsort = asort[row_order]
-    #bidx = torch.gather(aidx, dim1, row_order_view)
+    # bidx = torch.gather(aidx, dim1, row_order_view)
 
-    #choices = z.new_zeros((*list(z.shape)[:dim1], z.shape[dim2], z.shape[dim2]), dtype=torch.bool)
+    # choices = z.new_zeros((*list(z.shape)[:dim1], z.shape[dim2], z.shape[dim2]), dtype=torch.bool)
     choices = z.new_zeros((*list(z.shape)[:dim1], z.shape[dim2]), dtype=torch.long)
     mask = z.new_zeros((*list(z.shape)[:dim1], z.shape[dim2]), dtype=torch.bool)
 
@@ -42,13 +42,13 @@ def greedy_argmin_permutation(z: Tensor) -> Tensor:
 def decompose_dir_magn(z: Tensor, start_dim=1) -> Tuple[Tensor, Tensor]:
     # TODO: Documentation
     lower = torch.tril(z, diagonal=-1)
-    upper = torch.transpose(torch.triu(z, diagonal=1), start_dim, start_dim+1)
+    upper = torch.transpose(torch.triu(z, diagonal=1), start_dim, start_dim + 1)
 
     direction = lower - upper
     magnitude = lower**2 + upper**2
 
-    bi_direction = direction - torch.transpose(direction, start_dim, start_dim+1)
-    bi_magnitude = magnitude + torch.transpose(magnitude, start_dim, start_dim+1)
+    bi_direction = direction - torch.transpose(direction, start_dim, start_dim + 1)
+    bi_magnitude = magnitude + torch.transpose(magnitude, start_dim, start_dim + 1)
 
     return bi_direction, bi_magnitude
 
@@ -56,11 +56,11 @@ def decompose_dir_magn(z: Tensor, start_dim=1) -> Tuple[Tensor, Tensor]:
 def decompose_sum(z: Tensor, start_dim=1, power: int = 1) -> Tensor:
     # TODO: Documentation
     lower = torch.tril(z, diagonal=-1)
-    upper = torch.transpose(torch.triu(z, diagonal=1), start_dim, start_dim+1)
+    upper = torch.transpose(torch.triu(z, diagonal=1), start_dim, start_dim + 1)
 
     sum = lower**power + upper**power
 
-    bi_sum = sum + torch.transpose(sum, start_dim, start_dim+1)
+    bi_sum = sum + torch.transpose(sum, start_dim, start_dim + 1)
 
     return bi_sum
 
@@ -68,7 +68,7 @@ def decompose_sum(z: Tensor, start_dim=1, power: int = 1) -> Tensor:
 def decompose_signed_max(z: Tensor, start_dim=1) -> Tensor:
     # TODO: Documentation
     lower = torch.tril(z, diagonal=-1)
-    upper = torch.transpose(torch.triu(z, diagonal=1), start_dim, start_dim+1)
+    upper = torch.transpose(torch.triu(z, diagonal=1), start_dim, start_dim + 1)
 
     concat = torch.stack([
         lower,
@@ -77,7 +77,7 @@ def decompose_signed_max(z: Tensor, start_dim=1) -> Tensor:
 
     z = signed_max(concat, dim=0)
 
-    y = z + torch.transpose(z, start_dim, start_dim+1)
+    y = z + torch.transpose(z, start_dim, start_dim + 1)
 
     return y
 
@@ -87,5 +87,5 @@ def signed_max(z: Tensor, dim: int = 0) -> Tensor:
     max_ = torch.amax(z, dim=dim)
     min_ = torch.amin(z, dim=dim)
     max_greater = (torch.abs(max_) >= torch.abs(min_)).int()
-    signed_max = max_greater*max_ + (1 - max_greater)*min_
+    signed_max = max_greater * max_ + (1 - max_greater) * min_
     return signed_max

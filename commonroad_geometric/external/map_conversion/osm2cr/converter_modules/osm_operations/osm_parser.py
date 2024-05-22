@@ -3,6 +3,7 @@ This module provides all methods to parse an OSM file and convert it to a graph.
 It also provides a method to project OSM nodes to cartesian coordinates.
 """
 import xml.etree.ElementTree as ElTree
+from pathlib import Path
 from typing import List, Dict, Tuple, Set, Optional, Any
 from xml.etree.ElementTree import Element
 
@@ -25,7 +26,7 @@ from commonroad_geometric.external.map_conversion.osm2cr.converter_modules.utili
 )
 
 # type def
-RestrictionDict =  Dict[int, Set[Restriction]]
+RestrictionDict = Dict[int, Set[Restriction]]
 Bounds = Tuple[float, float, float, float]
 
 
@@ -107,7 +108,7 @@ def get_nodes(roads: Set[ElTree.Element], root) -> Tuple[Dict[int, ElTree.Elemen
             tags = node.findall("tag")
             for tag in tags:
                 if (tag.attrib["k"] == "highway" and tag.attrib["v"] == "crossing"
-                    or tag.attrib["k"] == "crossing"):
+                        or tag.attrib["k"] == "crossing"):
                     crossing_nodes[node_id] = node
     assert len(road_nodes) == len(node_ids)
     return road_nodes, crossing_nodes
@@ -578,7 +579,7 @@ def get_graph_edges_from_road(roads: Set[ElTree.Element],
                               points: Dict[int, Point],
                               bounds: Bounds,
                               origin: np.ndarray,
-) -> Dict[int, Set[rg.GraphEdge]]:
+                              ) -> Dict[int, Set[rg.GraphEdge]]:
     """
     gets graph edges from set of roads
 
@@ -778,7 +779,7 @@ def roads_to_graph(roads: Set[ElTree.Element],
                    origin: tuple,
                    traffic_signs: List,
                    traffic_lights: List,
-                   additional_nodes: List[rg.GraphNode]=None) -> rg.Graph:
+                   additional_nodes: List[rg.GraphNode] = None) -> rg.Graph:
     """
     converts a set of roads and points to a road graph
 
@@ -838,8 +839,8 @@ def get_crossing_points(
             else:
                 neighbor = edge.node1
             if (neighbor.id in road_node_ids and neighbor.get_degree() > 2
-                and neighbor.get_distance(node) < intersection_range
-            ):
+                    and neighbor.get_distance(node) < intersection_range
+                    ):
                 return True
         return False
 
@@ -860,7 +861,7 @@ def get_crossing_points(
     return new_crossing_nodes, already_contained
 
 
-def create_graph(file_path: str) -> rg.Graph:
+def create_graph(file_path: Path) -> rg.Graph:
     """
     Create a graph from the given osm file.
     If a sublayer should be extracted the graph will be a SublayeredGraph.

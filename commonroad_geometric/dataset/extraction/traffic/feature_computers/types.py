@@ -5,7 +5,7 @@ from typing import Callable, Dict, Optional, TYPE_CHECKING, TypeVar, Union
 
 from commonroad.scenario.lanelet import Lanelet
 from commonroad.scenario.obstacle import DynamicObstacle
-from commonroad.scenario.trajectory import State
+from commonroad.scenario.state import State
 from torch import Tensor
 from typing_extensions import TypeAlias
 

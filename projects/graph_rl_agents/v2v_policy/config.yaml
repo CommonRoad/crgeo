@@ -4,14 +4,14 @@ defaults:
 
 device: auto
 project_dir: ./projects/output/rl/v2v_policy
-scenario_dir: ./data/highd-sample/
+scenario_dir: ../../data/highd-dataset-converted
 seed: 0
 warmstart: False
-profile: True
+profile: False
 
-training: 
+training:
   wandb_logging: True
-  checkpoint_freq: 10000
+  checkpoint_freq: 50000
   eval_freq: 10
   gradient_save_freq: 1
   log_freq: 1
@@ -21,12 +21,12 @@ training:
   normalize_rewards: False
   normalize_rewards_threshold: 10.0
   record_backoff: 1.0
-  record_freq: 10000
+  video_frequency: 10000
   total_timesteps: 1_000_000
   verbose: 0
   video_length: 1000
 
-model: 
+model:
   gae_lambda: 0.8
   gamma: 0.99
   n_epochs: 8
@@ -41,11 +41,23 @@ model:
   gnn_hidden_dim: 80
   gnn_layers: 3
 
-experiment: 
+experiment:
   data_padding_size: 200
+  edge_drawer_class_name: "KNearestEdgeDrawer"  # or "VoronoiEdgeDrawer"  
   dist_threshold_v2v: 50.0
-  ego_map_radius: 100.0
-  render_on_step: True
+  edge_drawer_k: 3
+  ego_map_radius: 50.0
+  
+  render_on_step: False
   render_debug_overlays: True
+  enable_traffic: True
+  raise_exceptions: False
 
+  linear_lanelet_projection: True
+  enable_waypoint_resampling: True
+  lanelet_waypoint_density: 10
 
+  spawning:
+    min_goal_distance: 100.0
+    max_goal_distance: 150.0
+    min_vehicle_distance: 10.0

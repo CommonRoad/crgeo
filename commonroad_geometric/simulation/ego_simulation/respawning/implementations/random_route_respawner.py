@@ -2,15 +2,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING, Tuple, Union
+from typing import Optional, TYPE_CHECKING
 
-import networkx as nx
-import numpy as np
 from commonroad.scenario.trajectory import State
-
-from commonroad_geometric.common.io_extensions.lanelet_network import lanelet_orientation_at_position, map_out_lanelets_to_intersections
-from commonroad_geometric.common.io_extensions.obstacle import state_at_time
-from commonroad_geometric.common.types import Unlimited
 from commonroad_geometric.simulation.ego_simulation.respawning.base_respawner import BaseRespawner, BaseRespawnerOptions, RespawnerSetupFailure, T_Respawn_Tuple
 
 if TYPE_CHECKING:
@@ -25,10 +19,12 @@ class RandomRouteRespawnerOptions(BaseRespawnerOptions):
     exit_offset_meters: float = 2.5
     init_speed: float = 4.0
 
+
 class RandomRouteRespawner(BaseRespawner):
     """
     Respawns ego vehicle at a randomly chosen entry point.
     """
+
     def __init__(
         self,
         options: Optional[RandomRouteRespawnerOptions] = None
@@ -47,7 +43,7 @@ class RandomRouteRespawner(BaseRespawner):
 
         entry_lanelet_polyline = ego_vehicle_simulation.simulation.get_lanelet_center_polyline(entry_lanelet_id)
         exit_lanelet_polyline = ego_vehicle_simulation.simulation.get_lanelet_center_polyline(exit_lanelet_id)
-        
+
         entry_position = entry_lanelet_polyline(self._options.entry_offset_meters)
         entry_orientation = entry_lanelet_polyline.get_direction(self._options.entry_offset_meters)
         exit_position = exit_lanelet_polyline(exit_lanelet_polyline.length - self._options.entry_offset_meters)

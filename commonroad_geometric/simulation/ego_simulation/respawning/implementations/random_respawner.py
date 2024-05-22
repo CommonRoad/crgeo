@@ -6,7 +6,7 @@ from typing import Optional, TYPE_CHECKING, Tuple, Union
 
 import networkx as nx
 import numpy as np
-from commonroad.scenario.trajectory import State
+from commonroad.scenario.state import State, InitialState
 
 from commonroad_geometric.common.io_extensions.lanelet_network import lanelet_orientation_at_position, map_out_lanelets_to_intersections
 from commonroad_geometric.common.io_extensions.obstacle import state_at_time
@@ -25,15 +25,17 @@ class RandomRespawnerOptions(BaseRespawnerOptions):
     random_goal_arclength: bool = True
     random_start_timestep: bool = True
     only_intersections: bool = False
-    route_length: Optional[Union[int, Tuple[int, int]]] = (3, 10)
-    init_speed: float = 4.0
+    route_length: Optional[Union[int, Tuple[int, int]]] = (3, 15)
+    init_speed: Union[str, float] = 10.0
     min_goal_distance: Optional[float] = 100.0
+    min_goal_distance_l2: Optional[float] = 100.0
     max_goal_distance: Optional[float] = 200.0
-    min_remaining_distance: Optional[float] = 45.0
+    max_goal_distance_l2: Optional[float] = 200.0
+    min_remaining_distance: Optional[float] = None
     max_attempts_outer: int = 50
-    min_vehicle_distance: Optional[float] = 16.0
-    min_vehicle_speed: Optional[float] = 1.5
-    min_vehicles_route: Optional[int] = 2
+    min_vehicle_distance: Optional[float] = 12.0
+    min_vehicle_speed: Optional[float] = None
+    min_vehicles_route: Optional[int] = None
     max_attempts_inner: int = 5
 
 
@@ -55,7 +57,7 @@ class RandomRespawner(BaseRespawner):
         # assert ego_vehicle_simulation.simulation.current_time_step == 0
 
         if self._options.random_start_timestep and ego_vehicle_simulation.simulation.final_time_step is not Unlimited:
-            start_step_offset = self.rng.randint(0, int(ego_vehicle_simulation.simulation.final_time_step) // 2)
+            start_step_offset = self.rng.randint(0, int(ego_vehicle_simulation.simulation.final_time_step) // 4)
             ego_vehicle_simulation._simulation = ego_vehicle_simulation.simulation( # TODO: Typing
                 from_time_step=start_step_offset,
                 ego_vehicle=ego_vehicle_simulation.ego_vehicle,
@@ -150,8 +152,8 @@ class RandomRespawner(BaseRespawner):
             attempts_inner: int = -1
             while attempts_inner < self._options.max_attempts_inner:
                 attempts_inner += 1
-                start_offset = 10.0 if not start_lanelet.predecessor else 0.0
-                final_offset = 10.0 if not goal_lanelet.successor else 0.0
+                start_offset = 10.0 if not start_lanelet.predecessor else 1.0
+                final_offset = 10.0 if not goal_lanelet.successor else 1.0
                 if self._options.random_init_arclength:
                     start_arclength = start_offset + (start_lanelet.distance[-1] - final_offset) * self.rng.random()
                 else:
@@ -159,17 +161,25 @@ class RandomRespawner(BaseRespawner):
                 start_arclength = max(0.0, min(start_arclength, start_lanelet.distance[-1]))
                 start_position = start_lanelet.interpolate_position(start_arclength)[0]
                 goal_distance = route_subset_distance - start_arclength - (goal_lanelet.distance[-1] - goal_arclength)
+                goal_distance_l2 = np.linalg.norm(self._goal_position - start_position)
 
                 if goal_distance < 0 or self._options.min_goal_distance is not None and goal_distance < self._options.min_goal_distance:
                     continue
+                if self._options.min_goal_distance_l2 is not None and goal_distance_l2 < self._options.min_goal_distance_l2:
+                    continue
                 if self._options.max_goal_distance is not None and goal_distance > self._options.max_goal_distance:
+                    continue
+                if self._options.max_goal_distance_l2 is not None and goal_distance_l2 > self._options.max_goal_distance_l2:
                     continue
                 
                 if self._options.min_vehicle_distance is not None or self._options.min_vehicle_speed is not None or self._options.min_vehicles_route is not None:
                     valid_lanelet_environment = True
-                    threshold_vehicles = min(len(ego_vehicle_simulation.simulation.current_scenario.obstacles), self._options.min_vehicles_route)
-                    if self._options.min_vehicles_route is not None and len(route_vehicle_ids) < threshold_vehicles:
-                        continue
+
+                    if self._options.min_vehicles_route is not None:
+                        threshold_vehicles = min(len(ego_vehicle_simulation.simulation.current_scenario.obstacles), self._options.min_vehicles_route)
+                        if self._options.min_vehicles_route is not None and len(route_vehicle_ids) < threshold_vehicles:
+                            continue
+            
                     for obstacle_id in route_vehicle_ids:
                         obstacle = ego_vehicle_simulation.simulation.current_scenario._dynamic_obstacles[obstacle_id]
                         obstacle_state = state_at_time(obstacle, ego_vehicle_simulation.current_time_step, assume_valid=True)
@@ -194,12 +204,28 @@ class RandomRespawner(BaseRespawner):
 
         if not success and self._options.throw_on_failure:
             raise RespawnerSetupFailure(f"Max respawn attempts reached ({attempts_outer})")
+        
+        if self._options.init_speed == "auto":
+            vehicle_states = [state_at_time(obstacle, ego_vehicle_simulation.current_time_step) for obstacle in ego_vehicle_simulation.simulation.current_scenario.dynamic_obstacles]
+            vehicle_states = [state for state in vehicle_states if state is not None]
+            vehicle_speeds = [state.velocity for state in vehicle_states if state is not None]
+            vehicle_ego_distances = [np.linalg.norm(start_position - state.position) for state in vehicle_states]
+            if len(vehicle_ego_distances) > 0:
+                closest_vehicle_index = min(range(len(vehicle_ego_distances)), key=lambda i: vehicle_ego_distances[i])
+                if vehicle_ego_distances[closest_vehicle_index] < 50.0:
+                    init_speed = vehicle_speeds[closest_vehicle_index]
+                else:
+                    init_speed = 5.0
+            else:
+                # fallback if no vehicles in scenario
+                init_speed = 5.0
+        else:
+            init_speed = self._options.init_speed
 
         start_orientation = lanelet_orientation_at_position(start_lanelet, start_position)
-        initial_state = State(
+        initial_state = InitialState(
             position=start_position,
-            steering_angle=0.0,
-            velocity=self._options.init_speed,
+            velocity=init_speed,
             orientation=start_orientation,
             yaw_rate=0.0,
             slip_angle=0.0,

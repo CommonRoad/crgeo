@@ -19,10 +19,10 @@ class Set2SetDecoder(BaseDecoder):
         super().__init__()
         self.upscaler = nn.Linear(
             input_size,
-            input_size*n
+            input_size * n
         )
         self.decoder = Set2Set(
-            in_channels=input_size*n,
+            in_channels=input_size * n,
             processing_steps=processing_steps,
             num_layers=1
         )
@@ -45,7 +45,7 @@ class Set2SetDecoder(BaseDecoder):
         upscaled = self.upscaler(x)
 
         Y: Tensor = self.decoder(upscaled, batch=torch.arange(batch_size, device=x.device)).view(
-            batch_size, self._n, 2*self.output_size
+            batch_size, self._n, 2 * self.output_size
         )
         Y = Y[:, :, self.output_size:]
         if n > self._n:
@@ -55,8 +55,6 @@ class Set2SetDecoder(BaseDecoder):
             ], dim=1)
         else:
             Y = Y[:, :n, :]
-
-        
 
         if x.ndim == 1:
             Y = Y.squeeze(0)

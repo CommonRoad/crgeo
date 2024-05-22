@@ -15,11 +15,13 @@ class LaneletDistanceFeatureComputer(BaseFeatureComputer[V2VFeatureParams]):
     def __init__(
         self,
         max_lanelet_distance: float = 60.0,
-        max_lanelet_distance_placeholder: float = 60.0 * 1.1
+        max_lanelet_distance_placeholder: float = 60.0 * 1.1,
+        linear_lanelet_projection: bool = False
     ):
         super().__init__()
         self._max_lanelet_distance = max_lanelet_distance
         self._max_lanelet_distance_placeholder = max_lanelet_distance_placeholder
+        self._linear_lanelet_projection = linear_lanelet_projection
 
     def __call__(
         self,
@@ -44,8 +46,14 @@ class LaneletDistanceFeatureComputer(BaseFeatureComputer[V2VFeatureParams]):
 
         source_center_polyline = simulation.get_lanelet_center_polyline(source_lanelet.lanelet_id)
         target_center_polyline = simulation.get_lanelet_center_polyline(target_lanelet.lanelet_id)
-        source_arclength = source_center_polyline.get_projected_arclength(position=params.source_state.position)
-        target_arclength = target_center_polyline.get_projected_arclength(position=params.target_state.position)
+        source_arclength = source_center_polyline.get_projected_arclength(
+            position=params.source_state.position,
+            linear_projection=self._linear_lanelet_projection
+        )
+        target_arclength = target_center_polyline.get_projected_arclength(
+            position=params.target_state.position,
+            linear_projection=self._linear_lanelet_projection
+        )
 
         if source_lanelet.lanelet_id == target_lanelet.lanelet_id:
             distance = abs(source_arclength - target_arclength)
@@ -71,14 +79,17 @@ class LaneletDistanceFeatureComputer(BaseFeatureComputer[V2VFeatureParams]):
                         start_pos = source_arclength
                     if t == target_lanelet.lanelet_id:
                         end_pos = target_arclength
-                    orthogonal_distance = np.linalg.norm(lanelet_graph.nodes[s]["start_pos"] - lanelet_graph.nodes[t]["start_pos"])
+                    orthogonal_distance = np.linalg.norm(
+                        lanelet_graph.nodes[s]["start_pos"] -
+                        lanelet_graph.nodes[t]["start_pos"])
                     # ignore curvature of lanelet
                     return math.sqrt(orthogonal_distance ** 2 + (end_pos - start_pos) ** 2)
 
                 else:
                     return None
 
-            for s, t in [ (source_lanelet.lanelet_id, target_lanelet.lanelet_id), (target_lanelet.lanelet_id, source_lanelet.lanelet_id) ]:
+            for s, t in [(source_lanelet.lanelet_id, target_lanelet.lanelet_id),
+                         (target_lanelet.lanelet_id, source_lanelet.lanelet_id)]:
                 with suppress(nx.NetworkXNoPath):
                     distance: float
                     shortest_path: List[Node]
