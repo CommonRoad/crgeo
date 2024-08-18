@@ -27,6 +27,7 @@ def ft_veh_state(params: VFeatureParams) -> FeatureDict:
             math.cos(params.state.orientation),
             math.sin(params.state.orientation),
         ], dtype=torch.float),
+        V_Feature.SteeringAngle.value: params.state.steering_angle if "steering_angle" in params.state.attributes else 0.0,
         V_Feature.Length.value: params.obstacle.obstacle_shape.length,
         V_Feature.Width.value: params.obstacle.obstacle_shape.width,
     }

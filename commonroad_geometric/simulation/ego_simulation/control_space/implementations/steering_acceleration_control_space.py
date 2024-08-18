@@ -34,6 +34,8 @@ class SteeringAccelerationSpace(BaseControlSpace):
         options: Optional[SteeringAccelerationControlOptions] = None
     ) -> None:
         options = options or SteeringAccelerationControlOptions()
+        if isinstance(options, dict):
+            options = SteeringAccelerationControlOptions(**options)
 
         self._lower_bound_acceleration = options.lower_bound_acceleration
         self._upper_bound_acceleration = options.upper_bound_acceleration

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Deque, Dict, List, NamedTuple, Optional, Sequence, Union
+import logging
+from copy import deepcopy
 
 from commonroad_geometric.common.types import T_CountParam
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
@@ -11,12 +13,19 @@ from commonroad_geometric.dataset.extraction.base_extractor import BaseExtractor
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.types import VTVFeatureParams
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractor, TrafficExtractionParams
 from commonroad_geometric.simulation.base_simulation import Unlimited
+from commonroad_geometric.dataset.postprocessing.base_data_postprocessor import T_LikeBaseDataPostprocessor
 
 
-class _TimestampData(NamedTuple):
+logger = logging.getLogger(__name__)
+
+@dataclass
+class _TimestampData:
     time_step: int
-    data: CommonRoadData
-    obstacle_id_to_obstacle_idx: Dict[int, int]
+    data: CommonRoadData = field(default_factory=lambda: CommonRoadData())
+
+    def __post_init__(self):
+        self.obstacle_id_to_obstacle_idx = {v.item(): k for k, v in enumerate(self.data.v.id)}
+
 
 
 @dataclass
@@ -46,6 +55,8 @@ class TemporalTrafficExtractorOptions(BaseExtractorOptions):
     add_temporal_vehicle_edges: bool = True
     max_time_steps_temporal_edge: T_CountParam = Unlimited
     temporal_vehicle_edge_feature_computers: Optional[Sequence[Callable[[VTVFeatureParams], List[float]]]] = None
+    postprocessors: Sequence[T_LikeBaseDataPostprocessor] = field(default_factory=list)
+    disable_postprocessing: bool = False
 
 
 ReturnType = Union[None, Sequence[CommonRoadData], CommonRoadDataTemporal]
@@ -85,8 +96,7 @@ class TemporalTrafficExtractor(BaseExtractor[TemporalTrafficExtractorOptions, Tr
 
         self._past_time_steps.append(_TimestampData(
             time_step=time_step,
-            data=data,
-            obstacle_id_to_obstacle_idx=self._simulation.obstacle_id_to_obstacle_idx,
+            data=data
         ))
 
         if not self.options.no_skip and self._skip_steps > 0:
@@ -116,6 +126,24 @@ class TemporalTrafficExtractor(BaseExtractor[TemporalTrafficExtractorOptions, Tr
                 obstacle_id_to_obstacle_idx=[ts.obstacle_id_to_obstacle_idx for ts in self._past_time_steps],
                 feature_computers=self.options.temporal_vehicle_edge_feature_computers,
             )
+
+        if temporal_data.vtv.num_edges > 0:
+            assert temporal_data.vtv.edge_index.max() < temporal_data.v.num_nodes
+
+        if not params.disable_postprocessing:
+            for postprocessor in self.options.postprocessors:
+                result = postprocessor(
+                    [temporal_data],
+                    simulation=self.simulation,
+                    ego_vehicle=params.ego_vehicle
+                )
+                if len(result) == 1:
+                    temporal_data = result[0]
+                else:
+                    logger.warning(f"Skipping ambiguous postprocessing routine {type(postprocessor).__name__} "
+                                   f"(returned {len(result)} samples)")
+
+
         return temporal_data
 
     def reset_feature_computers(self) -> None:

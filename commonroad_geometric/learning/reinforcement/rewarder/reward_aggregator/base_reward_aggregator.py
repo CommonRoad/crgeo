@@ -8,6 +8,7 @@ import numpy as np
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 from commonroad_geometric.common.class_extensions.string_resolver_mixing import StringResolverMixin
 from commonroad_geometric.dataset.commonroad_data import CommonRoadData
+from commonroad_geometric.dataset.commonroad_data_temporal import CommonRoadDataTemporal
 from commonroad_geometric.learning.reinforcement.observer.base_observer import T_Observation
 from commonroad_geometric.learning.reinforcement.rewarder.reward_computer.base_reward_computer import BaseRewardComputer
 from commonroad_geometric.simulation.ego_simulation.ego_vehicle_simulation import EgoVehicleSimulation
@@ -24,7 +25,8 @@ class BaseRewardAggregator(ABC, AutoReprMixin, StringResolverMixin):
         reward_computers: List[BaseRewardComputer]
     ) -> None:
         if len(reward_computers) == 0:
-            raise ValueError("Please provide at least one reward computer")
+            warnings.warn("No reward computers provided. Default behavior: aggregate with zero rewards.")
+
 
         self._reward_computers = reward_computers
         self._reward_cache: Dict[BaseRewardComputer, float] = {}
@@ -118,8 +120,6 @@ class BaseRewardAggregator(ABC, AutoReprMixin, StringResolverMixin):
             self._max_reward_step = self._substep_reward
         self._cumulative_reward += self._substep_reward
         self._cumulative_step_reward += self._substep_reward
-        assert lowest_reward_computer is not None
-        assert highest_reward_computer is not None
         self._lowest = (lowest_reward_computer, lowest_reward)
         self._highest = (highest_reward_computer, highest_reward)
         for k, v in reward_component_info.items():

@@ -17,7 +17,7 @@ class RenderTrafficGraphPlugin(BaseRenderPlugin):
     edge_linewidth: float = 0.3
     edge_arc: float = 0.0
     edge_color_other_connection: Color = Color((0.0, 0.9, 0.0, 0.4))
-    edge_color_ego_connection: Color = Color((0.9, 0.0, 0.1, 0.7))
+    edge_color_ego_connection: Color = Color((0.1, 0.9, 0.1, 0.5))
     edge_color_temporal: Color = Color((0.0, 0.0, 0.9, 0.4))
     render_id: bool = False
     render_temporal: bool = True

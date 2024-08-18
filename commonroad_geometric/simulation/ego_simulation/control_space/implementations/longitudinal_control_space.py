@@ -60,6 +60,8 @@ class LongitudinalControlSpace(BaseControlSpace):
         options: Optional[LongitudinalControlOptions] = None
     ) -> None:
         options = options or LongitudinalControlOptions()
+        if isinstance(options, dict):
+            options = LongitudinalControlOptions(**options)
         self.options = options
 
         if self.options.pid_control:

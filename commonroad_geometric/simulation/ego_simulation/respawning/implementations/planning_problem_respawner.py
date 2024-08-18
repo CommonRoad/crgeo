@@ -27,6 +27,8 @@ class PlanningProblemRespawner(BaseRespawner):
         options: Optional[PlanningProblemRespawnerOptions] = None
     ) -> None:
         options = options or PlanningProblemRespawnerOptions()
+        if isinstance(options, dict):
+            options = PlanningProblemRespawnerOptions(**options)
         self._options: PlanningProblemRespawnerOptions = options
         super().__init__(options=options)
 

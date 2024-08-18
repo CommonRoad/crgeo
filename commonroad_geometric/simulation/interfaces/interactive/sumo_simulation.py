@@ -57,7 +57,7 @@ class SumoSimulationOptions(BaseSimulationOptions):
     report_presimulation_progress: bool = True
     traffic_spawner: BaseTrafficSpawner = ConstantRateSpawner()
     init_vehicle_speed: float = 5.0
-    max_vehicle_speed: float = 10.0
+    max_vehicle_speed: float = 5.0
     p_wants_lane_change: float = 0.25
     p_car: float = 1.0
     p_truck: float = 0.0
@@ -80,6 +80,8 @@ class SumoSimulation(BaseSimulation):
             options (SumoSimulationOptions): Options for SUMO and this simulation.
         """
         self._options: SumoSimulationOptions = options or SumoSimulationOptions()
+        if isinstance(self._options, dict):
+            self._options = SumoSimulationOptions(**self._options)
         self._sumo_sim = _CRSumoSimulation()
         self._sumo_conf = DefaultSumoConfig()
         self._sumo_conf.dt = self._options.dt

@@ -27,6 +27,12 @@ class RandomRespawnerOptions(BaseRespawnerOptions):
     only_intersections: bool = False
     route_length: Optional[Union[int, Tuple[int, int]]] = (3, 15)
     init_speed: Union[str, float] = 10.0
+    random_speed_range: Tuple[float, float] = (0.0, 10.0)
+    init_steering_angle: Union[str, float] = 0.0
+    random_steering_angle_range: Tuple[float, float] = (-0.1, 0.1)
+    init_orientation_noise: float = 0.0
+    init_position_noise: float = 0.0
+    min_init_arclength: Optional[float] = 0.0
     min_goal_distance: Optional[float] = 100.0
     min_goal_distance_l2: Optional[float] = 100.0
     max_goal_distance: Optional[float] = 200.0
@@ -50,6 +56,8 @@ class RandomRespawner(BaseRespawner):
         options: Optional[RandomRespawnerOptions] = None
     ) -> None:
         options = options or RandomRespawnerOptions()
+        if isinstance(options, dict):
+            options = RandomRespawnerOptions(**options)
         self._options: RandomRespawnerOptions = options
         super().__init__(options=options)
 
@@ -159,6 +167,8 @@ class RandomRespawner(BaseRespawner):
                 else:
                     start_arclength = start_offset
                 start_arclength = max(0.0, min(start_arclength, start_lanelet.distance[-1]))
+                if start_arclength < self._options.min_init_arclength:
+                    continue
                 start_position = start_lanelet.interpolate_position(start_arclength)[0]
                 goal_distance = route_subset_distance - start_arclength - (goal_lanelet.distance[-1] - goal_arclength)
                 goal_distance_l2 = np.linalg.norm(self._goal_position - start_position)
@@ -219,10 +229,25 @@ class RandomRespawner(BaseRespawner):
             else:
                 # fallback if no vehicles in scenario
                 init_speed = 5.0
+        elif self._options.init_speed == "uniform_random":
+            # Select a speed randomly within the specified range
+            init_speed = self.rng.uniform(*self._options.random_speed_range)
         else:
             init_speed = self._options.init_speed
 
+        if self._options.init_steering_angle == "uniform_random":
+            init_steering_angle = self.rng.uniform(*self._options.random_steering_angle_range)
+        else:
+            init_steering_angle = self._options.init_steering_angle
+
         start_orientation = lanelet_orientation_at_position(start_lanelet, start_position)
+
+        if self._options.init_orientation_noise > 0.0:
+            start_orientation += self.rng.gauss(0, self._options.init_orientation_noise)
+        if self._options.init_position_noise > 0.0:
+            start_position[0] += self.rng.gauss(0, self._options.init_position_noise)
+            start_position[1] += self.rng.gauss(0, self._options.init_position_noise)
+
         initial_state = InitialState(
             position=start_position,
             velocity=init_speed,
@@ -231,5 +256,8 @@ class RandomRespawner(BaseRespawner):
             slip_angle=0.0,
             time_step=ego_vehicle_simulation.current_time_step if ego_vehicle_simulation.current_time_step is not None else ego_vehicle_simulation.initial_time_step
         )
+
+
+        initial_state.steering_angle = init_steering_angle
 
         return initial_state, self._goal_position, goal_lanelet

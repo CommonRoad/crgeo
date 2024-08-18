@@ -1,0 +1,70 @@
+defaults:
+  - base_rl_config
+  - _self_
+
+device: auto
+project_dir: ./projects/output/rl/drivable_area
+# scenario_dir: ./data/osm_recordings/
+# scenario_dir: ../../data/highd-dataset-converted
+# scenario_dir: ./data/highd-sample/
+scenario_dir: ./projects/output/geometric/drivable_area/generated_scenarios
+seed: 0
+warmstart: False
+profile: False
+checkpoint: ./projects/graph_rl_agents/drivable_area/pretrained_agent.zip
+
+training:
+  wandb_logging: True
+  checkpoint_freq: 50000
+  eval_freq: 10
+  gradient_save_freq: 1
+  log_freq: 1
+  n_envs: 1
+  n_eval_episodes: 10
+  normalize_observations: False
+  normalize_rewards: False
+  normalize_rewards_threshold: 10.0
+  record_backoff: 1.0
+  video_frequency: 25_000 # set to None to disable recording
+  total_timesteps: 10_000_000
+  verbose: 0
+  video_length: 2000
+
+experiment:
+  observation_type: encoding # Literal["encoding", "lidar_circle", "lane_circle"]
+  enable_waypoint_resampling: true
+  lanelet_waypoint_density: 5
+  enable_feature_normalization: False
+  feature_normalization_params_path: 
+  encoding_model_path: ./projects/graph_rl_agents/drivable_area/pretrained/model.pt
+  data_padding_size: 500
+  ego_map_radius: 200.0
+  render_on_step: True
+  edge_range: 40.0
+  render_debug_overlays: False
+  only_ego_inc_edges: True # False
+  render_decoding: True
+  raise_exceptions: False
+  hd_videos: False
+  enable_representations: &enable_representations True
+  spawning:
+    min_goal_distance: 250.0
+    max_goal_distance: 300.0
+    min_vehicle_distance: 20.0
+    init_speed: "auto"
+
+model:
+  gae_lambda: 0.8
+  gamma: 0.99
+  n_epochs: 8
+  ent_coef: 1e-2
+  n_steps: 256
+  batch_size: 32
+  vf_coef: 0.5
+  max_grad_norm: 10.0
+  learning_rate: 5e-4
+  clip_range: 0.2
+  gnn_out_dim: 80
+  gnn_hidden_dim: 80
+  gnn_layers: 3
+  enable_representations: *enable_representations

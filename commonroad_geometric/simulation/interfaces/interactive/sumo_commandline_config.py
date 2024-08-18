@@ -234,6 +234,7 @@ class SumoCommandLineConfig:
     person_device__rerouting__explicit: Optional[str] = None
     person_device__rerouting__deterministic: Optional[bool] = None
     person_device__rerouting__period: Optional[float] = None
+    allow_fringe: Optional[bool] = None
 
     # Report
     verbose: Optional[bool] = False

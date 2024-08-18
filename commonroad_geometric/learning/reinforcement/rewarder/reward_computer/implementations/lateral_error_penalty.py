@@ -27,7 +27,7 @@ class LateralErrorPenaltyRewardComputer(BaseRewardComputer):
         observation: T_Observation
     ) -> float:
         try:
-            lateral_error = data.ego.lanelet_lateral_error.item()
+            lateral_error = data.ego.lanelet_lateral_error[-1].item()
         except AttributeError:
             current_state = simulation.ego_vehicle.state
             try:

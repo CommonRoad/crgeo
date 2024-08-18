@@ -44,7 +44,7 @@ model:
 experiment:
   data_padding_size: 200
   edge_drawer_class_name: "KNearestEdgeDrawer"  # or "VoronoiEdgeDrawer"  
-  dist_threshold_v2v: 50.0
+  dist_threshold_v2v: 10.0
   edge_drawer_k: 3
   ego_map_radius: 50.0
   
@@ -55,7 +55,7 @@ experiment:
 
   linear_lanelet_projection: True
   enable_waypoint_resampling: True
-  lanelet_waypoint_density: 10
+  lanelet_waypoint_density: 20
 
   spawning:
     min_goal_distance: 100.0

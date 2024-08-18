@@ -133,7 +133,8 @@ class BaseRespawner(ABC, AutoReprMixin, StringResolverMixin):
                 assert ego_vehicle_simulation.planning_problem is not None
                 ego_state = ego_vehicle_simulation.planning_problem.initial_state
                 ego_state.time_step = ego_vehicle_simulation.current_time_step
-                ego_state.steering_angle = 0.0
+                if not hasattr(ego_state, 'steering_angle'):
+                    ego_state.steering_angle = 0.0
                 
                 ego_vehicle.reset(initial_state=ego_state)
                 if not validate_spawn_location():

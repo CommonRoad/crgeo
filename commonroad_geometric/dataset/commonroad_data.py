@@ -275,7 +275,7 @@ class VirtualAttributesBaseStorage(BaseStorage):
     def key(self) -> str:
         return self._key
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, key: str) -> Tensor:
         try:
             if key in self._column_indices:
                 start_index, end_index = self._column_indices[key]

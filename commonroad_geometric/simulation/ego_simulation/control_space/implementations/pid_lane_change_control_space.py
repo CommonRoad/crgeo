@@ -43,6 +43,8 @@ class PIDLaneChangeControlSpace(BaseControlSpace):
         options: Optional[PIDLaneChangeControlOptions] = None
     ) -> None:
         options = options or PIDLaneChangeControlOptions()
+        if isinstance(options, dict):
+            options = PIDLaneChangeControlOptions(**options)
         self._lower_bound_acceleration = options.lower_bound_acceleration
         self._upper_bound_acceleration = options.upper_bound_acceleration
         self._lower_bound_velocity = options.lower_bound_velocity

@@ -85,8 +85,10 @@ class TrafficExtractor(
     def __init__(
         self,
         simulation: BaseSimulation,
-        options: TrafficExtractorOptions,
+        options: TrafficExtractorOptions | dict,
     ) -> None:
+        if isinstance(options, dict):
+            options = TrafficExtractorOptions(**options)
         super().__init__(simulation=simulation, options=options)
         self._setup(self.simulation.options)
         self._iterator: Optional[Iterator[tuple[int, Scenario]]] = None
@@ -408,7 +410,7 @@ class TrafficExtractor(
         for key in keys(static_data):
             if key.startswith('edge_'):
                 continue
-            if static_data[key].ndim > 0:
+            if static_data[key].ndim > 0 and static_data[key].ndim <= 2:
                 if map_filter_active:
                     data[key] = static_data[key][self._lanelet_indices]
                 else:

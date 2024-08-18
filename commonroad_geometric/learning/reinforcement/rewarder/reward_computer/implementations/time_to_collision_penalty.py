@@ -42,7 +42,7 @@ class TimeToCollisionPenaltyRewardComputer(BaseRewardComputer):
 
         edge_index = data.v2v.edge_index
         is_ego_mask = data.v.is_ego_mask
-        ego_index = torch.where(is_ego_mask)[0].item()
+        ego_index = torch.where(is_ego_mask)[0][-1].item()
         ego_inc_mask = edge_index[1, :] == ego_index
         ego_inc_index = torch.where(ego_inc_mask)[0]
 

@@ -3,6 +3,7 @@ from typing import Dict, Optional
 
 import networkx as nx
 import numpy as np
+import math
 from commonroad.geometry.shape import Shape, ShapeGroup
 from commonroad.planning.goal import GoalRegion
 from commonroad.scenario.lanelet import LaneletNetwork
@@ -30,7 +31,9 @@ class GoalAlignmentComputer(BaseFeatureComputer[VFeatureParams]):
         include_goal_distance_lateral: bool = True,
         include_goal_distance: bool = True,
         include_lane_changes_required: bool = True,
-        logarithmic: bool = True
+        logarithmic: bool = True,
+        closeness_transform: bool = False,
+        closeness_transform_threshold: float = 100.0
     ) -> None:
         if not any((
             include_goal_distance_longitudinal,
@@ -45,6 +48,9 @@ class GoalAlignmentComputer(BaseFeatureComputer[VFeatureParams]):
         self._include_goal_distance = include_goal_distance
         self._include_lane_changes_required = include_lane_changes_required
         self._logarithmic = logarithmic
+        self._closeness_transform = closeness_transform
+        self._closeness_transform_threshold = closeness_transform_threshold
+        assert not logarithmic and closeness_transform
         self._lanelet_network: Optional[LaneletNetwork] = None
         self._scenario_id: Optional[ScenarioID] = None
         self._undefined_features = self._return_undefined_features()
@@ -79,8 +85,10 @@ class GoalAlignmentComputer(BaseFeatureComputer[VFeatureParams]):
                         features[V_Feature.GoalDistanceLongitudinal.value] = -np.log(-distance_goal_long + 1)
                     else:
                         features[V_Feature.GoalDistanceLongitudinal.value] = np.log(distance_goal_long + 1)
+                elif self._closeness_transform:
+                    features[V_Feature.GoalDistanceLongitudinal.value] = GoalAlignmentComputer._closeness_transform_fn(distance_goal_long, self._closeness_transform_threshold)
                 else:
-                    features[V_Feature.GoalDistanceLongitudinal.value] = distance_goal_long
+                    features[V_Feature.GoalDistanceLongitudinal.value] = distance_goal_long / 10.0
             
             if self._include_goal_distance_lateral:
                 if self._logarithmic:
@@ -89,11 +97,16 @@ class GoalAlignmentComputer(BaseFeatureComputer[VFeatureParams]):
                     else:
                         features[V_Feature.GoalDistanceLateral.value] = np.log(distance_goal_lat + 1)
                 else:
-                    features[V_Feature.GoalDistanceLateral.value] = distance_goal_lat
+                    features[V_Feature.GoalDistanceLateral.value] = distance_goal_lat / 10.0
 
         if self._include_goal_distance:
             distance, heading_error = GoalAlignmentComputer._get_goal_distance_and_orientation(position, orientation, params.ego_route.goal_region)
-            features[V_Feature.GoalDistance.value] = np.log(distance + EPS) if self._logarithmic else distance
+            if self._logarithmic:
+                features[V_Feature.GoalDistance.value] = np.log(distance + EPS)
+            if self._closeness_transform:
+                features[V_Feature.GoalDistance.value] = GoalAlignmentComputer._closeness_transform_fn(distance, self._closeness_transform_threshold)
+            else:
+                features[V_Feature.GoalDistance.value] = distance / 10.0
             features["goal_heading_error"] = heading_error
 
         if self._include_lane_changes_required:
@@ -173,6 +186,12 @@ class GoalAlignmentComputer(BaseFeatureComputer[VFeatureParams]):
             self._lanelet_network = simulation.current_scenario.lanelet_network
             self._shortest_paths = nx.shortest_path(simulation.lanelet_graph)
             self._lane_changes_required_cache = {}
+
+    @staticmethod
+    def _closeness_transform_fn(x: float, threshold: float) -> float:
+        if not math.isfinite(x):
+            return 0.0
+        return 1 - min(x, threshold) / threshold
 
     @staticmethod
     def _get_goal_distance_and_orientation(position: np.array, orientation: float, goal: GoalRegion) -> float:

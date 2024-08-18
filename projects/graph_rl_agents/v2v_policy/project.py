@@ -56,7 +56,7 @@ def create_rewarders():
         ),
         ConstantRewardComputer(reward=-0.001),
         #
-        ReachedGoalRewardComputer(reward=2.0),
+        ReachedGoalRewardComputer(reward=5.0),
         OvershotGoalRewardComputer(reward=-0.5),
         # SteeringAnglePenaltyRewardComputer(weight=0.0005, loss_type=RewardLossMetric.L1),
         StillStandingPenaltyRewardComputer(penalty=-0.05, velocity_threshold=2.0),
@@ -139,27 +139,27 @@ RENDERER_OPTIONS = [
 # Data extraction
 V_FEATURE_COMPUTERS = [
     ft_veh_state,
-    GoalAlignmentComputer(
-        include_goal_distance_longitudinal=True,
-        include_goal_distance_lateral=True,
-        include_goal_distance=True,
-        include_lane_changes_required=True,
-        logarithmic=True
-    ),
-    YawRateFeatureComputer(),
-    VehicleLaneletPoseFeatureComputer(
-        include_longitudinal_abs=False,
-        include_longitudinal_rel=False,
-        include_lateral_left=True,
-        include_lateral_right=True,
-        include_lateral_error=False,
-        include_heading_error=True,
-        update_exact_interval=10
-    ),
-    # VehicleLaneletConnectivityComputer(),
-    EgoFramePoseFeatureComputer(),
-    NumLaneletAssignmentsFeatureComputer(),
-    DistanceToRoadBoundariesFeatureComputer()
+    # GoalAlignmentComputer(
+    #     include_goal_distance_longitudinal=True,
+    #     include_goal_distance_lateral=True,
+    #     include_goal_distance=True,
+    #     include_lane_changes_required=True,
+    #     logarithmic=True
+    # ),
+    # YawRateFeatureComputer(),
+    # VehicleLaneletPoseFeatureComputer(
+    #     include_longitudinal_abs=False,
+    #     include_longitudinal_rel=False,
+    #     include_lateral_left=True,
+    #     include_lateral_right=True,
+    #     include_lateral_error=False,
+    #     include_heading_error=True,
+    #     update_exact_interval=10
+    # ),
+    # # VehicleLaneletConnectivityComputer(),
+    # EgoFramePoseFeatureComputer(),
+    # NumLaneletAssignmentsFeatureComputer(),
+    # DistanceToRoadBoundariesFeatureComputer()
 ]
 L_FEATURE_COMPUTERS = [
     LaneletGeometryFeatureComputer(),

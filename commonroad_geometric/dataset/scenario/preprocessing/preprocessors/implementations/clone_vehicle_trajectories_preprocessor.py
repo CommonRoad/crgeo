@@ -22,10 +22,12 @@ class CloneVehicleTrajectoriesPreprocessor(ScenarioPreprocessor):
     def __init__(
         self, 
         position_noise: float = 0.0,
-        orientation_noise: float | str = 0.0
+        orientation_noise: float | str = 0.0,
+        velocity_noise: float = 0.0
     ) -> None:
         self.position_noise = position_noise
         self.orientation_noise = orientation_noise
+        self.velocity_noise = velocity_noise
         super(CloneVehicleTrajectoriesPreprocessor, self).__init__()
 
     def _process(self, scenario_bundle: ScenarioBundle) -> T_ScenarioPreprocessorResult:
@@ -38,10 +40,13 @@ class CloneVehicleTrajectoriesPreprocessor(ScenarioPreprocessor):
                     orientation_noise = np.random.uniform(-np.pi, np.pi)
                 else:
                     orientation_noise = np.random.normal(loc=0.0, scale=self.orientation_noise)
+                velocity = max(0.0, state.velocity + np.random.normal(loc=0.0, scale=self.velocity_noise))
+
                 orientation = make_valid_orientation(state.orientation + orientation_noise)
                 copied_state = deepcopy(state)
                 copied_state.position = position
                 copied_state.orientation = orientation
+                copied_state.velocity = velocity
                 cloned_trajectory.append(copied_state)
 
             clone = DynamicObstacle(

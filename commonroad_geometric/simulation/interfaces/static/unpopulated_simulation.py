@@ -31,6 +31,8 @@ class UnpopulatedSimulation(BaseSimulation[UnpopulatedSimulationOptions]):
             options (BaseSimulationOptions): Options for this simulation.
         """
         options = options or UnpopulatedSimulationOptions()
+        if isinstance(options, dict):
+            options = UnpopulatedSimulationOptions(**options)
         if isinstance(initial_scenario, Path):
             initial_scenario, _ = CommonRoadFileReader(filename=str(initial_scenario)).open()
         empty_scenario = deepcopy(initial_scenario)

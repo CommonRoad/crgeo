@@ -364,7 +364,14 @@ class CommonRoadDataset(Dataset, Generic[T_IntermediateData, T_Data]):
         if idx != index:
             logger.debug(__(r"Skipping missing {idx=} instead returning data for {index=}", idx=idx, index=index))
         preprocessed_path = self._idx_to_processed_path[index]
-        data = self.config.load_fn(preprocessed_path, map_location=self.config.load_device)
+        try:
+            data = self.config.load_fn(preprocessed_path, map_location=self.config.load_device)
+        except RuntimeError:
+            logger.error(f"Failed to retrieve {idx=}")
+            index = self._indices[-1] # TODO
+            preprocessed_path = self._idx_to_processed_path[index]
+            data = self.config.load_fn(preprocessed_path, map_location=self.config.load_device)
+
         return data[1] if isinstance(data, tuple) else data
     
     def index_to_scenario_index(self, idx: int) -> int:
@@ -519,7 +526,7 @@ def _pre_transform_worker(
     scenario_index: int
 ) -> list[Path]:
     processed_paths = []
-    for sample_index, data in enumerate(pre_transform(scenario, planning_problem_set)):
+    for sample_index, data in pre_transform(scenario, planning_problem_set):
         if data is not None:
             if pre_filter is None or pre_filter(data):
                 processed_file_name = create_processed_file_name(

@@ -41,7 +41,8 @@ def generate_traffic(
     complete_trajectory_count: int = 0,
     include_ego_vehicle_trajectory: bool = False,
     time_step_cutoff: Optional[int] = None,
-    overwrite: bool = False
+    overwrite: bool = False,
+    render_generation: bool = False
 ) -> Dict[str, Optional[TrajectoryMetadata]]:
 
     if overwrite:
@@ -62,6 +63,7 @@ def generate_traffic(
                 complete_trajectory_count=complete_trajectory_count,
                 include_ego_vehicle_trajectory=include_ego_vehicle_trajectory,
                 time_step_cutoff=time_step_cutoff,
+                render_generation=render_generation
             )
             scenario_id_to_metadata[str(scenario_bundle.preprocessed_scenario.scenario_id)
                                     ] = trajectory_recording_metadata
@@ -76,7 +78,8 @@ def generate_traffic(
                 repeat(min_trajectory_length),
                 repeat(complete_trajectory_count),
                 repeat(include_ego_vehicle_trajectory),
-                repeat(time_step_cutoff)
+                repeat(time_step_cutoff),
+                repeat(render_generation)
             )
             results = {}
             for func_args in func_args_iterable:
@@ -128,7 +131,8 @@ def _generate_traffic(
     min_trajectory_length: int = 0,
     complete_trajectory_count: int = 0,
     include_ego_vehicle_trajectory: bool = False,
-    time_step_cutoff: Optional[int] = None
+    time_step_cutoff: Optional[int] = None,
+    render_generation: bool = True
 ) -> Optional[TrajectoryMetadata]:
     logger.info(
         f"Process {os.getpid()} with parent process {os.getppid()} is generating traffic for scenario {scenario_bundle.preprocessed_scenario.scenario_id}")
@@ -144,6 +148,7 @@ def _generate_traffic(
             min_trajectory_length=min_trajectory_length,
             complete_trajectory_count=complete_trajectory_count,
             time_step_cutoff=time_step_cutoff,
+            render_generation=render_generation,
         )
 
         ego_trajectory_id = None
