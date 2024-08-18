@@ -12,7 +12,7 @@ from commonroad_geometric.dataset.extraction.traffic.temporal_traffic_extractor 
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractor, TrafficExtractorOptions
 from commonroad_geometric.dataset.scenario.iteration.scenario_iterator import ScenarioIterator
 from commonroad_geometric.dataset.scenario.preprocessing.filters.implementations import OverlappingTrajectoriesFilter
-from commonroad_geometric.dataset.scenario.preprocessing.preprocessors.implementations import DepopulateScenarioPreprocessor, LaneletNetworkSubsetPreprocessor, VehicleFilterPreprocessor
+from commonroad_geometric.dataset.scenario.preprocessing.preprocessors.implementations import *
 from commonroad_geometric.rendering import Color
 from commonroad_geometric.rendering.plugins.cameras.follow_vehicle_camera import FollowVehicleCamera
 from commonroad_geometric.rendering.plugins.cameras.global_map_camera import GlobalMapCamera
@@ -60,17 +60,8 @@ def create_renderers(args) -> dict[str, TrafficSceneRenderer]:
             ),
             camera=FollowVehicleCamera(view_range=VIEW_RANGE) if args.camera_follow else GlobalMapCamera(),
             plugins=[
-                RenderLaneletNetworkPlugin(randomize_lanelet_color=True),
-                RenderObstaclePlugin(
-                    skip_ego_id=False,
-                    randomize_color_from="viewer"
-                ),
-                RenderObstacleTrailPlugin(
-                    randomize_color_from="viewer",
-                    trail_interval=10,
-                    trail_alpha=True
-                ),
-                RenderTrafficGraphPlugin()
+                RenderLaneletNetworkPlugin(),
+                RenderObstaclePlugin()
             ],
         )
     )
@@ -183,8 +174,9 @@ def enjoy(args) -> None:
 
     preprocessing_pipeline = VehicleFilterPreprocessor()
     preprocessing_pipeline >>= LaneletNetworkSubsetPreprocessor(radius=500.0)
-    preprocessing_pipeline >>= DepopulateScenarioPreprocessor(5)
+    # preprocessing_pipeline >>= DepopulateScenarioPreprocessor(5)
     preprocessing_pipeline >>= OverlappingTrajectoriesFilter()
+    preprocessing_pipeline >>= PadTrajectoriesPreprocessor()
 
     scenario_iterator = ScenarioIterator(
         directory=args.scenario_dir,

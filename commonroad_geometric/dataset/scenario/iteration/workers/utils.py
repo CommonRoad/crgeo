@@ -14,7 +14,7 @@ def preprocess_scenario(
     logger.debug(f"Preprocessing scenario_path={scenario_path} with preprocessor={preprocessor.name}")
     scenario_bundle = ScenarioBundle.read(
         scenario_path=scenario_path,
-        lanelet_assignment=True
+        lanelet_assignment=False
     )
     processing_results = preprocessor(scenario_bundle)
     return processing_results

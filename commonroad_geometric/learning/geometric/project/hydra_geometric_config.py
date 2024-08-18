@@ -1,6 +1,5 @@
 from pathlib import Path
-from enum import Enum
-from typing import NamedTuple, Optional
+from typing import Optional, Dict, Any
 from dataclasses import dataclass, field
 from omegaconf import MISSING
 from hydra.core.config_store import ConfigStore
@@ -35,7 +34,8 @@ class GeometricProjectConfig:
     cmd: str = ""
     device: str = 'auto'
     disable_postprocessing_inference: bool = False
-
+    # Add a generic field for additional configurations
+    additional_config: Dict[str, Any] = field(default_factory=dict)
 
 cs = ConfigStore.instance()
 cs.store(name="base_geometric_config", node=GeometricProjectConfig)

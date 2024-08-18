@@ -59,6 +59,7 @@ class RLEnvironmentOptions:
     async_reset_delay: float = 0.05  # TODO: This should be automatically tuned based on mean ep. durations for better performance
     async_resets: bool = False
     auto_update_async_reset_delay: bool = True
+    disable_graph_extraction: bool = False
     log_step_info: bool = False
     loop_scenarios: bool = True
     num_respawns_per_scenario: int = 0
@@ -114,9 +115,11 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
         # 'video.frames_per_second': DEFAULT_FPS
     }
 
-    def __init__(self, params: RLEnvironmentParams, render_mode: str = 'rgb_array'):
+    def __init__(self, params: RLEnvironmentParams | dict, render_mode: str = 'rgb_array'):
         """Initializes gym environment"""
         self.render_mode = render_mode
+        if isinstance(params.options, dict):
+            params.options = RLEnvironmentOptions(**params.options)
         self._scenario_iterator = ScenarioIterator(
             directory=Path(params.scenario_dir),
             is_looping=params.options.loop_scenarios,
@@ -157,7 +160,7 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
             try:
                 self._resetter.on_init()
                 self._observation_space = self._observer.setup(
-                    dummy_data=self.ego_vehicle_simulation.extract_data()
+                    dummy_data=self.ego_vehicle_simulation.extract_data() if not self.options.disable_graph_extraction else None
                 )
                 break
             except Exception as e:
@@ -484,16 +487,10 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
             self._ego_vehicle_simulation.close()
 
     def observe(self) -> Tuple[T_Observation, CommonRoadData]:
-        data = self.ego_vehicle_simulation.extract_data()
-
-        if data.v.is_ego_mask.sum().item() != 1:
-            if self._last_obs is not None:
-                logger.warning(
-                    f"Observe call encountered data instance with {data.v.is_ego_mask.sum().item()} ego vehicles. Using last observation as fallback (TODO)")  # TODO
-                return self._last_obs, data
-            else:
-                raise SimulationRuntimeError(
-                    f"Observe call encountered data instance with {data.v.is_ego_mask.sum().item()} ego vehicles")
+        if self.options.disable_graph_extraction:
+            data = None
+        else:
+            data = self.ego_vehicle_simulation.extract_data()
 
         obs = self._observer.observe(
             data=data,

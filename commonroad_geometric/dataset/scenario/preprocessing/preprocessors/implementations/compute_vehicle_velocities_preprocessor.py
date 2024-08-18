@@ -28,6 +28,9 @@ class ComputeVehicleVelocitiesPreprocessor(ScenarioPreprocessor):
                 displacement = np.linalg.norm(next_state.position - state.position)
                 velocity = displacement / dt
                 state.velocity = velocity
-            next_state.velocity = velocity
-        
+            try:
+                next_state.velocity = velocity
+            except UnboundLocalError:
+                pass
+
         return [scenario_bundle]

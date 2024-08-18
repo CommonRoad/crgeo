@@ -95,9 +95,9 @@ class FeatureComputers:
 def create_scenario_filterers():
     return LogExceptionWrapper(
         wrapped_preprocessor=chain_preprocessors(*[
-            WeaklyConnectedFilter(),
-            LaneletGraphFilter(min_edges=8, min_nodes=10),
-            HeuristicOSMScenarioFilter(),
+            # WeaklyConnectedFilter(),
+            # LaneletGraphFilter(min_edges=8, min_nodes=10),
+            # HeuristicOSMScenarioFilter(),
         ])
     )
 
@@ -137,7 +137,7 @@ def create_lanelet_graph_conversion_steps(
 class TrajectoryPredictionProject(BaseGeometricProject):
 
     @register_run_command
-    def generate_dataset(self) -> None:
+    def generate_scenarios(self) -> None:
         cfg = self.cfg.experiment
 
         traffic_spawner = ConstantRateSpawner(

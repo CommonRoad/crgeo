@@ -57,9 +57,6 @@ def sample(val: Union[Interval, float]) -> float:
 class _CRSumoSimulation(AutoReprMixin):
     """
     Class for interfacing between the SUMO simulation and CommonRoad.
-
-    Modified version of crsumo
-    supporting continuous simulation.
     """
 
     def __init__(self, silent: bool = True, include_lanes: set[int] = None,):
@@ -408,7 +405,7 @@ class _CRSumoSimulation(AutoReprMixin):
             if n_exit_lanes == 1:
                 exit_lane = 0
             else:
-                exit_lane = rng.randint(0, n_exit_lanes - 1)
+                exit_lane = rng.choice([i for i in range(n_exit_lanes) if i != depart_lane])
             arrival_lane = str(exit_lane)
         else:
             arrival_lane = "current"
@@ -436,10 +433,10 @@ class _CRSumoSimulation(AutoReprMixin):
         if max_speed is not None:
             self.vehicledomain.setMaxSpeed(sumo_id, max_speed)
         self.vehicledomain.setVehicleClass(sumo_id, vehicle_class)
-        self.vehicledomain.setParameter(sumo_id, 'impatience', 0.0)
-        self.vehicledomain.setParameter(sumo_id, 'jmTimegapMinor', 0.5)
-        self.vehicledomain.setParameter(sumo_id, 'jmIgnoreFoeSpeed', 1.0)
-        self.vehicledomain.setParameter(sumo_id, 'jmIgnoreFoeProb', 1.0)
+        self.vehicledomain.setParameter(sumo_id, 'impatience', "0.0")
+        self.vehicledomain.setParameter(sumo_id, 'jmTimegapMinor', "0.5")
+        self.vehicledomain.setParameter(sumo_id, 'jmIgnoreFoeSpeed', "1.0")
+        self.vehicledomain.setParameter(sumo_id, 'jmIgnoreFoeProb', "1.0")
 
         return sumo_id
 

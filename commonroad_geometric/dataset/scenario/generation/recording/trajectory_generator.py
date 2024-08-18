@@ -63,6 +63,14 @@ class TrajectoryGenerator(AutoReprMixin):
             generated_scenario.add_objects(dynamic_obstacle)
 
         ego_planning_problem_set = self._get_planning_problem_set(ego_trajectory_id)
+        generated_scenario.author = "crgeo"
+        generated_scenario.affiliation = "TUM"
+        generated_scenario.source = 'SUMO'
+        generated_scenario.tags = tuple() # TODO
+        generated_scenario.dt = self._sumo_recorder.sumo_simulation.dt
+
+        # generated_scenario.assign_obstacles_to_lanelets()
+        
         return generated_scenario, ego_planning_problem_set
 
     def generate_scenario_with_ego_trajectory(
@@ -78,9 +86,11 @@ class TrajectoryGenerator(AutoReprMixin):
         Returns:
             Scenario with ego trajectory of given trajectory_id
         """
-        generated_scenario, ego_planning_problem_set = self.generate_scenario_with_trajectories(trajectory_ids=[ego_trajectory_id],
-                                                                                                ego_trajectory_id=ego_trajectory_id,
-                                                                                                ego_obstacle_id=ego_obstacle_id)
+        generated_scenario, ego_planning_problem_set = self.generate_scenario_with_trajectories(
+            trajectory_ids=[ego_trajectory_id],
+            ego_trajectory_id=ego_trajectory_id,
+            ego_obstacle_id=ego_obstacle_id,
+        )
         return generated_scenario, ego_planning_problem_set
 
     def _get_dynamic_obstacle_with_trajectory(

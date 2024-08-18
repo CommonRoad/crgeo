@@ -23,6 +23,7 @@ class RenderEgoVehiclePlugin(BaseRenderPlugin):
     ego_vehicle_linewidth: Optional[float] = None
     ego_vehicle_fill_color: Optional[Color] = None
     ego_vehicle_color: Optional[Color] = None
+    ego_vehicle_color_collision: Optional[Color] = Color((1.0, 0.0, 0.0, 1.0))
     render_trail: bool = False
     direction_arrow: bool = False
     trail_interval: int = 35
@@ -126,11 +127,16 @@ class RenderEgoVehiclePlugin(BaseRenderPlugin):
 
                     index += self.trail_interval
 
+        if self.ego_vehicle_color_collision is not None and params.ego_vehicle_simulation.check_if_has_collision().collision: 
+            border_color = self.ego_vehicle_color_collision
+        else:
+            border_color = self.ego_vehicle_color
+
         viewer.draw_2d_shape(
             creator=self.__class__.__name__,
             vertices=self.ego_vehicle_vertices,
             fill_color=self.ego_vehicle_fill_color if self.filled else None,
-            border_color=self.ego_vehicle_color,
+            border_color=border_color,
             translation=params.ego_vehicle.state.position,
             rotation=params.ego_vehicle.state.orientation,
             line_width=self.ego_vehicle_linewidth

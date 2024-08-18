@@ -58,7 +58,7 @@ class BaseGeometric(BaseModel):
     See '/models/examples/' for a simple example of an implementation.
     """
 
-    def __init__(self, cfg: Union[Config, dict]) -> None:
+    def __init__(self, cfg: Union[Config, dict] = None) -> None:
         if cfg is None:
             self.cfg = None
         else:

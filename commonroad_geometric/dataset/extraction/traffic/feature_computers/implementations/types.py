@@ -13,6 +13,7 @@ class V_Feature(Enum):
     Orientation = 'orientation'
     YawRate = 'yaw_rate'
     OrientationVec = 'orientation_vec'
+    SteeringAngle = 'steering_angle'
     Length = 'length'
     Width = 'width'
     LaneletArclengthAbs = 'lanelet_arclength_abs'
@@ -35,7 +36,7 @@ class V_Feature(Enum):
     AngleEgoFrame = 'angle_ego_frame'
     VelocityEgoFrame = 'velocity_ego_frame'
     NumLanaletAssignments = 'num_lanelet_assignments'
-    IsOffroad = 'is_offrad'
+    IsOffroad = 'is_offroad'
 
 
 @unique

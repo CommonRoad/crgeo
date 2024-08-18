@@ -14,7 +14,7 @@ from commonroad_geometric.learning.geometric.base_geometric import BaseModel
 from projects.geometric_models.drivable_area.utils.confusion_matrix import BaseConfusionMatrix
 
 
-class DrivableAreaDecoder(BaseModel):
+class OccupancyDecoder(BaseModel):
 
     def __init__(
         self,
@@ -221,7 +221,7 @@ class DrivableAreaDecoder(BaseModel):
 
         drivable_area = drivable_area.view(N, prediction_size, prediction_size)
 
-        true_drivable_area_thresh, prediction_thresh = DrivableAreaDecoder.thresholded_drivable_area(
+        true_drivable_area_thresh, prediction_thresh = OccupancyDecoder.thresholded_drivable_area(
             drivable_area=drivable_area, prediction=prediction,
         )
         return F.binary_cross_entropy(
@@ -235,7 +235,7 @@ class DrivableAreaDecoder(BaseModel):
         drivable_area: Tensor,
         prediction: Tensor,
     ) -> BaseConfusionMatrix:
-        true_drivable_area_thresh, prediction_thresh = DrivableAreaDecoder.thresholded_drivable_area(
+        true_drivable_area_thresh, prediction_thresh = OccupancyDecoder.thresholded_drivable_area(
             drivable_area=drivable_area, prediction=prediction,
         )
         actual_pos, actual_neg = true_drivable_area_thresh, ~true_drivable_area_thresh

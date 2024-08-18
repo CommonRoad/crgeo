@@ -47,7 +47,7 @@ class PIDControlOptions(BaseControlSpaceOptions):
     upper_bound_steering: float = 0.4
 
     min_velocity_steering: float = 1.0
-    k_P_orientation: float = 6.0  # increase to increase aggresiveness
+    k_P_orientation: float = 5.0  # increase to increase aggresiveness
     k_D_orientation: float = 0.0  # increase to counter overshooting behavior
     k_I_orientation: float = 0.0  # increase to counter stationary error
     k_yaw_rate: float = 1.75
@@ -73,6 +73,8 @@ class PIDControlSpace(BaseControlSpace):
         options: Optional[PIDControlOptions] = None
     ) -> None:
         options = options or PIDControlOptions()
+        if isinstance(options, dict):
+            options = PIDControlOptions(**options)
         self._options = options
         self._lower_bound_acceleration = options.lower_bound_acceleration
         self._upper_bound_acceleration = options.upper_bound_acceleration

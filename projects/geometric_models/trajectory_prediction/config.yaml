@@ -12,7 +12,7 @@ disable_postprocessing_inference: True
 profile: False
 
 dataset:
-  train_scenario_dir: &scenario_dir ./projects/output/geometric/trajectory_prediction/generated_dataset #./data/osm_recordings/
+  train_scenario_dir: &scenario_dir ./data/osm_recordings # ./projects/output/geometric/trajectory_prediction/generated_scenarios #./data/osm_recordings/
   test_scenario_dir: *scenario_dir # TODO
   #val_scenario_dir: ./data/osm_recordings/
   val_scenario_dir: ./data/t_junction_recorded/
@@ -92,6 +92,7 @@ model:
     lanelet_to_lanelet_features: *lanelet_to_lanelet_features
     edge_feature_size: &lanelet_edge_feature_size 32
     node_type_embedding_dim: 10
+    edge_type_encoding: embedding
 
     # reweight_loss: false
     # reweight_loss: 0.5
@@ -122,7 +123,6 @@ model:
     delta_time: *delta_time
 
     kst_vehicle_constraints:  # kinematic single track model vehicle constraints
-      # from Table 1, vehicle identifier 2
       steering_angle_bound: 1.066
       velocity_min: -13.6
       velocity_max: 50.8
@@ -170,7 +170,7 @@ training:
   shuffle: False
   swallow_errors: False
   test_freq: 1
-  test_split: 256
+  test_split: 1
   validate_inner: False
   validation_freq:  1
   validation_split:  1

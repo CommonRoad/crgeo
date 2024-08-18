@@ -38,6 +38,8 @@ class InBetweenTrafficRespawner(BaseRespawner):
         options: Optional[InBetweenTrafficRespawner] = None
     ) -> None:
         options = options or InBetweenTrafficRespawnerOptions()
+        if isinstance(options, dict):
+            options = InBetweenTrafficRespawnerOptions(**options)
         super().__init__(options=options)
         self._options = options
         assert self._options.min_threshold_diff > self._options.start_arclength_offset

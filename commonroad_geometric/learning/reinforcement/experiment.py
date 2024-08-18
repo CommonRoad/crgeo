@@ -12,7 +12,7 @@ from stable_baselines3.common.vec_env.subproc_vec_env import SubprocVecEnv
 from commonroad_geometric.common.utils.datetime import get_timestamp_filename
 from commonroad_geometric.common.utils.filesystem import load_dill, save_dill
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions
-from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory, BaseExtractorFactory
 from commonroad_geometric.learning.reinforcement.commonroad_gym_env import RLEnvironmentOptions, RLEnvironmentParams
 from commonroad_geometric.learning.reinforcement.constants import COMMONROAD_GYM_ENV_ID
 from commonroad_geometric.learning.reinforcement.rewarder.reward_aggregator.base_reward_aggregator import BaseRewardAggregator
@@ -51,7 +51,7 @@ class RLExperimentConfig:
     simulation_cls: Type[BaseSimulation]
     simulation_options: BaseSimulationOptions
     termination_criteria: List[BaseTerminationCriterion]
-    traffic_extraction_options: TrafficExtractorOptions
+    traffic_extraction_factory: BaseExtractorFactory
 
 
 class RLExperiment:
@@ -71,7 +71,7 @@ class RLExperiment:
             control_space_options=self.config.control_space_options,
             respawner_cls=self.config.respawner_cls,
             respawner_options=self.config.respawner_options,
-            extractor_factory=TrafficExtractorFactory(self.config.traffic_extraction_options),
+            extractor_factory=self.config.traffic_extraction_factory,
             ego_vehicle_simulation_options=self.config.ego_vehicle_simulation_options
         )
         env_params = RLEnvironmentParams(
@@ -94,7 +94,10 @@ class RLExperiment:
             env_options = self.config.env_options
         except AttributeError:
             env_options = RLEnvironmentOptions()
-        env_options_dict = {k: v for k, v in asdict(env_options).items()}
+        if isinstance(env_options, dict):
+            env_options_dict = {k: v for k, v in env_options.items()}
+        else:
+            env_options_dict = {k: v for k, v in asdict(env_options).items()}
         env_options_dict.update(env_options_kwargs)
         env_params = self._setup_env_params(scenario_dir) #, override_options=RLEnvironmentOptions(**env_options_dict))
         vec_env_cls: Type[VecEnv] = DummyVecEnv if n_envs == 1 else SubprocVecEnv  # type: ignore # TODO

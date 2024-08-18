@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 def register_run_command(func):
     def _decorator(self, *args, **kwargs):
         if self.cfg.profile:
-            profile(partial(func, self=self), args=args, kwargs=kwargs)
+            return profile(partial(func, self=self), args=args, kwargs=kwargs)
         else:
-            func(self, *args, **kwargs)
+            return func(self, *args, **kwargs)
     _decorator.tagged = True
     return _decorator
 

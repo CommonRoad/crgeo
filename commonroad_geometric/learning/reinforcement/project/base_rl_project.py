@@ -98,7 +98,7 @@ class BaseRLProject(BaseProject):
     def enjoy(self) -> None:
         # TODO: cleanup
         trainer = self._init_trainer()
-        trainer.init_agent(device='cpu', scenario_dir=self.cfg.scenario_dir)
+        trainer.init_agent(device='cpu', scenario_dir=self.cfg.scenario_dir, checkpoint=trainer.params.checkpoint)
         for episode_summary in trainer.enjoy():
             print(episode_summary)
 
@@ -111,7 +111,7 @@ class BaseRLProject(BaseProject):
     @register_run_command
     def play_agent(self) -> None:
         trainer = self._init_trainer()
-        trainer.init_agent(device='cpu', scenario_dir=self.cfg.scenario_dir)
+        trainer.init_agent(device='cpu', scenario_dir=self.cfg.scenario_dir, checkpoint=trainer.params.checkpoint)
         trainer.play(predict_agent=True)
 
     def _init_trainer(self) -> RLTrainer:

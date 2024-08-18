@@ -157,17 +157,17 @@ class DefaultSumoConfig(DefaultConfig):
         # the following values cannot be set of pedestrians
         'accel': {
             # default 2.9 m/s²
-            ObstacleType.CAR: Interval(2, 2.9),
+            ObstacleType.CAR: Interval(1.3, 1.8),
             # default 1.3
-            ObstacleType.TRUCK: Interval(1, 1.5),
+            ObstacleType.TRUCK: Interval(0.7, 1.0),
             # default 1.2
-            ObstacleType.BUS: Interval(1, 1.4),
+            ObstacleType.BUS: Interval(0.7, 1.0),
             # default 1.2
             ObstacleType.BICYCLE: Interval(1, 1.4),
         },
         'decel': {
             # default 7.5 m/s²
-            ObstacleType.CAR: Interval(4, 6.5),
+            ObstacleType.CAR: Interval(3, 5.5),
             # default 4
             ObstacleType.TRUCK: Interval(3, 4.5),
             # default 4
@@ -177,13 +177,13 @@ class DefaultSumoConfig(DefaultConfig):
         },
         'maxSpeed': {
             # default 180/3.6 m/s
-            ObstacleType.CAR: 180 / 3.6,
+            ObstacleType.CAR: 40 / 3.6,
             # default 130/3.6
-            ObstacleType.TRUCK: 130 / 3.6,
+            ObstacleType.TRUCK: 35 / 3.6,
             # default 85/3.6
-            ObstacleType.BUS: 85 / 3.6,
+            ObstacleType.BUS: 25 / 3.6,
             # default 85/3.6
-            ObstacleType.BICYCLE: 25 / 3.6,
+            ObstacleType.BICYCLE: 7.5 / 3.6,
         },
         'sigma': {
             ObstacleType.CAR: Interval(0.7, 0.9),

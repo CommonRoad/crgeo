@@ -10,6 +10,8 @@ from commonroad.scenario.state import State
 from commonroad.scenario.trajectory import Trajectory
 
 
+
+
 def interval__eq__(self: Interval, other: Interval) -> bool:
     if not isinstance(other, Interval):
         return False

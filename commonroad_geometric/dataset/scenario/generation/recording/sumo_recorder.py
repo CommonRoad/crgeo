@@ -1,10 +1,11 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
+from tqdm import tqdm
 
 from commonroad.scenario.obstacle import DynamicObstacle
 from commonroad.scenario.scenario import Scenario
-from commonroad.scenario.state import State
+from commonroad.scenario.state import State, CustomState
 from commonroad_geometric.common.class_extensions.auto_repr_mixin import AutoReprMixin
 
 from commonroad_geometric.common.io_extensions.obstacle import state_at_time
@@ -86,6 +87,7 @@ class SumoRecorder(AutoReprMixin):
         min_trajectory_length: int = 0,
         complete_trajectory_count: int = 0,
         time_step_cutoff: Optional[int] = None,
+        render_generation: bool = True
     ) -> SumoRecordingData:
         """
         Records starting from initial_time_step (allowing for the simulation to "warm up") for time_steps.
@@ -113,7 +115,7 @@ class SumoRecorder(AutoReprMixin):
         # Don't record the steps before the initial_time_step, this is TODO supposed to be handled by the SumoSimulation internally
         # Don't pass to_time_step argument as we want to ensure that the
         # simulation can run until complete_trajectory_count is reached
-        for time_step, scenario in self._simulation:
+        for time_step, scenario in tqdm(self._simulation):
             if time_step < initial_time_step:
                 continue
             if time_step > final_time_step:
@@ -123,6 +125,9 @@ class SumoRecorder(AutoReprMixin):
                     break
             newly_inactive_obstacles = self.record_step(time_step, scenario)
             self._inactive_obstacle_ids |= newly_inactive_obstacles
+
+            if render_generation:
+                self._simulation.render()
 
         # Add missing final states for active obstacles
         for obstacle_id, obstacle in self._active_obstacle_id_to_obstacle_t_minus_one.items():
@@ -176,5 +181,5 @@ class SumoRecorder(AutoReprMixin):
         obstacle_state = state_at_time(obstacle, self._simulation.current_time_step, assume_valid=True)
         trajectory_attributes = {attribute: getattr(obstacle_state, attribute)
                                  for attribute in self._recorded_attributes}
-        trajectory_sample = State(**trajectory_attributes)
+        trajectory_sample = CustomState(time_step=self._simulation.current_time_step, **trajectory_attributes)
         return trajectory_sample

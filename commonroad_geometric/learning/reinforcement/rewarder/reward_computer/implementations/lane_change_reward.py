@@ -34,7 +34,7 @@ class LaneChangeRewardComputer(BaseRewardComputer):
         observation: T_Observation
     ) -> float:
         try:
-            lane_changes_required: int = data.ego.lane_changes_required.item()
+            lane_changes_required: int = data.ego.lane_changes_required[-1].item()
         except KeyError:
             raise MissingFeatureException('lane_changes_required')
         loss = 0

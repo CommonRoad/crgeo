@@ -17,8 +17,7 @@ def _save_scenario(
     scenario: Scenario,
     planning_problem_set: Optional[PlanningProblemSet] = None
 ) -> Path:
-    from commonroad.common.file_writer import CommonRoadFileWriter
-    from commonroad.common.file_writer import OverwriteExistingFile
+    from commonroad.common.file_writer import CommonRoadFileWriter, OverwriteExistingFile
 
     if planning_problem_set is None:
         planning_problem_set = PlanningProblemSet(planning_problem_list=[])
@@ -87,6 +86,7 @@ class TrajectoryRecorder(AutoReprMixin):
         min_trajectory_length: int = 0,
         complete_trajectory_count: int = 0,
         time_step_cutoff: Optional[int] = None,
+        render_generation: bool = True
     ) -> SumoRecordingData:
         """
         Records starting from initial_time_step (allowing for the simulation to "warm up") for time_steps.
@@ -109,6 +109,7 @@ class TrajectoryRecorder(AutoReprMixin):
             min_trajectory_length=min_trajectory_length,
             complete_trajectory_count=complete_trajectory_count,
             time_step_cutoff=time_step_cutoff,
+            render_generation=render_generation
         )
 
     def save_ego_trajectory_in_scenario(
@@ -129,7 +130,10 @@ class TrajectoryRecorder(AutoReprMixin):
         Returns:
             TrajectoryMetadata, including filename of scenario file
         """
-        scenario, ego_planning_problem_set = self._trajectory_generator.generate_scenario_with_ego_trajectory(ego_trajectory_id=ego_trajectory_id, ego_obstacle_id=ego_obstacle_id)
+        scenario, ego_planning_problem_set = self._trajectory_generator.generate_scenario_with_ego_trajectory(
+            ego_trajectory_id=ego_trajectory_id, 
+            ego_obstacle_id=ego_obstacle_id
+        )
 
         if output_filename is not None:
             output_path = Path(output_dir, f'{output_filename}_{SumoRecorder.RECORDER_VERSION}.xml')
@@ -172,10 +176,16 @@ class TrajectoryRecorder(AutoReprMixin):
         Returns:
             TrajectoryMetadata, including filename of scenario file
         """
-        scenario, ego_planning_problem_set = self._trajectory_generator.generate_scenario_with_trajectories(trajectory_ids=trajectory_ids,
-                                                                                                            ego_trajectory_id=ego_trajectory_id,
-                                                                                                            ego_obstacle_id=ego_obstacle_id)
+        scenario_output_dir = Path(scenario_output_dir)
+
+
+        scenario, ego_planning_problem_set = self._trajectory_generator.generate_scenario_with_trajectories(
+            trajectory_ids=trajectory_ids,
+            ego_trajectory_id=ego_trajectory_id,
+            ego_obstacle_id=ego_obstacle_id
+        )
         if output_filename is not None:
+            output_filename = Path(output_filename)
             output_path = scenario_output_dir / f"{output_filename}_{SumoRecorder.RECORDER_VERSION}.xml"
         else:
             output_path = Path(scenario_output_dir,

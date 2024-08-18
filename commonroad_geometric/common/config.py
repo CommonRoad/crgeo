@@ -4,7 +4,7 @@ import copy
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Union, Optional, Tuple, Dict, Sequence, Iterable
+from typing import Any, Union, Optional, Tuple, Dict, Sequence, Iterable, List
 
 unset = object()
 
@@ -141,11 +141,14 @@ class Config:
         return self.__class__(data, _root=root)
 
     def __repr__(self) -> str:
-        return repr(self.as_dict())
+        return f"Config({self.__str__()})"
 
     def __str__(self) -> str:
-        from pprint import pformat
-        return pformat(self.as_dict())
+        return json.dumps(self.as_dict(), indent=4)
+
+    def __dir__(self) -> List[str]:
+        return list(self._data.keys())
+
 
 class MutableConfig(Config):
 

@@ -763,7 +763,8 @@ class GeometricTrainer:
                     progress_reporter.update(index)
                 train_loss_sum = 0.0
 
-                tqdm.write(", ".join(f"{k + ':'} {v:.4f}" for k, v in info_dict.items() if isinstance(v, float)))
+                if self._cfg.verbose:
+                    tqdm.write(", ".join(f"{k + ':'} {v:.4f}" for k, v in info_dict.items() if isinstance(v, float)))
 
                 if self._cfg.enable_rendering and not self._renderer_process_spawned and self._cfg.render_subprocess and self._ctx.model.latest_model_path is not None:
                     self._spawn_render_process()
@@ -798,9 +799,8 @@ class GeometricTrainer:
             batch = batch.to(device)
 
             try:
+                batch = model.train_preprocess(batch)
                 output = model.forward(batch)
-                # if batch.batch_size != output[0][0].shape[0]:
-                #     output = model.forward(batch)
                 loss_th, info_dict = model.compute_loss(output, batch)
             except Exception as e:
                 if raise_errors:

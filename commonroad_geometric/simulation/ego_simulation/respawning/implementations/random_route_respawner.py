@@ -30,6 +30,8 @@ class RandomRouteRespawner(BaseRespawner):
         options: Optional[RandomRouteRespawnerOptions] = None
     ) -> None:
         options = options or RandomRouteRespawnerOptions()
+        if isinstance(options, dict):
+            options = RandomRouteRespawnerOptions(**options)
         self._options: RandomRouteRespawnerOptions = options
         super().__init__(options=options)
 

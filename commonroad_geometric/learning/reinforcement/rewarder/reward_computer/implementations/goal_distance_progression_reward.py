@@ -27,8 +27,9 @@ class GoalDistanceProgressionRewardComputer(BaseRewardComputer):
         data: CommonRoadData,
         observation: T_Observation
     ) -> float:
+        
         try:
-            goal_distance = data.ego.goal_distance.item()
+            goal_distance = data.ego.goal_distance[-1].item()
         except KeyError:
             raise MissingFeatureException('goal_distance')
         if self._last_goal_distance is None:

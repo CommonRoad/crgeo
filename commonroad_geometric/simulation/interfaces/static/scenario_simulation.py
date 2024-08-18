@@ -37,8 +37,10 @@ class ScenarioSimulation(BaseSimulation[ScenarioSimulationOptions]):
             options (ScenarioSimulationOptions): Options for this simulation.
         """
         options = options or ScenarioSimulationOptions()
+        if isinstance(options, dict):
+            options = ScenarioSimulationOptions(**options)
         options.remove_ego_vehicle_from_obstacles = False
-        if isinstance(initial_scenario, Path):
+        if isinstance(initial_scenario, (str, Path)):
             initial_scenario, _ = CommonRoadFileReader(filename=str(initial_scenario)).open()
 
         # dt from initial_scenario must be used as this was the setting for recording the scenario

@@ -1,0 +1,80 @@
+defaults:
+  - base_geometric_config
+  - _self_
+
+project_dir: ./projects/output/geometric/highway_lane_rep
+seed: 0
+wandb_logging: True
+warmstart: False
+device: auto
+logging_level: info
+disable_postprocessing_inference: True
+profile: False
+
+dataset: 
+  #train_scenario_dir: &scenario_dir ./projects/output/geometric/drivable_area/generated_scenarios
+  #train_scenario_dir: &scenario_dir ./data/highway_test/ # ./data/highd-test/ # for debugging
+  #train_scenario_dir: &scenario_dir ./data/highd-sample/ # for debugging
+  train_scenario_dir: &scenario_dir ../../data/highd-dataset-converted/
+  test_scenario_dir: *scenario_dir # TODO
+  #val_scenario_dir: ./data/osm_recordings/
+  #val_scenario_dir: ./data/highd-sample/
+  val_scenario_dir: *scenario_dir
+  overwrite: True
+  pre_transform_workers: &num_workers 1
+  cache_data: False
+  max_samples_per_scenario: 
+  max_scenarios: &max_scenarios 200
+
+experiment: 
+  pixel_size: &prediction_size 64 # if self.cfg.decoder_type == "ConvTranspose": assert self.cfg.prediction_size == 64
+  view_range: 32.0
+  edge_range: 42.0
+  add_temporal_vehicle_edges: False
+  enable_feature_normalization: False
+  enable_waypoint_resampling: True
+  disable_drivable_area_rasterizing: False
+  feature_normalization_params_path: ${project_dir}/dataset/normalization_params.pt
+  lanelet_fill_offset: 0.4
+  lanelet_fill_resolution: 10
+  lanelet_waypoint_density: 10
+  only_incoming_edges: True
+  remove_ego: False
+  render_collection: False
+
+  pre_transform:
+    lanelet_max_segment_length: 100.0
+
+model:
+  path_conditioning: False
+
+training: 
+  backward_freq: 1
+  batch_size: 16
+  checkpoint_frequency: 500
+  early_stopping: 
+  enable_multi_gpu: False
+  enable_rendering: True
+  render_subprocess: True
+  gradient_clipping_threshold: 1.0
+  log_freq: 2000
+  max_epochs: 10000
+  max_optimize_samples: 1
+  overfit: False
+  shuffle: False
+  swallow_errors: False
+  test_freq: 1
+  test_split: 1
+  validate_inner: False
+  validation_freq:  1
+  validation_split:  1
+  verbose: 1
+  video_freq: 1000
+  video_length: 400
+  video_record_backoff: 1.25
+  lr_scheduler_cls: CosineAnnealingWarmRestarts
+  lr_scheduler_kwargs:
+    T_0: 80
+    T_mult: 1
+    eta_min: 0.0001
+

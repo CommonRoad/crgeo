@@ -29,7 +29,7 @@ from commonroad_geometric.learning.geometric.training.callbacks.implementations.
 from commonroad_geometric.learning.geometric.training.callbacks.implementations.log_wandb_callback import LogWandbCallback
 from commonroad_geometric.learning.geometric.training.callbacks.implementations.watch_model_callback import WatchWandbCallback
 from commonroad_geometric.learning.geometric.training.experiment import GeometricExperiment, GeometricExperimentConfig
-from commonroad_geometric.learning.geometric.training.geometric_trainer import GeometricTrainer
+from commonroad_geometric.learning.geometric.training.geometric_trainer import GeometricTrainer, GeometricTrainingContext
 from commonroad_geometric.learning.geometric.training.render_model import render_model
 from commonroad_geometric.learning.training.wandb_service.wandb_service import WandbService
 
@@ -271,7 +271,7 @@ class BaseGeometricProject(BaseProject):
         self.experiment.transform_dataset(dataset)
 
     @register_run_command
-    def train(self) -> None:
+    def train(self) -> GeometricTrainingContext:
         model, optimizer_state = self._get_model_and_optimizer_state()
 
         model.train(True)
@@ -330,6 +330,8 @@ class BaseGeometricProject(BaseProject):
             render_scenario_path=self.dir_structure.val_scenario_dir
         )
 
+        return trainer._ctx
+
     def _get_latest_model_path(self) -> Path:
         model_path = get_most_recent_file(
             list_files(
@@ -355,7 +357,7 @@ class BaseGeometricProject(BaseProject):
             )
             logger.info(f"Successfully loaded model from checkpoint: {checkpoint_dir.name}")
         else:
-            model = self.model_cls(self.model_cfg)
+            model = self.model_cls(cfg=self.model_cfg)
             if force_build:
                 dataset = self.get_train_dataset(
                     force_dataset_overwrite=False,

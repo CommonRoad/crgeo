@@ -39,18 +39,18 @@ class VehicleModel(Enum):
 
 # Using VehicleParameterMapping from feasibility checker causes bugs
 def to_vehicle_parameter(vehicle_type: VehicleType):
-    if vehicle_type == VehicleType.FORD_ESCORT:
+    if str(vehicle_type) == str(VehicleType.FORD_ESCORT):
         return parameters_vehicle1()
-    elif vehicle_type == VehicleType.BMW_320i:
+    elif str(vehicle_type) == str(VehicleType.BMW_320i):
         return parameters_vehicle2()
-    elif vehicle_type == VehicleType.VW_VANAGON:
+    elif str(vehicle_type) == str(VehicleType.VW_VANAGON):
         return parameters_vehicle3()
     else:
         raise TypeError(f"Vehicle type {vehicle_type} not supported!")
 
 
 def assert_vehicle_model(vehicle_model: VehicleModel):
-    if vehicle_model == VehicleModel.MB:
+    if str(vehicle_model) == str(VehicleModel.MB):
         raise NotImplementedError(f"Vehicle model {vehicle_model} is not implemented yet!")
     else:
         return vehicle_model
@@ -127,11 +127,16 @@ class _BaseVehicle(ABC, AutoReprMixin):
         raise ValueError("To set the collision_object of the vehicle directly is prohibited!")
 
     def create_obb_collision_object(self, state: State):
-        return pycrcc.RectOBB(self.parameters.l / 2,
-                              self.parameters.w / 2,
-                              state.orientation,
-                              state.position[0],
-                              state.position[1])
+        x = state.position[0] - self.parameters.b * math.cos(state.orientation)
+        y = state.position[1] - self.parameters.b * math.sin(state.orientation)
+    
+        return pycrcc.RectOBB(
+            self.parameters.l / 2,
+            self.parameters.w / 2,
+            state.orientation,
+            x,
+            y
+        )
 
     def update_collision_object(self):
         """ Updates the collision_object of the vehicle """
@@ -367,7 +372,7 @@ class EgoVehicle(_BaseVehicle):
         :return: propagated state
         """
 
-        if self.vehicle_model == VehicleModel.PM:
+        if str(self.vehicle_model) == str(VehicleModel.PM):
             # using vehicle_dynamics.state_to_array(current_state) causes error since state has orientation and velocity
             x_current = np.array([current_state.position[0],
                                   current_state.position[1],
@@ -397,7 +402,7 @@ class EgoVehicle(_BaseVehicle):
                 time_step=current_state.time_step + 1,
             )
 
-        if self.vehicle_model == VehicleModel.ST:
+        if str(self.vehicle_model) == str(VehicleModel.ST):
             x_current, _ = self.vehicle_dynamics._state_to_array(current_state)
             x_next = self._forward_simulation(x_current, u_input)
             # simulated_state.acceleration = u_input[1]
@@ -443,7 +448,7 @@ class EgoVehicle(_BaseVehicle):
         steering_angle = next_state.steering_angle
         # x_next = self._forward_simulation(x_current, u_input)
         
-        if self.vehicle_model == VehicleModel.KS:
+        if str(self.vehicle_model) == str(VehicleModel.KS):
             # simulated_state.acceleration = u_input[1]
             # simulated_state.yaw_rate = (simulated_state.orientation - x_current_old[4]) / self.dt
             position = np.array([
@@ -463,7 +468,7 @@ class EgoVehicle(_BaseVehicle):
 
             return next_state
 
-        if self.vehicle_model == VehicleModel.YawRate:
+        if str(self.vehicle_model) == str(VehicleModel.YawRate):
             # simulated_state.acceleration = u_input[0]
             # simulated_state.yaw_rate = u_input[1]
             return State(

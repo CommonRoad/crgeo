@@ -132,12 +132,12 @@ def segment_lanelets(
                 lanelet_segments = [
                     clone_lanelet(
                         lanelet,
-                        lanelet_id=segment_lanelet_ids[i],
+                        lanelet_id=int(segment_lanelet_ids[i]),
                         left_vertices=left_vertices[i],
                         center_vertices=center_vertices[i],
                         right_vertices=right_vertices[i],
-                        predecessor=[ segment_lanelet_ids[i - 1] ] if i > 0 else lanelet.predecessor,
-                        successor=[ segment_lanelet_ids[i + 1] ] if i < num_segments - 1 else lanelet.successor,
+                        predecessor=[ int(segment_lanelet_ids[i - 1]) ] if i > 0 else lanelet.predecessor,
+                        successor=[ int(segment_lanelet_ids[i + 1]) ] if i < num_segments - 1 else lanelet.successor,
                     )
                     for i in range(num_segments)
                 ]

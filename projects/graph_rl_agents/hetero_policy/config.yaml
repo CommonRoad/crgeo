@@ -1,0 +1,210 @@
+defaults:
+  - base_rl_config
+  - _self_
+
+device: auto
+project_dir: ./projects/output/rl/hetero_policy
+scenario_dir: ./data/highd-sample/
+# scenario_dir: ./data/osm_recordings/
+seed: 0
+warmstart: False
+profile: False
+
+training: 
+  wandb_logging: True
+  checkpoint_freq: 50000
+  eval_freq: 10
+  gradient_save_freq: 1
+  log_freq: 1
+  n_envs: 1
+  n_eval_episodes: 10
+  normalize_observations: False
+  normalize_rewards: False
+  normalize_rewards_threshold: 10.0
+  record_backoff: 1.0
+  video_frequency: 25_000 # set to None to disable recording
+  total_timesteps: 1_000_000_000
+  verbose: 1
+  video_length: 2500
+
+experiment: 
+  highway_mode: &highway_mode False
+  virtual_lanelet_length: &virtual_lanelet_length 100.0
+  enable_traffic: &enable_traffic True
+  data_padding_size: 400
+  dist_threshold_v2v: 80.0
+  ego_map_radius: 80.0
+  raise_exceptions: False
+  linear_lanelet_projection: True
+  num_respawns_per_scenario: 0
+  async_resets: False
+  render_on_step: False
+  render_debug_overlays: True
+  enable_waypoint_resampling: True
+  disable_drivable_area_rasterizing: False
+  lanelet_waypoint_density: 10
+  reward:
+    # -- Intersections --
+    # living_penalty: -1.0
+    # max_speed: 11.0
+    # cruise_speed: 5.0
+    # cross_track_error_sensitivity: 1.5
+    # overspeeding_penalty_coefficient: 0.5
+    # collision: -2.5
+    # time_to_collision: 1.5
+    # reached_goal: 0.0
+    # offroad: -4.0
+    # still_standing: -1.5
+
+    # -- Highway --
+    living_penalty: -0.01
+    max_speed: 15.0
+    cruise_speed: 5.0
+    path_following: 0.01
+    cross_track_error_sensitivity: 0.0
+    overspeeding_penalty_coefficient: 0.005
+    collision: -0.05
+    time_to_collision: 0.015
+    reached_goal: 0.1
+    offroad: -3.0
+    still_standing: -0.005
+  termination:
+    offroad: False
+    collision: False
+    timeout: 1000
+    traffic_jam: True
+  spawning:
+    min_goal_distance: 100.0
+    min_vehicle_distance: 8.0
+  curriculum:
+    enabled: True 
+    vehicle_spawning_start_rate: 1.0
+    vehicle_spawning_increase_rate: 
+
+model: 
+  gae_lambda: 0.8
+  gamma: 0.99
+  n_epochs: 4
+  net_arch_vf: [256, 128]
+  net_arch_pi: [128, 64]
+
+  policy_coef: 1.0
+  ent_coef: 0.01 # 0.01
+  vf_coef: 0.5 # 0.5
+  recon_coef: 100.0
+
+  n_steps: 128
+  batch_size: 16
+  max_grad_norm: 10.0
+  learning_rate: 5e-4
+  clip_range: 0.15
+  log_std_init: -1
+
+  # gae_lambda: 0.95  # Increased to leverage more future rewards
+  # gamma: 0.995      # Slightly higher to emphasize future rewards
+  # n_epochs: 10      # More epochs per update for finer optimization
+  # net_arch_vf: [256, 256, 128]  # A deeper network for the value function
+  # net_arch_pi: [128, 128, 64]   # A deeper network for the policy
+  # ent_coef: 0.02    # Increased to encourage exploration
+  # n_steps: 512      # More steps before each update for stability
+  # batch_size: 64    # Adjusted to accommodate the increased n_steps
+  # vf_coef: 0.6      # Giving more weight to the value function loss
+  # max_grad_norm: 1.0  # Lower to prevent destabilizing updates
+  # learning_rate: 5e-4  # Initial learning rate
+  # clip_range: 0.15  # Tighter clipping to stabilize training updates
+
+  gnn_features: *enable_traffic
+  
+  encoder_config:
+    input_graph_features:
+      lanelet: &lanelet_features 2
+      lanelet_to_lanelet: &lanelet_to_lanelet_features 8
+      vehicle: 8
+      vehicle_to_vehicle: 10
+      lanelet_to_vehicle: 0
+      vehicle_to_lanelet: 6
+
+    graph_features:
+      node_features: &node_features 128
+
+    lanelet_network_encoder:
+      # Lanelet node features
+      lanelet_features: *lanelet_features
+      node_feature_size: *node_features
+      # node_feature_mlp_layers: 2
+
+      # vertex_feature_encoder: LSTM
+      vertex_feature_encoder: GRU
+      # vertex_feature_encoder: DeepSet
+
+      # RNN to encode lanelet vertices
+      rnn_hidden_size: 64
+
+      # Invariant deep set model to encode lanelet vertices
+      deep_set_mlp_dropout: 0.1
+      deep_set_aggregation: sum
+
+      # Lanelet edge features
+      lanelet_to_lanelet_features: *lanelet_to_lanelet_features
+      edge_feature_size: 32
+
+      edge_type_encoding: embedding
+      # edge_type_encoding: one-hot
+      node_type_embedding_dim: 10
+
+    traffic:
+      # Drivable area prediction
+      temporal:
+        enabled: false
+        steps_observe: 5
+        steps_predict: 15
+
+      lanelet_node_feature_size: *node_features
+      vehicle_node_feature_size: *node_features
+      temporal_edge_feature_size: 12
+      temporal_edge_freq_init_const: 10
+
+      v2v_edge_feature_size: 32
+      v2l_edge_feature_size: 32
+      l2v_edge_feature_size: 32
+
+      gnn:
+        conv_layers: 8
+        # activation_fn: gelu
+        activation_fn: leakyrelu
+        attention_channels: 128
+        attention_heads: 16
+        add_self_loops: true
+        global_context: true
+        global_context_size: *node_features
+        residual_connection: false
+
+      ablation:
+        remove_l_v_edges: false
+        remove_vtv_edges: false
+        remove_edge_attributes: false
+
+    road_coverage:
+      # GNN
+      # gnn_type: EGATConv
+      gnn_type: HEATConv
+      gnn_conv_layers: 3
+      gnn_skip_connections: true
+
+      node_feature_size: 256
+      edge_feature_size: 16
+
+      gnn_attention_heads: 4
+
+      jumping_knowledge: concat
+      node_output_size: *node_features
+
+      training_resample_ratio: 0.5
+
+  decoder_config:
+    node_feature_size: *node_features
+    prediction_size: 64
+
+    decoder_type: ConvTranspose
+    # decoder_type: Upsample Conv
+    # decoder_type: MLP

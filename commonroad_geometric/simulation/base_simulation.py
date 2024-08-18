@@ -58,6 +58,7 @@ class BaseSimulationOptions:
     ignore_assignment_opposite_direction: bool = True
     lanelet_graph_conversion_steps: Optional[List[GraphConversionStep]] = None
     linear_lanelet_projection: bool = False
+    sort_lanelet_assignments: bool = True
 
 
 class SimulationLifecycle(StateMachine):  # type: ignore
@@ -636,8 +637,7 @@ class BaseSimulation(LaneletNetworkInfo, Renderable, Iterator[Tuple[int, Scenari
 
     def assign_unassigned_obstacles(
         self,
-        obstacles: Optional[List[DynamicObstacle]] = None,
-        sort_lanelet_assignments: bool = True,
+        obstacles: Optional[List[DynamicObstacle]] = None
     ) -> None:
 
         scenario = self.current_scenario
@@ -671,7 +671,7 @@ class BaseSimulation(LaneletNetworkInfo, Renderable, Iterator[Tuple[int, Scenari
                                                                                 angle=obstacle_state.orientation)
                 lanelet_assignment = scenario.lanelet_network.find_lanelet_by_shape(obstacle_shape)
 
-            if sort_lanelet_assignments:
+            if self.options.sort_lanelet_assignments:
                 lanelet_polylines = list(map(self.get_lanelet_center_polyline, lanelet_assignment))
                 lanelet_assignment = [lanelet_assignment[i] for i in self._sorted_lanelet_indices(
                     lanelet_polylines,
@@ -725,7 +725,7 @@ class BaseSimulation(LaneletNetworkInfo, Renderable, Iterator[Tuple[int, Scenari
     def render(
         self,
         *,
-        renderers: Sequence[TrafficSceneRenderer],
+        renderers: Optional[Sequence[TrafficSceneRenderer]] = None,
         render_params: Optional[RenderParams] = None,
         return_frames: bool = False,
         **render_kwargs: Dict[str, Any]
@@ -745,6 +745,8 @@ class BaseSimulation(LaneletNetworkInfo, Renderable, Iterator[Tuple[int, Scenari
             - a sequences of frames with one frame per renderer (list[np.ndarray]) if return_frames is True
             - an empty list ([]) if return_frames is False
         """
+        if renderers is None:
+            renderers = []
         if not renderers and not self.options.step_renderers:
             self.options.step_renderers = [TrafficSceneRenderer()]
         renderers = renderers or self.options.step_renderers

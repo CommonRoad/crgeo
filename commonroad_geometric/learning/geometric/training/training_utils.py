@@ -76,7 +76,10 @@ def custom_collate_fn(data_list: List[T_Data], follow_batch=None, exclude_keys=N
     """
     is_cr_data_temporal = isinstance(data_list[0], CommonRoadDataTemporal)
     if is_cr_data_temporal:
-        batch = CommonRoadDataTemporalBatch.from_data_list(data_list, follow_batch, exclude_keys)
+        if len(data_list) == 1:
+            batch = data_list[0] # TODO 
+        else:
+            batch = CommonRoadDataTemporalBatch.from_data_list(data_list, follow_batch, exclude_keys)
     else:
         batch = Batch.from_data_list(data_list, follow_batch, exclude_keys)
 

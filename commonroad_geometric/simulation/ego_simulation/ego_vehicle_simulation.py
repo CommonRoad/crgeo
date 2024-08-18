@@ -85,6 +85,8 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
             traffic_extractor (VehicleExtractor):
         """
         options = options or EgoVehicleSimulationOptions()
+        if isinstance(options, dict):
+            options = EgoVehicleSimulationOptions(**options)
         self._options = options
         self._simulation = simulation
         self._control_space = control_space
@@ -413,7 +415,7 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
         else:
             return_struct = EgoVehicleCollisionInfo(
                 collision=has_collision,
-                ego_at_fault=None,
+                ego_at_fault=has_collision,
                 closest_obstacle_id=None
             )
 
@@ -489,10 +491,6 @@ class EgoVehicleSimulation(Renderable, AutoReprMixin):
 
         render_params = render_params or RenderParams()
         render_kwargs = render_params.render_kwargs or {}
-        if self.check_if_has_reached_goal() and 'ego_vehicle_color' not in render_kwargs:
-            render_kwargs['ego_vehicle_color'] = Color((0.1, 0.1, 0.8, 1.0))
-        if self.simulation.collision_checker.collide(self.ego_vehicle.collision_object):
-            render_kwargs['ego_vehicle_color'] = Color((1.0, 0.0, 0.0, 1.0))
 
         try:
             render_params.data = self._cached_data.value

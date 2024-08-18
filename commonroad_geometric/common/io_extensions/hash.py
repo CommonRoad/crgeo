@@ -13,10 +13,10 @@ def hash_dynamic_obstacle(obstacle: DynamicObstacle) -> int:
             obstacle.obstacle_shape,
             # obstacle.prediction,
             obstacle.initial_state,
-            tuple(obstacle.initial_center_lanelet_ids),
-            tuple(obstacle.initial_shape_lanelet_ids),
-            obstacle.initial_signal_state,
-            tuple(obstacle.signal_series),
+            # tuple(obstacle.initial_center_lanelet_ids),
+            # tuple(obstacle.initial_shape_lanelet_ids),
+            # obstacle.initial_signal_state,
+            # tuple(obstacle.signal_series),
         )
     )
 
@@ -62,12 +62,12 @@ def hash_scenario(scenario: Scenario) -> int:
             scenario.lanelet_network,
             tuple(scenario.static_obstacles),
             tuple(hash_dynamic_obstacle(o) for o in scenario.dynamic_obstacles),
-            tuple(scenario.environment_obstacle),
-            tuple(scenario.phantom_obstacle),
-            scenario.author,
-            tuple(scenario.tags),
-            scenario.affiliation,
-            scenario.source,
-            scenario.location
+            # tuple(scenario.environment_obstacle),
+            # tuple(scenario.phantom_obstacle),
+            # scenario.author,
+            # # tuple(scenario.tags),
+            # scenario.affiliation,
+            # scenario.source,
+            # scenario.location
         )
     )

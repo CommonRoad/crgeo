@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, TYPE_CHECKING, Tuple, Type, Union, cast, overload
+from typing import Any, Iterable, Callable, Dict, List, Optional, Sequence, TYPE_CHECKING, Tuple, Type, Union, cast, overload
 
 import numpy as np
 import torch
@@ -14,7 +14,7 @@ from torch_geometric.typing import EdgeType, NodeType
 
 from commonroad_geometric.common.torch_utils.helpers import get_index_mapping_by_first_occurrence
 from commonroad_geometric.common.types import T_CountParam, Unlimited
-from commonroad_geometric.dataset.commonroad_data import CommonRoadData, VirtualAttributesEdgeStorage, VirtualAttributesNodeStorage
+from commonroad_geometric.dataset.commonroad_data import CommonRoadData, VirtualAttributesBaseStorage, VirtualAttributesEdgeStorage, VirtualAttributesNodeStorage
 
 if TYPE_CHECKING:
     from commonroad_geometric.dataset.extraction.traffic.feature_computers.types import VTVFeatureParams
@@ -231,15 +231,31 @@ class CommonRoadDataTemporal(CommonRoadData):
     # exclude __reduce__
 
     def get_example(self, idx: int) -> CommonRoadData:
-        data = cast(CommonRoadData, separate(
-            cls=CommonRoadData,
+
+        # hack to support late features
+        for store in self.stores:
+            is_sub_store = isinstance(store, VirtualAttributesBaseStorage)
+            if is_sub_store and store.key not in self._slice_dict:
+                continue
+            store_mapping = store._mapping if is_sub_store else store
+            slice_target = self._slice_dict[store.key] if is_sub_store else self._slice_dict
+            inc_target = self._inc_dict[store.key] if is_sub_store else self._inc_dict
+            for k in store_mapping:
+                if k in {"batch", "ptr"}: 
+                    continue
+                if isinstance(store_mapping[k], Tensor) and k not in slice_target:
+                    slice_target[k] = next(iter(slice_target.values()))
+                    inc_target[k] = next(iter(inc_target.values()))
+
+
+        data = separate_temporal(
             batch=self,
             idx=idx,
             slice_dict=self._slice_dict,
             inc_dict=self._inc_dict,
             decrement=True,
-        ))
-        if hasattr(self, "_duplicate_lanelet_graphs_attrs_dict"):
+        )
+        if hasattr(self._global_store, "_duplicate_lanelet_graphs_attrs_dict"):
             for key, attrs in self._duplicate_lanelet_graphs_attrs_dict.items():
                 for attr in attrs:
                     data[key][attr] = self[key][attr]
@@ -251,6 +267,14 @@ class CommonRoadDataTemporal(CommonRoadData):
         if isinstance(idx, str) or isinstance(idx, tuple) and len(idx) > 0 and isinstance(idx[0], str):
             return super().__getitem__(idx)
         return Batch.__getitem__(self, idx)
+    
+    def time_slices(self, steps_observe: int, steps_predict: int) -> Iterable[Tuple[int, List[CommonRoadData]]]:
+        N = self.num_graphs
+        t = 0
+        data_list: List[CommonRoadData] = self.index_select(list(range(N)))
+        while t + steps_observe + steps_predict <= self.num_graphs:
+            yield t, data_list[t:t + steps_observe + steps_predict]
+            t += steps_observe
 
     def get_time_window(self, time_slice: slice) -> CommonRoadDataTemporal:
         start, end, stride = time_slice.indices(self.num_graphs)
@@ -267,10 +291,10 @@ class CommonRoadDataTemporal(CommonRoadData):
 
         if end - start > 1 and self.vehicle_temporal_vehicle is not None:
             # reconstruct edge_index, edge_attr, t_src attributes of ("vehicle", "temporal", "vehicle") edges
-            time_steps = torch.arange(start, end, dtype=torch.long, device=device).unsqueeze(0)
-            time_slice_mask = torch.any(self.vehicle_temporal_vehicle.t_src == time_steps, dim=1)
-            data_slice.vehicle_temporal_vehicle.edge_attr = self.vehicle_temporal_vehicle.edge_attr[time_slice_mask]
-            data_slice.vehicle_temporal_vehicle.t_src = self.vehicle_temporal_vehicle.t_src[time_slice_mask]
+            # time_steps = torch.arange(start, end, dtype=torch.long, device=device).unsqueeze(0)
+            # time_slice_mask = torch.any(self.vehicle_temporal_vehicle.t_src == time_steps, dim=1)
+            # data_slice.vehicle_temporal_vehicle.edge_attr = self.vehicle_temporal_vehicle.edge_attr[time_slice_mask]
+            # data_slice.vehicle_temporal_vehicle.t_src = self.vehicle_temporal_vehicle.t_src[time_slice_mask]
 
             if start > 0:
                 edge_index_start = self.vehicle.ptr[start]
@@ -283,6 +307,8 @@ class CommonRoadDataTemporal(CommonRoadData):
                 else:
                     edge_index_inv_mask = edge_index_mask_end
 
+            data_slice.vehicle_temporal_vehicle.edge_attr = self.vehicle_temporal_vehicle.edge_attr[~edge_index_inv_mask]
+            data_slice.vehicle_temporal_vehicle.t_src = self.vehicle_temporal_vehicle.t_src[~edge_index_inv_mask]
             data_slice.vehicle_temporal_vehicle.edge_index = self.vehicle_temporal_vehicle.edge_index[
                 :, ~edge_index_inv_mask]
             if start > 0:
@@ -336,7 +362,7 @@ class CommonRoadDataTemporal(CommonRoadData):
     ) -> Any:
         return _separate(
             key=key,
-            value=self[key][attr],
+            values=self[key][attr],
             idx=time_step,
             slices=self._slice_dict[key][attr],
             incs=self._inc_dict[key][attr],
@@ -357,6 +383,7 @@ class CommonRoadDataTemporal(CommonRoadData):
             x = self.vehicle.x  # type: ignore
         else:
             x = torch.cat([self.vehicle[key] for key in keys], dim=-1)
+        x = x.flatten(start_dim=1)
         id = self.vehicle.id.squeeze()  # type: ignore
         x_v: Tensor = x[id == vehicle_id, :]
         return x_v
@@ -369,14 +396,17 @@ class CommonRoadDataTemporal(CommonRoadData):
             x = self.vehicle.x
         else:
             x = torch.cat([self.vehicle[key] for key in keys], dim=-1)
+        x = x.flatten(start_dim=1)
+
+        n_nodes = x.shape[0]
         n_features = x.shape[1]
         n_timesteps = self.vehicle.batch.max().item() + 1
         indices = get_index_mapping_by_first_occurrence(self.vehicle.id.squeeze(-1))[None, :, None]
         n_vehicles = indices.max().item() + 1
         batch = self.vehicle.batch.unsqueeze(-1)
-        x_v = torch.zeros((n_vehicles, x.shape[0], n_features))
+        x_v = torch.zeros((n_vehicles, n_nodes, n_features), device=self.device)
         x_v.scatter_(0, indices.repeat(1, 1, n_features), x.unsqueeze(0))
-        x_t = torch.zeros((n_vehicles, n_timesteps, n_features))
+        x_t = torch.zeros((n_vehicles, n_timesteps, n_features), device=self.device)
         x_t.scatter_add_(1, batch.unsqueeze(0).repeat(n_vehicles, 1, n_features), x_v)
         return x_t
 
@@ -437,3 +467,46 @@ class CommonRoadDataTemporalBatch(Batch):
         data.batch_size = self._temporal_data_num_graphs[idx]
 
         return data
+
+
+def separate_temporal(
+    batch: Any,
+    idx: int,
+    slice_dict: Any,
+    inc_dict: Any = None,
+    decrement: bool = True,
+) -> CommonRoadData:
+    # Separates the individual element from a `batch` at index `idx`.
+    # `separate` can handle both homogeneous and heterogeneous data objects by
+    # individually separating all their stores.
+    # In addition, `separate` can handle nested data structures such as
+    # dictionaries and lists.
+
+    data = CommonRoadData().stores_as(batch)
+
+    # Iterate over each storage object and recursively separate its attributes:
+    for batch_store, data_store in zip(batch.stores, data.stores):
+        key = batch_store._key
+        if key is not None and key in slice_dict:  # Heterogeneous:
+            attrs = slice_dict[key].keys()
+        else:  # Homogeneous:
+            attrs = set(batch_store.keys())
+            attrs = [attr for attr in slice_dict.keys() if attr in attrs]
+
+        for attr in attrs:
+            if key is not None:
+                slices = slice_dict[key][attr]
+                incs = inc_dict[key][attr] if decrement else None
+            else:
+                slices = slice_dict[attr]
+                incs = inc_dict[attr] if decrement else None
+
+            data_store[attr] = _separate(attr, batch_store[attr], idx, slices,
+                                         incs, batch, batch_store, decrement)
+
+        # The `num_nodes` attribute needs special treatment, as we cannot infer
+        # the real number of nodes from the total number of nodes alone:
+        if hasattr(batch_store, '_num_nodes'):
+            data_store.num_nodes = batch_store._num_nodes[idx]
+
+    return data
