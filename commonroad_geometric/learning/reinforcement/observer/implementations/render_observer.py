@@ -10,20 +10,23 @@ from commonroad_geometric.rendering.traffic_scene_renderer import TrafficSceneRe
 
 
 class RenderObserver(BaseObserver):
-    def __init__(self, renderer: TrafficSceneRenderer):
-        self.renderer = renderer
+    def __init__(self, renderer_options: TrafficSceneRendererOptions):
+        self.renderer_options = renderer_options
+        self.renderer: Optional[TrafficSceneRenderer] = None
         super().__init__()
 
     def setup(self, dummy_data: Optional[CommonRoadData] = None) -> gymnasium.Space:
         return gymnasium.spaces.Box(low=0, high=255, shape=(
-            self.renderer.options.viewer_options.window_width, 
-            self.renderer.options.viewer_options.window_height, 3), dtype=np.uint8) 
+            self.renderer_options.viewer_options.window_width, 
+            self.renderer_options.viewer_options.window_height, 3), dtype=np.uint8) 
 
     def observe(
         self,
         data: CommonRoadData,
         ego_vehicle_simulation: EgoVehicleSimulation
     ) -> T_Observation:
+        if self.renderer is None:
+            self.renderer = TrafficSceneRenderer(options=self.renderer_options)
         # Return the rendered image from the ego vehicle simulation
         obs = ego_vehicle_simulation.render(renderers=[self.renderer], return_frames=True)[0]
         return obs
