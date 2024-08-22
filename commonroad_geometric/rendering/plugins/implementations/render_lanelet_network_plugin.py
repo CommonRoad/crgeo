@@ -64,6 +64,7 @@ class RenderLaneletNetworkPlugin(BaseRenderPlugin):
         if all((
             self.persistent,
             self._last_drawn_scenario_id[viewer] == params.scenario.scenario_id,
+            not self.from_graph or 
             params.time_step == 1 + self._last_drawn_scenario_time_step[viewer] or
             params.time_step == self._last_drawn_scenario_time_step[viewer]
         )):
