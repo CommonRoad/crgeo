@@ -384,6 +384,7 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
             else:
                 self.ego_vehicle_simulation.reset()
             self._rewarder.reset()
+            self._observer.reset(self.ego_vehicle_simulation)
             self._step_counter = 0
         try:
             obs, data = self.observe()
