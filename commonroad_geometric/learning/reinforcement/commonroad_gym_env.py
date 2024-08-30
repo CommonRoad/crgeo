@@ -3,7 +3,7 @@ import os
 import timeit
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Generic, List, Literal, Optional, Sequence, Set, Tuple, TypedDict, Union, Iterator
+from typing import Any, Dict, Generic, List, Literal, Optional, Sequence, Set, Tuple, TypedDict, Union, Iterator, Callable
 
 import gymnasium
 import numpy as np
@@ -63,7 +63,7 @@ class RLEnvironmentOptions:
     log_step_info: bool = False
     loop_scenarios: bool = True
     num_respawns_per_scenario: int = 0
-    observer: Optional[BaseObserver] = None
+    observer: Optional[Union[BaseObserver, Callable[[], BaseObserver]]] = None
     raise_exceptions: bool = False
     render_debug_overlays: bool = False  # TODO: move render stuff to somewhere else
     render_on_step: bool = False  # TODO: Add "render_condition", lambda method for enabling & disabling
@@ -151,7 +151,14 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
             injected_async_delay=self._options.async_reset_delay,
             auto_update_delay=self._options.auto_update_async_reset_delay
         )
-        self._observer = self._options.observer if self._options.observer is not None else DEFAULT_OBSERVER_CLS()
+
+        if params.options.observer is None:
+            self._observer = DEFAULT_OBSERVER_CLS()
+        elif callable(params.options.observer):
+            self._observer = params.options.observer()  # Call the function if it's callable
+        else:
+            self._observer = params.options.observer  # Directly assign if it's already an instance
+            
         # With removal of seed method from Env API, the seed is now passed to reset
         # Need to keep track of last seed to prevent reshuffling the ScenarioIterator on every reset
         self._last_seed = None
