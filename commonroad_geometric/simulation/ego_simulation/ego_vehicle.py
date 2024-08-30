@@ -127,8 +127,8 @@ class _BaseVehicle(ABC, AutoReprMixin):
         raise ValueError("To set the collision_object of the vehicle directly is prohibited!")
 
     def create_obb_collision_object(self, state: State):
-        x = state.position[0] - self.parameters.b * math.cos(state.orientation)
-        y = state.position[1] - self.parameters.b * math.sin(state.orientation)
+        x = state.position[0]
+        y = state.position[1]
     
         return pycrcc.RectOBB(
             self.parameters.l / 2,
