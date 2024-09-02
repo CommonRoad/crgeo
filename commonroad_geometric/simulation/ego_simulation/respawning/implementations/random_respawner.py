@@ -28,8 +28,10 @@ class RandomRespawnerOptions(BaseRespawnerOptions):
     route_length: Optional[Union[int, Tuple[int, int]]] = (3, 15)
     init_speed: Union[str, float] = 10.0
     random_speed_range: Tuple[float, float] = (0.0, 10.0)
+    normal_speed_params: Tuple[float, float] = (10.0, 2.0)  # (mean, std_dev)
     init_steering_angle: Union[str, float] = 0.0
     random_steering_angle_range: Tuple[float, float] = (-0.1, 0.1)
+    normal_steering_angle_params: Tuple[float, float] = (0.0, 0.05)  # (mean, std_dev)
     init_orientation_noise: float = 0.0
     init_position_noise: float = 0.0
     min_init_arclength: Optional[float] = 0.0
@@ -232,11 +234,23 @@ class RandomRespawner(BaseRespawner):
         elif self._options.init_speed == "uniform_random":
             # Select a speed randomly within the specified range
             init_speed = self.rng.uniform(*self._options.random_speed_range)
+        elif self._options.init_speed == "normal_random":
+            # Select a speed using a normal distribution
+            mean, std_dev = self._options.normal_speed_params
+            init_speed = self.rng.gauss(mean, std_dev)
+            # Ensure the speed is within the specified range
+            init_speed = max(self._options.random_speed_range[0], min(self._options.random_speed_range[1], init_speed))
         else:
             init_speed = self._options.init_speed
 
         if self._options.init_steering_angle == "uniform_random":
             init_steering_angle = self.rng.uniform(*self._options.random_steering_angle_range)
+        elif self._options.init_steering_angle == "normal_random":
+            # Select a steering angle using a normal distribution
+            mean, std_dev = self._options.normal_steering_angle_params
+            init_steering_angle = self.rng.gauss(mean, std_dev)
+            # Ensure the steering angle is within the specified range
+            init_steering_angle = max(self._options.random_steering_angle_range[0], min(self._options.random_steering_angle_range[1], init_steering_angle))
         else:
             init_steering_angle = self._options.init_steering_angle
 
