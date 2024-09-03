@@ -15,6 +15,7 @@ from commonroad_geometric.dataset.extraction.traffic.feature_computers.implement
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_vehicle import *
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import (TrafficExtractorOptions,
                                                                                TrafficFeatureComputerOptions)
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
 from commonroad_geometric.dataset.postprocessing.implementations import *
 from commonroad_geometric.dataset.scenario.preprocessing.filters.implementations import *
 from commonroad_geometric.dataset.scenario.preprocessing.identity_preprocessor import IdentityPreprocessor
@@ -212,19 +213,21 @@ class LaneOccupancyRLProject(BaseRLProject):
                 max_attempts_inner=5,
                 min_remaining_distance=DEFAULT_PATH_LENGTH
             ),
-            traffic_extraction_options=TrafficExtractorOptions(
-                edge_drawer=NoEdgeDrawer(),
-                feature_computers=TrafficFeatureComputerOptions(
-                    v=V_FEATURE_COMPUTERS,
-                    v2v=V2V_FEATURE_COMPUTERS,
-                    l=L_FEATURE_COMPUTERS,
-                    l2l=L2L_FEATURE_COMPUTERS,
-                    v2l=V2L_FEATURE_COMPUTERS,
-                ),
-                postprocessors=postprocessors,
-                only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
-                assign_multiple_lanelets=True,
-                ego_map_radius=cfg["ego_map_radius"]
+            traffic_extraction_factory=TrafficExtractorFactory(
+                options=TrafficExtractorOptions(
+                    edge_drawer=NoEdgeDrawer(),
+                    feature_computers=TrafficFeatureComputerOptions(
+                        v=V_FEATURE_COMPUTERS,
+                        v2v=V2V_FEATURE_COMPUTERS,
+                        l=L_FEATURE_COMPUTERS,
+                        l2l=L2L_FEATURE_COMPUTERS,
+                        v2l=V2L_FEATURE_COMPUTERS,
+                    ),
+                    postprocessors=postprocessors,
+                    only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
+                    assign_multiple_lanelets=True,
+                    ego_map_radius=cfg["ego_map_radius"]
+                )
             ),
             ego_vehicle_simulation_options=EGO_VEHICLE_SIMULATION_OPTIONS,
             rewarder=SumRewardAggregator(REWARDER_COMPUTERS),

@@ -5,7 +5,6 @@ from torch.optim import Adam
 from pathlib import Path
 
 from commonroad_geometric.common.io_extensions.scenario import LaneletAssignmentStrategy
-from commonroad_geometric.dataset.commonroad_data import CommonRoadData
 from commonroad_geometric.dataset.extraction.traffic.edge_drawers.implementations import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.lanelet import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.lanelet_to_lanelet import *
@@ -14,6 +13,7 @@ from commonroad_geometric.dataset.extraction.traffic.feature_computers.implement
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_vehicle import *
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import (TrafficExtractorOptions,
                                                                                TrafficFeatureComputerOptions)
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
 from commonroad_geometric.dataset.postprocessing.implementations import *
 from commonroad_geometric.dataset.scenario.preprocessing.wrappers.chain_preprocessors import chain_preprocessors
 from commonroad_geometric.learning.reinforcement import RLEnvironmentOptions
@@ -109,39 +109,41 @@ class HighwayLaneRepRLProject(BaseRLProject):
                 min_vehicles_route=None,
                 max_attempts_inner=5
             ),
-            traffic_extraction_options=TrafficExtractorOptions(
-                edge_drawer=NoEdgeDrawer(),
-                postprocessors=postprocessors,
-                only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
-                assign_multiple_lanelets=True,
-                ego_map_radius=cfg["ego_map_radius"],
-                ego_map_strict=True,
-                linear_lanelet_projection=cfg["linear_lanelet_projection"],
-                feature_computers=TrafficFeatureComputerOptions(
-                    v=[
-                        ft_veh_state,
-                        YawRateFeatureComputer(),
-                        VehicleLaneletConnectivityComputer(),
-                        # NumLaneletAssignmentsFeatureComputer(),
-                    ],
-                    v2v=[
-                        ft_same_lanelet,
-                        LaneletDistanceFeatureComputer(
-                            linear_lanelet_projection=cfg["linear_lanelet_projection"]
-                        ),
-                        ft_rel_state_ego
-                    ],
-                    l=[
-                        LaneletGeometryFeatureComputer(),
-                    ],
-                    l2l=[
-                        LaneletConnectionGeometryFeatureComputer(),
-                    ],
-                    v2l=[
-                        VehicleLaneletPoseEdgeFeatureComputer(
-                            linear_lanelet_projection=cfg["linear_lanelet_projection"]
-                        )
-                    ]
+            traffic_extraction_factory=TrafficExtractorFactory(
+                options=TrafficExtractorOptions(
+                    edge_drawer=NoEdgeDrawer(),
+                    postprocessors=postprocessors,
+                    only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
+                    assign_multiple_lanelets=True,
+                    ego_map_radius=cfg["ego_map_radius"],
+                    ego_map_strict=True,
+                    linear_lanelet_projection=cfg["linear_lanelet_projection"],
+                    feature_computers=TrafficFeatureComputerOptions(
+                        v=[
+                            ft_veh_state,
+                            YawRateFeatureComputer(),
+                            VehicleLaneletConnectivityComputer(),
+                            # NumLaneletAssignmentsFeatureComputer(),
+                        ],
+                        v2v=[
+                            ft_same_lanelet,
+                            LaneletDistanceFeatureComputer(
+                                linear_lanelet_projection=cfg["linear_lanelet_projection"]
+                            ),
+                            ft_rel_state_ego
+                        ],
+                        l=[
+                            LaneletGeometryFeatureComputer(),
+                        ],
+                        l2l=[
+                            LaneletConnectionGeometryFeatureComputer(),
+                        ],
+                        v2l=[
+                            VehicleLaneletPoseEdgeFeatureComputer(
+                                linear_lanelet_projection=cfg["linear_lanelet_projection"]
+                            )
+                        ]
+                    )
                 )
             ),
             ego_vehicle_simulation_options=EGO_VEHICLE_SIMULATION_OPTIONS,
