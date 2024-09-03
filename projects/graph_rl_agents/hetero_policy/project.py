@@ -19,6 +19,8 @@ from commonroad_geometric.dataset.extraction.traffic.feature_computers.implement
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_vehicle import *
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import (TrafficExtractorOptions,
                                                                                TrafficFeatureComputerOptions)
+
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
 from commonroad_geometric.dataset.scenario.preprocessing.preprocessors.implementations import *
 from commonroad_geometric.dataset.scenario.preprocessing.wrappers.chain_preprocessors import chain_preprocessors
 from commonroad_geometric.learning.reinforcement import RLEnvironmentOptions
@@ -190,45 +192,47 @@ class HeteroPolicyProject(BaseRLProject):
                 min_vehicles_route=None,
                 max_attempts_inner=5
             ),
-            traffic_extraction_options=TrafficExtractorOptions(
-                edge_drawer=TrafficFlowEdgeDrawer(
-                    base_edge_drawer=VoronoiEdgeDrawer(),
-                    dist_threshold=cfg["dist_threshold_v2v"]
-                ),
-                postprocessors=postprocessors,
-                only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
-                assign_multiple_lanelets=True,
-                ego_map_radius=cfg["ego_map_radius"],
-                ego_map_strict=True,
-                linear_lanelet_projection=cfg["linear_lanelet_projection"],
-                feature_computers=TrafficFeatureComputerOptions(
-                    v=[
-                        ft_veh_state,
-                        YawRateFeatureComputer(),
-                        VehicleLaneletConnectivityComputer(),
-                        VehicleLaneletPoseFeatureComputer(linear_lanelet_projection=True)
-                    ],
-                    v2v=[
-                        ft_same_lanelet,
-                        LaneletDistanceFeatureComputer(
-                            linear_lanelet_projection=cfg["linear_lanelet_projection"],
-                            max_lanelet_distance_placeholder=60.0 * 1.1,
-                            max_lanelet_distance=60.0
-                        ),
-                        ft_rel_state_ego,
-                        TimeToCollisionFeatureComputer(),
-                    ],
-                    l=[
-                        LaneletGeometryFeatureComputer(),
-                    ],
-                    l2l=[
-                        LaneletConnectionGeometryFeatureComputer(),
-                    ],
-                    v2l=[
-                        VehicleLaneletPoseEdgeFeatureComputer(
-                            linear_lanelet_projection=cfg["linear_lanelet_projection"]
-                        )
-                    ]
+            traffic_extraction_factory=TrafficExtractorFactory(
+                options=TrafficExtractorOptions(
+                    edge_drawer=TrafficFlowEdgeDrawer(
+                        base_edge_drawer=VoronoiEdgeDrawer(),
+                        dist_threshold=cfg["dist_threshold_v2v"]
+                    ),
+                    postprocessors=postprocessors,
+                    only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
+                    assign_multiple_lanelets=True,
+                    ego_map_radius=cfg["ego_map_radius"],
+                    ego_map_strict=True,
+                    linear_lanelet_projection=cfg["linear_lanelet_projection"],
+                    feature_computers=TrafficFeatureComputerOptions(
+                        v=[
+                            ft_veh_state,
+                            YawRateFeatureComputer(),
+                            VehicleLaneletConnectivityComputer(),
+                            VehicleLaneletPoseFeatureComputer(linear_lanelet_projection=True)
+                        ],
+                        v2v=[
+                            ft_same_lanelet,
+                            LaneletDistanceFeatureComputer(
+                                linear_lanelet_projection=cfg["linear_lanelet_projection"],
+                                max_lanelet_distance_placeholder=60.0 * 1.1,
+                                max_lanelet_distance=60.0
+                            ),
+                            ft_rel_state_ego,
+                            TimeToCollisionFeatureComputer(),
+                        ],
+                        l=[
+                            LaneletGeometryFeatureComputer(),
+                        ],
+                        l2l=[
+                            LaneletConnectionGeometryFeatureComputer(),
+                        ],
+                        v2l=[
+                            VehicleLaneletPoseEdgeFeatureComputer(
+                                linear_lanelet_projection=cfg["linear_lanelet_projection"]
+                            )
+                        ]
+                    )
                 )
             ),
             ego_vehicle_simulation_options=EgoVehicleSimulationOptions(

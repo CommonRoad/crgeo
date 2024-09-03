@@ -12,6 +12,7 @@ from commonroad_geometric.dataset.extraction.traffic.feature_computers.implement
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_lanelet import *
 from commonroad_geometric.dataset.extraction.traffic.feature_computers.implementations.vehicle_to_vehicle import *
 from commonroad_geometric.dataset.extraction.traffic.traffic_extractor import TrafficExtractorOptions, TrafficFeatureComputerOptions
+from commonroad_geometric.dataset.extraction.traffic.traffic_extractor_factory import TrafficExtractorFactory
 from commonroad_geometric.dataset.scenario.preprocessing.wrappers.chain_preprocessors import chain_preprocessors
 from commonroad_geometric.learning.reinforcement import RLEnvironmentOptions
 from commonroad_geometric.learning.reinforcement.experiment import RLExperiment, RLExperimentConfig
@@ -139,27 +140,28 @@ RENDERER_OPTIONS = [
 # Data extraction
 V_FEATURE_COMPUTERS = [
     ft_veh_state,
-    # GoalAlignmentComputer(
-    #     include_goal_distance_longitudinal=True,
-    #     include_goal_distance_lateral=True,
-    #     include_goal_distance=True,
-    #     include_lane_changes_required=True,
-    #     logarithmic=True
-    # ),
-    # YawRateFeatureComputer(),
-    # VehicleLaneletPoseFeatureComputer(
-    #     include_longitudinal_abs=False,
-    #     include_longitudinal_rel=False,
-    #     include_lateral_left=True,
-    #     include_lateral_right=True,
-    #     include_lateral_error=False,
-    #     include_heading_error=True,
-    #     update_exact_interval=10
-    # ),
+    GoalAlignmentComputer(
+        include_goal_distance_longitudinal=True,
+        include_goal_distance_lateral=True,
+        include_goal_distance=True,
+        include_lane_changes_required=True,
+        logarithmic=False,
+        closeness_transform=True
+    ),
+    YawRateFeatureComputer(),
+    VehicleLaneletPoseFeatureComputer(
+        include_longitudinal_abs=False,
+        include_longitudinal_rel=False,
+        include_lateral_left=True,
+        include_lateral_right=True,
+        include_lateral_error=False,
+        include_heading_error=True,
+        update_exact_interval=10
+    ),
     # # VehicleLaneletConnectivityComputer(),
-    # EgoFramePoseFeatureComputer(),
+    EgoFramePoseFeatureComputer(),
     # NumLaneletAssignmentsFeatureComputer(),
-    # DistanceToRoadBoundariesFeatureComputer()
+    DistanceToRoadBoundariesFeatureComputer()
 ]
 L_FEATURE_COMPUTERS = [
     LaneletGeometryFeatureComputer(),
@@ -210,24 +212,26 @@ class V2VPolicyProject(BaseRLProject):
                 min_vehicles_route=None,
                 max_attempts_inner=5
             ),
-            traffic_extraction_options=TrafficExtractorOptions(
-                edge_drawer=VoronoiEdgeDrawer(
-                    dist_threshold=cfg["dist_threshold_v2v"]
-                ) if cfg["edge_drawer_class_name"] != "KNearestEdgeDrawer" else KNearestEdgeDrawer(
-                    k=cfg["edge_drawer_k"],
-                    dist_threshold=cfg["dist_threshold_v2v"],
-                ),
-                feature_computers=TrafficFeatureComputerOptions(
-                    v=V_FEATURE_COMPUTERS,
-                    v2v=V2V_FEATURE_COMPUTERS,
-                    l=L_FEATURE_COMPUTERS,
-                    l2l=L2L_FEATURE_COMPUTERS,
-                    v2l=V2L_FEATURE_COMPUTERS,
-                ),
-                postprocessors=[],
-                only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
-                assign_multiple_lanelets=True,
-                ego_map_radius=cfg["ego_map_radius"]
+            traffic_extraction_factory=TrafficExtractorFactory(
+                options=TrafficExtractorOptions(
+                    edge_drawer=VoronoiEdgeDrawer(
+                        dist_threshold=cfg["dist_threshold_v2v"]
+                    ) if cfg["edge_drawer_class_name"] != "KNearestEdgeDrawer" else KNearestEdgeDrawer(
+                        k=cfg["edge_drawer_k"],
+                        dist_threshold=cfg["dist_threshold_v2v"],
+                    ),
+                    feature_computers=TrafficFeatureComputerOptions(
+                        v=V_FEATURE_COMPUTERS,
+                        v2v=V2V_FEATURE_COMPUTERS,
+                        l=L_FEATURE_COMPUTERS,
+                        l2l=L2L_FEATURE_COMPUTERS,
+                        v2l=V2L_FEATURE_COMPUTERS,
+                    ),
+                    postprocessors=[],
+                    only_ego_inc_edges=False,  # set to True to speed up extraction for 1-layer GNNs
+                    assign_multiple_lanelets=True,
+                    ego_map_radius=cfg["ego_map_radius"]
+                )
             ),
             ego_vehicle_simulation_options=EgoVehicleSimulationOptions(
                 vehicle_model=VehicleModel.KS,
