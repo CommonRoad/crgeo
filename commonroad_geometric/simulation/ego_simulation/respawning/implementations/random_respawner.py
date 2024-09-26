@@ -42,6 +42,7 @@ class RandomRespawnerOptions(BaseRespawnerOptions):
     min_remaining_distance: Optional[float] = None
     max_attempts_outer: int = 50
     min_vehicle_distance: Optional[float] = 12.0
+    future_timestep_count: int = 5
     min_vehicle_speed: Optional[float] = None
     min_vehicles_route: Optional[int] = None
     max_attempts_inner: int = 5
@@ -63,11 +64,51 @@ class RandomRespawner(BaseRespawner):
         self._options: RandomRespawnerOptions = options
         super().__init__(options=options)
 
+    def _check_future_vehicle_proximity(self, ego_vehicle_simulation: EgoVehicleSimulation, start_position: np.ndarray) -> bool:
+        """
+        Checks if any vehicles will pass within a certain distance from the ego vehicle within the next N timesteps.
+        Returns True if the ego vehicle's position is valid (i.e., no nearby vehicles in the future).
+        """
+        valid_lanelet_environment = True
+        future_timestep_count = self._options.future_timestep_count
+        min_future_vehicle_distance = self._options.min_vehicle_distance
+        
+        # Get the current time step
+        current_time_step = ego_vehicle_simulation.current_time_step
+
+        # Get all dynamic obstacles (vehicles) in the scenario
+        dynamic_obstacles = ego_vehicle_simulation.simulation.current_scenario.dynamic_obstacles
+
+        # Iterate over all dynamic obstacles (vehicles) to predict their future positions
+        for obstacle in dynamic_obstacles:
+
+            # Check each future timestep
+            for future_step in range(1, future_timestep_count + 1):
+                future_timestep = current_time_step + future_step
+                obstacle_state = state_at_time(obstacle, future_timestep, assume_valid=False)
+
+                # Ensure that the state is valid (vehicle exists at this future time)
+                if obstacle_state is None:
+                    continue
+
+                # Calculate the distance between the ego vehicle's starting position and the future position of the obstacle
+                obstacle_distance = np.linalg.norm(start_position - obstacle_state.position)
+
+                # If the obstacle is too close at any future timestep, return False
+                if obstacle_distance < min_future_vehicle_distance:
+                    valid_lanelet_environment = False
+                    break
+
+            if not valid_lanelet_environment:
+                break
+
+        return valid_lanelet_environment
+
     def _get_respawn_tuple(self, ego_vehicle_simulation: EgoVehicleSimulation) -> T_Respawn_Tuple:
         # assert ego_vehicle_simulation.simulation.current_time_step == 0
 
         if self._options.random_start_timestep and ego_vehicle_simulation.simulation.final_time_step is not Unlimited:
-            start_step_offset = self.rng.randint(0, int(ego_vehicle_simulation.simulation.final_time_step) // 4)
+            start_step_offset = self.rng.randint(int(ego_vehicle_simulation.simulation.initial_time_step), int(ego_vehicle_simulation.simulation.final_time_step) // 4)
             ego_vehicle_simulation._simulation = ego_vehicle_simulation.simulation( # TODO: Typing
                 from_time_step=start_step_offset,
                 ego_vehicle=ego_vehicle_simulation.ego_vehicle,
@@ -183,6 +224,8 @@ class RandomRespawner(BaseRespawner):
                     continue
                 if self._options.max_goal_distance_l2 is not None and goal_distance_l2 > self._options.max_goal_distance_l2:
                     continue
+                if goal_lanelet_id == start_lanelet_id and goal_arclength < start_arclength:
+                    continue
                 
                 if self._options.min_vehicle_distance is not None or self._options.min_vehicle_speed is not None or self._options.min_vehicles_route is not None:
                     valid_lanelet_environment = True
@@ -202,6 +245,10 @@ class RandomRespawner(BaseRespawner):
                         if obstacle_distance < self._options.min_vehicle_distance:
                             valid_lanelet_environment = False
                             break
+
+                    if valid_lanelet_environment:
+                        valid_lanelet_environment = self._check_future_vehicle_proximity(ego_vehicle_simulation, start_position)
+
                     if not valid_lanelet_environment:
                         continue
 
