@@ -32,6 +32,23 @@ The package aims to serve as a flexible framework that, without putting restrict
 
 ---
 
+## Citing this work
+
+If you use this work in your research, please cite it as follows:
+
+```bibtex
+@INPROCEEDINGS{meyer2023geometric,
+  author={Meyer, Eivind and Brenner, Maurice and Zhang, Bowen and Schickert, Max and Musani, Bilal and Althoff, Matthias},
+  booktitle={2023 IEEE Intelligent Vehicles Symposium (IV)}, 
+  title={Geometric Deep Learning for Autonomous Driving: Unlocking the Power of Graph Neural Networks With CommonRoad-Geometric}, 
+  year={2023},
+  volume={},
+  number={},
+  pages={1-8},
+  doi={10.1109/IV55152.2023.10186741}
+}
+```
+
 
 # Getting started
 
