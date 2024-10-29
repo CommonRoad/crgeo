@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from typing import Optional
-
+import numpy as np
 import torch
 
 from commonroad_geometric.common.io_extensions.obstacle import state_at_time
@@ -20,6 +20,22 @@ class RenderObstaclePlugin(BaseRenderObstaclePlugin):
     graph_vertices_attr: Optional[str] = "vertices"
     graph_position_attr: Optional[str] = "pos"
     graph_orientation_attr: Optional[str] = "orientation"
+    vehicle_expansion: float = 1.0  # Scale factor for vehicle size
+
+    def _expand_vertices(self, vertices: list) -> list:
+        """
+        Expand vertices using a simple scaling transformation around centroid
+        """
+        # Convert to numpy array for easier manipulation
+        vertices_array = np.array(vertices)
+        
+        # Calculate centroid
+        centroid = np.mean(vertices_array, axis=0)
+        
+        # Translate to origin, scale, then translate back
+        expanded_vertices = (vertices_array - centroid) * self.vehicle_expansion + centroid
+        
+        return expanded_vertices
 
     def render(
         self,
@@ -60,6 +76,8 @@ class RenderObstaclePlugin(BaseRenderObstaclePlugin):
 
             state = state_at_time(obstacle, params.time_step)
             vertices = obstacle.obstacle_shape.vertices
+            if self.vehicle_expansion != 1.0:
+                vertices = self._expand_vertices(vertices)
 
             color = self.obstacle_color
             fill_color = self.obstacle_fill_color
@@ -137,6 +155,8 @@ class RenderObstaclePlugin(BaseRenderObstaclePlugin):
 
             if self.graph_vertices_attr is not None:
                 vertices = params.data.v[self.graph_vertices_attr][index].reshape(-1, 2).numpy(force=True)
+                if self.vehicle_expansion != 1.0:
+                    vertices = self._expand_vertices(vertices)
                 position = params.data.v[self.graph_position_attr][index].numpy(force=True)
                 orientation = params.data.v[self.graph_orientation_attr][index].numpy(force=True)
                 viewer.draw_2d_shape(
