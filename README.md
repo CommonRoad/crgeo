@@ -63,12 +63,9 @@ The easiest way of getting familiar with the framework is to consult the [tutori
 
 # Installation
 
-The installation script [`scripts/create-dev-environment.sh`](scripts/create-dev-environment.sh) installs the commonroad-geometric package and all its dependencies into a conda environment:
+Install PyTorch and PyTorch-Geometric versions compatible with your CUDA setup.
 
-Execute the script inside the directory which you want to use for your development environment.
-
-Note: make sure that the CUDA versions are compatible with your setup.
-
+Then install commonroad-geometric using pip from this repository.
 
 ### Note: Headless rendering
 If you want to export the rendering frames without the animation window popping up, please use the command given below.
