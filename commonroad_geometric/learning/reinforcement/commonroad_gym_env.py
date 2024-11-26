@@ -94,6 +94,7 @@ class CommonRoadGymStepInfo(TypedDict):
     total_num_obstacles: int
     reward_component_episode_info: Optional[Dict[str, Dict[str, float]]]
     vehicle_aggregate_stats: Dict[str, Dict[str, float]]
+    vehicle_current_state: Dict[str, float]
     cumulative_reward: float
     done: bool
     elapsed: float
@@ -124,6 +125,7 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
             directory=Path(params.scenario_dir),
             is_looping=params.options.loop_scenarios,
             preprocessor=params.options.preprocessor,
+            seed=get_random_seed()
         )
         self._scenario_iterable = iter(self._scenario_iterator)
         self._ego_vehicle_simulation_factory = params.ego_vehicle_simulation_factory
@@ -216,6 +218,14 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
     @property
     def termination_reasons(self) -> Set[str]:
         return self._termination_reasons
+    
+    @property
+    def observer(self) -> BaseObserver:
+        return self._observer
+    
+    @property
+    def last_obs(self) -> Optional[Union[Dict[str, np.ndarray], np.ndarray]]:
+        return self._last_obs
 
     @property
     def scenario_iterable(self) -> Iterator[ScenarioBundle]:
@@ -312,6 +322,7 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
             total_num_obstacles=len(self.ego_vehicle_simulation.current_scenario.dynamic_obstacles) - 1,
             reward_component_episode_info=self._rewarder.component_aggregate_info() if done else None,
             vehicle_aggregate_stats=self.ego_vehicle_simulation.ego_vehicle.aggregate_state_statistics,
+            vehicle_current_state=self.ego_vehicle_simulation.ego_vehicle.state.__dict__,
             cumulative_reward=self._rewarder.cumulative_reward,
             done=done,
             elapsed=elapsed,
