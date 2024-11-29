@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
 from random import Random
-from typing import Dict, Optional, TYPE_CHECKING, Tuple
+from typing import Dict, Optional, TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 from commonroad.common.util import AngleInterval, Interval
@@ -41,7 +41,6 @@ class BaseRespawnerOptions:
     max_curvature: Optional[float] = None
     use_cached: bool = False
 
-
 class BaseRespawner(ABC, AutoReprMixin, StringResolverMixin):
     """
     Base class for spawning the ego vehicle in the traffic environment as well as
@@ -50,9 +49,14 @@ class BaseRespawner(ABC, AutoReprMixin, StringResolverMixin):
 
     def __init__(
         self,
-        options: BaseRespawnerOptions
+        options: Union[BaseRespawnerOptions, Dict]
     ) -> None:
-        self._options = options
+        # Ensure options is always a BaseRespawnerOptions object
+        if isinstance(options, dict):
+            self._options = BaseRespawnerOptions(**options)
+        else:
+            self._options = options if options is not None else BaseRespawnerOptions()
+        
         self.rng = Random()
         self._respawn_cache: Dict[str, T_Respawn_Tuple] = {}
 

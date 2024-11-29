@@ -141,6 +141,11 @@ class ScenarioIterator(Iterable[ScenarioBundle], AutoReprMixin):
         logger.debug(f"Starting preprocessing worker")
         self._preprocessing_worker.start()
 
+        # Attributes for iteration state
+        self._result_iterator = None  # Iterator over preprocessing results
+        self._current_scenario_bundles = []  # List of scenario bundles from the current preprocessing result
+        self._current_bundle_index = 0  # Index within the current scenario bundles
+
     def _shuffle_scenario_paths(self, seed: int = None) -> None:
         """
         Shuffles internal scenario paths.
@@ -172,16 +177,44 @@ class ScenarioIterator(Iterable[ScenarioBundle], AutoReprMixin):
     def max_result_scenarios(self) -> int:
         return len(self._scenario_paths) * self.result_scenarios_per_scenario
 
-    def __iter__(self) -> Iterator[ScenarioBundle]:
+    def __iter__(self) -> 'ScenarioIterator':
         """
         Returns:
-            Iterator over preprocessed ScenarioBundle's retrieved from preprocessing worker
+            Self as an iterator over preprocessed ScenarioBundle's retrieved from preprocessing worker
         """
         self._preprocessing_worker.request_preprocessing(scenario_paths=self._scenario_paths)
         # Stops when get_next_preprocessing_result returns sentinel None
-        result_iterator = iter(self._preprocessing_worker.get_next_preprocessing_result, None)
-        for preprocessing_result in result_iterator:
-            for scenario_bundle in preprocessing_result:
-                yield scenario_bundle
+        self._result_iterator = iter(self._preprocessing_worker.get_next_preprocessing_result, None)
+        self._current_scenario_bundles = []
+        self._current_bundle_index = 0
+        return self
 
-        self._preprocessing_worker.shutdown()
+    def __next__(self) -> ScenarioBundle:
+        """
+        Returns:
+            The next ScenarioBundle from the preprocessing worker
+        """
+        # Check if there are more bundles in the current preprocessing result
+        if self._current_bundle_index < len(self._current_scenario_bundles):
+            scenario_bundle = self._current_scenario_bundles[self._current_bundle_index]
+            self._current_bundle_index += 1
+            return scenario_bundle
+
+        # Try to get the next preprocessing result
+        try:
+            preprocessing_result = next(self._result_iterator)
+        except StopIteration:
+            self._preprocessing_worker.shutdown()
+            raise StopIteration
+
+        if preprocessing_result is None:
+            # No more results; shutdown the worker and raise StopIteration
+            self._preprocessing_worker.shutdown()
+            raise StopIteration
+
+        # Update the current scenario bundles and reset the index
+        self._current_scenario_bundles = preprocessing_result
+        self._current_bundle_index = 0
+
+        # Recursively call __next__ to return the next bundle
+        return self.__next__()

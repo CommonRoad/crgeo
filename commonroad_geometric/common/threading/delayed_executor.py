@@ -91,14 +91,26 @@ class DelayedExecutor(AutoReprMixin):
         fn: AnyCallable[T_AnyReturn]
     ) -> AnyCallable[T_AnyReturn]:
         """
-        Creates a new function with injected delays.
+            Creates a new function with injected delays.
         """
-        # Check if fn is a function or method with accessible source code
-        try:
-            source_code = inspect.getsourcelines(fn)[0]
-        except (TypeError, OSError) as e:
-            logger.debug(f"Cannot inject delays into {fn}: {e}")
-            return fn  # Return the original function without modification
+        if not self._enabled or self._delay == 0.0:
+            return fn
+
+        if inspect.isgeneratorfunction(fn):
+            # Handle generator functions
+            def delayed_gen(*args, **kwargs):
+                gen = fn(*args, **kwargs)
+                for value in gen:
+                    self._sleeper()
+                    yield value
+            return delayed_gen
+        else:
+            # Existing code for normal functions
+            try:
+                source_code = inspect.getsourcelines(fn)[0]
+            except (TypeError, OSError) as e:
+                logger.debug(f"Cannot inject delays into {fn}: {e}")
+                return fn  # Return the original function without modification
 
         # Proceed with delay injection as before
         sleep_statement = '_Sleeper()'

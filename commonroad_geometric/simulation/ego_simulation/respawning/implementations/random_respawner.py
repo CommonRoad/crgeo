@@ -7,6 +7,7 @@ from typing import Optional, TYPE_CHECKING, Tuple, Union
 import networkx as nx
 import numpy as np
 from commonroad.scenario.state import State, InitialState
+from scipy.spatial import cKDTree
 
 from commonroad_geometric.common.io_extensions.lanelet_network import lanelet_orientation_at_position, map_out_lanelets_to_intersections
 from commonroad_geometric.common.io_extensions.obstacle import state_at_time
@@ -69,40 +70,34 @@ class RandomRespawner(BaseRespawner):
         Checks if any vehicles will pass within a certain distance from the ego vehicle within the next N timesteps.
         Returns True if the ego vehicle's position is valid (i.e., no nearby vehicles in the future).
         """
-        valid_lanelet_environment = True
         future_timestep_count = self._options.future_timestep_count
         min_future_vehicle_distance = self._options.min_vehicle_distance
-        
-        # Get the current time step
-        current_time_step = ego_vehicle_simulation.current_time_step
 
-        # Get all dynamic obstacles (vehicles) in the scenario
+        current_time_step = ego_vehicle_simulation.current_time_step
         dynamic_obstacles = ego_vehicle_simulation.simulation.current_scenario.dynamic_obstacles
 
-        # Iterate over all dynamic obstacles (vehicles) to predict their future positions
-        for obstacle in dynamic_obstacles:
+        for future_step in range(1, future_timestep_count + 1):
+            future_timestep = current_time_step + future_step
 
-            # Check each future timestep
-            for future_step in range(1, future_timestep_count + 1):
-                future_timestep = current_time_step + future_step
+            obstacle_positions = []
+            for obstacle in dynamic_obstacles:
                 obstacle_state = state_at_time(obstacle, future_timestep, assume_valid=False)
+                if obstacle_state is not None:
+                    obstacle_positions.append(obstacle_state.position)
 
-                # Ensure that the state is valid (vehicle exists at this future time)
-                if obstacle_state is None:
-                    continue
+            if not obstacle_positions:
+                continue  # No obstacles at this timestep
 
-                # Calculate the distance between the ego vehicle's starting position and the future position of the obstacle
-                obstacle_distance = np.linalg.norm(start_position - obstacle_state.position)
+            # Build KD-tree for current future timestep
+            obstacle_positions = np.array(obstacle_positions)
+            kd_tree = cKDTree(obstacle_positions)
 
-                # If the obstacle is too close at any future timestep, return False
-                if obstacle_distance < min_future_vehicle_distance:
-                    valid_lanelet_environment = False
-                    break
+            # Query the KD-tree to find obstacles within the minimum distance
+            indices = kd_tree.query_ball_point(start_position, r=min_future_vehicle_distance)
+            if indices:
+                return False  # Obstacle found within the minimum distance
 
-            if not valid_lanelet_environment:
-                break
-
-        return valid_lanelet_environment
+        return True  # No obstacles within the minimum distance in future timesteps
 
     def _get_respawn_tuple(self, ego_vehicle_simulation: EgoVehicleSimulation) -> T_Respawn_Tuple:
         # assert ego_vehicle_simulation.simulation.current_time_step == 0
@@ -203,7 +198,7 @@ class RandomRespawner(BaseRespawner):
             attempts_inner: int = -1
             while attempts_inner < self._options.max_attempts_inner:
                 attempts_inner += 1
-                start_offset = 10.0 if not start_lanelet.predecessor else 1.0
+                start_offset = self._options.min_init_arclength if not start_lanelet.predecessor else 1.0
                 final_offset = 10.0 if not goal_lanelet.successor else 1.0
                 if self._options.random_init_arclength:
                     start_arclength = start_offset + (start_lanelet.distance[-1] - final_offset) * self.rng.random()
@@ -217,9 +212,9 @@ class RandomRespawner(BaseRespawner):
                 goal_distance_l2 = np.linalg.norm(self._goal_position - start_position)
 
                 if goal_distance < 0 or self._options.min_goal_distance is not None and goal_distance < self._options.min_goal_distance:
-                    continue
+                    continue # Invalid because too close to goal
                 if self._options.min_goal_distance_l2 is not None and goal_distance_l2 < self._options.min_goal_distance_l2:
-                    continue
+                    continue # Invalid because too close to goal
                 if self._options.max_goal_distance is not None and goal_distance > self._options.max_goal_distance:
                     continue
                 if self._options.max_goal_distance_l2 is not None and goal_distance_l2 > self._options.max_goal_distance_l2:
