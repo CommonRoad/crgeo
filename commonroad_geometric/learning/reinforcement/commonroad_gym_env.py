@@ -160,20 +160,20 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
             self._observer = params.options.observer()  # Call the function if it's callable
         else:
             self._observer = params.options.observer  # Directly assign if it's already an instance
-            
+
         # With removal of seed method from Env API, the seed is now passed to reset
         # Need to keep track of last seed to prevent reshuffling the ScenarioIterator on every reset
         self._last_seed = None
 
         while True:
-            try:
-                self._resetter.on_init()
-                self._observation_space = self._observer.setup(
-                    dummy_data=self.ego_vehicle_simulation.extract_data() if not self.options.disable_graph_extraction else None
-                )
-                break
-            except Exception as e:
-                logger.error(e, exc_info=True)
+            # try:
+            self._resetter.on_init()
+            self._observation_space = self._observer.setup(
+                dummy_data=self.ego_vehicle_simulation.extract_data() if not self.options.disable_graph_extraction else None
+            )
+            break
+            # except Exception as e:
+            #     logger.error(e, exc_info=True)
 
     @property
     def action_space(self) -> gymnasium.Space:
@@ -524,7 +524,7 @@ class CommonRoadGymEnv(gymnasium.Env, Generic[T_SimulationOptions]):
             expected_shape = self.observation_space.shape
             # Check if the shape of the observation matches the expected shape
             if obs.shape != expected_shape:
-                raise ValueError(f"Dimension mismatch for {key}: expected {expected_shape}, got {value.shape}")
+                raise ValueError(f"Dimension mismatch for obs: expected {expected_shape}, got {obs.shape}")
         elif isinstance(self.observation_space, gymnasium.spaces.Dict):
             observation_space = dict(self.observation_space)
             # Iterate through the keys and values in the obs dictionary
